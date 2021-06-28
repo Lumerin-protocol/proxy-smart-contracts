@@ -1,3 +1,5 @@
-# Project Test
+# Token Test
 npx hardhat test
 
+# Deploy Token to Mainnet or specific Network
+npx hardhat run scripts/deploy.js --network <the-network-name>
