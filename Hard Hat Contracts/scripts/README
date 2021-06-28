@@ -1,0 +1,2 @@
+# Deploy Token to Network
+npx hardhat run scripts/deploy.js --network <the-network-name>
