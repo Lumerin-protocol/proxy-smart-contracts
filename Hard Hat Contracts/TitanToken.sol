@@ -1,4 +1,4 @@
-pragma solidity ^0.7.0;
+pragma solidity ^0.7.3;
 
 // Debug: import "hardhat/console.sol"; <-- Remove before release
 contract TitanToken {
