@@ -1,5 +1,6 @@
 pragma solidity ^0.7.0;
 
+// Debug: import "hardhat/console.sol"; <-- Remove before release
 contract TitanToken {
     // Some string type variables to identify the token.
     // The `public` modifier makes a variable readable from outside the contract.
