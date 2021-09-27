@@ -18,7 +18,7 @@ contract LumerinToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeab
     }
 
     function mint(address to, uint256 amount) public onlyOwner {
-        _mint(to, amount);
+        _mint(to, amount * 10 ** 8);
     }
 
     function pause() public onlyOwner {
