@@ -1,24 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.2;
 
-import "./@openzeppelin/openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
-import "./@openzeppelin/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
-import "./@openzeppelin/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
-import "./@openzeppelin/openzeppelin-contracts-upgradeable/contracts/security/PausableUpgradeable.sol";
-import "./@openzeppelin/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
-import "./@openzeppelin/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract LumerinToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, PausableUpgradeable, OwnableUpgradeable {
-
-    function initialize() public initializer {
-        __ERC20_init("Lumerin","LMR");
-        __ERC20Burnable_init();
+contract TitanToken is Initializable, ERC20Upgradeable, PausableUpgradeable, OwnableUpgradeable {
+    function initialize() initializer public {
+        __ERC20_init("Lumerin", "LMR");
         __Pausable_init();
         __Ownable_init();
-    }
 
-    function mint(address to, uint256 amount) public onlyOwner {
-        _mint(to, amount * 10 ** 8);
+        _mint(msg.sender, 1000000000 * 10 ** 8);
     }
 
     function pause() public onlyOwner {
@@ -28,10 +22,16 @@ contract LumerinToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeab
     function unpause() public onlyOwner {
         _unpause();
     }
-    
-    function _beforeTokenTransfer(address from, address to, uint256 amount) internal whenNotPaused override
+
+    function mint(address to, uint256 amount) public onlyOwner {
+        _mint(to, amount);
+    }
+
+    function _beforeTokenTransfer(address from, address to, uint256 amount)
+        internal
+        whenNotPaused
+        override
     {
         super._beforeTokenTransfer(from, to, amount);
     }
-    
 }
