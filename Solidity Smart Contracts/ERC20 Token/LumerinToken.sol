@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.2;
 
-import "./@openzeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.2/contracts/token/ERC20/ERC20Upgradeable.sol";
-import "./@openzeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.2/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
-import "./@openzeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.2/contracts/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
-import "./@openzeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.2/contracts/security/PausableUpgradeable.sol";
-import "./@openzeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.2/contracts/access/OwnableUpgradeable.sol";
-import "./@openzeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.2/contracts/proxy/utils/Initializable.sol";
+import "./@openzeppelin/openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
+import "./@openzeppelin/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
+import "./@openzeppelin/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
+import "./@openzeppelin/openzeppelin-contracts-upgradeable/contracts/security/PausableUpgradeable.sol";
+import "./@openzeppelin/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
+import "./@openzeppelin/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 
 contract LumerinToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, PausableUpgradeable, OwnableUpgradeable {
 
