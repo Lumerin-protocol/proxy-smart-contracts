@@ -1,7 +1,0 @@
-## Titan Token
-
-## Basics
-
-1). Minting
-
-2). Pausable
