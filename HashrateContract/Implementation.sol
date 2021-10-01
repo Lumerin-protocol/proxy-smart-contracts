@@ -23,7 +23,7 @@ contract Implementation is Initializable, Escrow{
   uint public speed; //th/s of contract
   uint public length; //how long the contract will last in days
   uint public port; //port provided by buyer
-  uint public validationFee; //fee required to fund the validator
+  uint public validationFee; //validator fee, may not be included in the contract depending on future state of documentation
   address public buyer; //address of the current purchaser of the contract
   address public seller; //address of the seller of the contract
   address contractManager; //should be hardcoded somewhere...
@@ -51,7 +51,6 @@ contract Implementation is Initializable, Escrow{
     contractManager = _contractManager;
     contractState = ContractState.Available;
     approved[seller] = true;
-    approved[buyer] = true;
     setParameters(contractManager, _lmn);
   }
 
@@ -72,16 +71,14 @@ contract Implementation is Initializable, Escrow{
   
 
   //need to remove lmn from contract call, also need to remove from webfacing
-  function setPurchaseContract(string memory _ipaddress, string memory _username, string memory _password) external payable {
-    require(msg.value == validationFee, "validation fee is incorrect");
+  function setPurchaseContract(string memory _ipaddress, string memory _username, string memory _password, address _buyer) external payable {
     require(contractState == ContractState.Available, "contract is not in an available state");
-    payable(contractManager).transfer(msg.value); //sending funds to contract manager address
     ipaddress = _ipaddress;
     username = _username;
     password = _password;
-    contractState = ContractState.Running;
-    //set the values for the escrow portion of the contract
-    createEscrow(seller, msg.sender, price);
+    buyer = _buyer;
+    createEscrow(seller, buyer, price);
+    approved[_buyer] = true;
     emit contractPurchased(msg.sender); //might need to replace this with an additional passed in variable for the contract purchaser
   }
 
@@ -102,18 +99,20 @@ contract Implementation is Initializable, Escrow{
 
   //function which checks to see if lumerin has been sent to the contracts address
   function setFundContract() external {
+    //if escrow is fully funded, set contract state to running
+    require(dueAmount() == 0, "lumerin tokens need to be sent to the contract");
+    contractState = ContractState.Running;
 
   }
 
   //called by the contract manager when the contractCanceled event is emitted
   //determines how many lumerin tokens should go to the buyer and how many should go to the seller
   function setPenaltyCloseOut(uint _hashesCompleted) external onlyContractManager {
-    uint sellerReimbursement = price*(limit-_hashesCompleted)/limit;
-    uint buyerReimbursement = price*_hashesCompleted/limit;
-    uint difference = Math.max(sellerReimbursement, buyerReimbursement) - Math.min(sellerReimbursement, buyerReimbursement);
+    uint sellerReimbursement = price*(limit-_hashesCompleted)/limit; //will always return the floor
+    uint buyerReimbursement = price*_hashesCompleted/limit; //will always return the floor
+    uint difference = price-(sellerReimbursement+buyerReimbursement);
 
     if (penaltyTarget == seller) {
-      //seller looses out on the rounding error
       buyerReimbursement += difference;
     } else {
       sellerReimbursement += difference;
@@ -122,3 +121,4 @@ contract Implementation is Initializable, Escrow{
     contractState = ContractState.Complete;
   }
 }
+
