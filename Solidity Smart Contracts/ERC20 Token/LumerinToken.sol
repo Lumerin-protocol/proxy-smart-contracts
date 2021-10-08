@@ -1,17 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.2;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract TitanToken is Initializable, ERC20Upgradeable, PausableUpgradeable, OwnableUpgradeable {
-    function initialize() initializer public {
-        __ERC20_init("Lumerin", "LMR");
-        __Pausable_init();
-        __Ownable_init();
-
+contract Lumerin is ERC20, ERC20Burnable, Pausable, Ownable {
+    constructor() ERC20("Lumerin", "LMR") {
         _mint(msg.sender, 1000000000 * 10 ** 8);
     }
 
@@ -23,10 +19,6 @@ contract TitanToken is Initializable, ERC20Upgradeable, PausableUpgradeable, Own
         _unpause();
     }
 
-    function mint(address to, uint256 amount) public onlyOwner {
-        _mint(to, amount);
-    }
-
     function _beforeTokenTransfer(address from, address to, uint256 amount)
         internal
         whenNotPaused
@@ -34,4 +26,5 @@ contract TitanToken is Initializable, ERC20Upgradeable, PausableUpgradeable, Own
     {
         super._beforeTokenTransfer(from, to, amount);
     }
+
 }
