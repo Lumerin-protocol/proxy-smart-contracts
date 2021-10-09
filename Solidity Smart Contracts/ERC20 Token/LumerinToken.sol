@@ -8,8 +8,13 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract Lumerin is ERC20, ERC20Burnable, Pausable, Ownable {
     constructor() ERC20("Lumerin", "LMR") {
-        _mint(msg.sender, 1000000000 * 10 ** 8);
+        _mint(msg.sender, 1000000000 * 10 ** decimals());
     }
+
+    function decimals() public view virtual override returns (uint8) {
+        return 8;
+    }
+
 
     function pause() public onlyOwner {
         _pause();
