@@ -5,38 +5,23 @@ pragma solidity ^0.8.0;
 /// @author Lance Seidman (Lumerin)
 /// @notice This first version will be used to hold lumerin temporarily for the Marketplace Hash Rental.
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "./LumerinToken.sol";
 
 
 contract Escrow {
     
-    enum State {AWAITING_PAYMENT, COMPLETE, FUNDED}
-    State public currentState;
 
     address public escrow_purchaser; // Entity making a payment...
     address public escrow_seller;  // Entity to receive funds...
-    //@dev would it make sense to have the escrow_validator also be public so people know the history of this mediator
-    //@dev would it make sense to consider the escrow_validator and the hashrate validator to be the same entity?
-    address escrow_validator;  // For dispute management...
     address titanToken;
     uint256 public contractTotal; // How much should be escrowed...
     uint256 public receivedTotal; // Optional; Keep a balance for how much has been received...
-    ERC20 myToken;
+    Lumerin myToken;
     
-    event dataEvent(uint256 date, string val);
-    
-   
-    // @notice Run once the contract is created. Set contract owner, which is assumed to be the Validator.
-    // @dev We're making the sender (releaser to the BC) the Validator and set the State of the contract.
-    constructor() {
-        currentState = State.AWAITING_PAYMENT;
-    }
-
     //internal function which will be called by the hashrate contract
     function setParameters(address _validator, address _titanToken) internal { 
-        escrow_validator = _validator;
         titanToken = _titanToken;
-        myToken = ERC20(titanToken);
+        myToken = Lumerin(titanToken);
     }
 
     // @notice This will create a new escrow based on the seller, buyer, and total.
@@ -46,8 +31,6 @@ contract Escrow {
         escrow_seller = _escrow_seller;
         escrow_purchaser = _escrow_purchaser;
         contractTotal = _lumerinTotal;
-        
-        emit dataEvent(block.timestamp, 'Escrow Created');
     }
 
     
@@ -64,8 +47,5 @@ contract Escrow {
     function withdrawFunds(uint _seller, uint _buyer) internal {
             myToken.transfer(escrow_seller, _seller);
             myToken.transfer(escrow_purchaser, _buyer);
-
-            currentState = State.COMPLETE; 
-            emit dataEvent(block.timestamp, 'Contract Completed');
     }
 }

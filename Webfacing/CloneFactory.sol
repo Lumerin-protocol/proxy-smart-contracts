@@ -33,10 +33,11 @@ contract CloneFactory {
     uint _limit,
     uint _speed,
     uint _length,
+    uint _validationFee,
     address _seller
   ) external returns (address) {
     address _newContract = Clones.clone(baseImplementation); 
-    Implementation(_newContract).initialize(_price, _limit, _speed, _length, _seller, validator, lmnDeploy);
+    Implementation(_newContract).initialize(_price, _limit, _speed, _length, _validationFee, _seller, validator, lmnDeploy);
     emit contractCreated(_newContract);
     return _newContract;
   }

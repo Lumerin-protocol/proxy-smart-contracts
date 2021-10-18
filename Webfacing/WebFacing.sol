@@ -12,9 +12,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 /// @notice Additional functions may be added as project needs evolve
 
 contract WebFacing is Ownable{
-  // top level smart contract which will provide access to the 
-  // entire smart contract deployment ecosystem
-
   Ledger l; //contract object for the ledger
   CloneFactory cf; //contract object for the clone factory
 
@@ -30,9 +27,11 @@ contract WebFacing is Ownable{
     uint _price, 
     uint _limit, 
     uint _speed, 
-    uint _length) 
+    uint _length,
+    uint _validationFee
+  ) 
     external returns (address){
-    address newAddress = cf.setCreateNewRentalContract(_price, _limit, _speed, _length, msg.sender); 
+    address newAddress = cf.setCreateNewRentalContract(_price, _limit, _speed, _length, _validationFee, msg.sender); 
     l.setAddContractToStorage(newAddress); 
     return newAddress;
   }
@@ -43,19 +42,16 @@ contract WebFacing is Ownable{
   }
 
   
-  function setPurchaseContract(address _contract, address _buyer, string memory _ip_address, string memory _username, string memory _password) 
+  function setPurchaseContract(address _contract, 
+                              address _buyer, 
+                              address _validator, 
+                              bool _withValidator, 
+                              string memory _ip_address, 
+                              string memory _username, 
+                              string memory _password) 
     public payable { 
-    Implementation(_contract).setPurchaseContract(_ip_address, _username, _password, _buyer); 
+    Implementation(_contract).setPurchaseContract(_ip_address, _username, _password, _buyer, _validator, _withValidator); 
     // add in function call to ledger to update contracts buyer variable
     emit contractPurchase(_contract); 
-  }
-
-  function setUpdateLedgerAddress(address _ledgerAddress) public onlyOwner {
-    l = Ledger(_ledgerAddress);
-  }
-
-
-  function setUpdateCloneFactoryAddress(address _cfAddress) public onlyOwner {
-    cf = CloneFactory(_cfAddress);
   }
 }
