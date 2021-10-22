@@ -3102,10 +3102,16 @@
       "links": {},
       "address": "0x0290FB167208Af455bB137780163b7B7a9a10C16",
       "transactionHash": "0x7d6448917a9019d032ee06c72935dc8414829e3fc1da9a5bc4b72581f7406c8a"
+    },
+    "1634917897480": {
+      "events": {},
+      "links": {},
+      "address": "0xe982E462b094850F12AF94d21D470e21bE9D0E9C",
+      "transactionHash": "0xc2f5a0713b8f272cfcdbaa01f1eb355dd0c21bd8c86843d1b7474eccd55ea0f5"
     }
   },
   "schemaVersion": "3.4.2",
-  "updatedAt": "2021-10-21T23:06:56.839Z",
+  "updatedAt": "2021-10-22T15:56:12.367Z",
   "networkType": "ethereum",
   "devdoc": {
     "author": "Josh Kean (Lumerin)",
