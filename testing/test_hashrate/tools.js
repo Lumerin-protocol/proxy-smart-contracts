@@ -2,6 +2,12 @@ let fs = require('fs')
 let {exec} = require('child_process')
 let sleep = require('sleep')
 let validatorAddress = "0xD12b787E2F318448AE2Fd04e51540c9cBF822e89";
+let EthCrypto = require('eth-crypto');
+
+const encryption = require('./enrypt.js')
+
+const sellerPrivateKey = "0x7c22ec64023216056a39e91d90f83ac4e296f27c56c9773220e6dab940e6ffe9"
+const sellerPublicKey = EthCrypto.publicKeyByPrivateKey(sellerPrivateKey)
 
 function getContractJSON(name) {
 	let path = `./build/contracts/${name}.json`;
@@ -58,9 +64,15 @@ async function waitForBlock(n, startingBlock, web3) {
 }
 
 async function purchaseContract(hashrateContract, buyerAddress, withValidator, expectPurchaseError, customFee) {
-	let ipAddress = "127.0.0.1";
-	let username = "titan";
-	let password = "can I have a raise please"
+	ip = "127.0.0.1"
+	port = "8000"
+	username = "Kodee is in arkansas"
+	let encryptedData;
+	await encryption.encrypt(
+		ip, port, username, sellerPrivateKey, sellerPublicKey
+	).then(r => encryptedData = r)
+	//encryptedData = "josh is great"
+	
 	let result;
 	let validationFee = 0;
 	if (withValidator) {
@@ -71,7 +83,7 @@ async function purchaseContract(hashrateContract, buyerAddress, withValidator, e
 	await contractSendFunction(
 		hashrateContract.methods.setPurchaseContract, 
 		buyerAddress, 
-		[ipAddress, username, password, buyerAddress, validatorAddress, withValidator],
+		[encryptedData, buyerAddress, validatorAddress, withValidator],
 		expectPurchaseError,
 		validationFee
 	).then(r => result = r)
@@ -127,6 +139,7 @@ async function contractSendFunction(contractCall, seller, args, expectError=fals
 			}
 		}
 	}
+	sleep.sleep(3)
 	return result
 }
 
@@ -144,7 +157,8 @@ async function genericPurchaseContract(
 								withValidator,
 								halfLmn = false,
 								expectPurchaseError = false,
-								customFee = false
+								customFee = false,
+								doubleLumerin = 1
 	) {
 	let hashrateContract;
 	let sellerLumerin;
@@ -157,7 +171,7 @@ async function genericPurchaseContract(
 	let contract = getContractJSON('Implementation');
 	hashrateContract = new web3.eth.Contract(contract.abi, hashrateContractAddress)
 
-	await purchaseContract(hashrateContract, buyerAddress, withValidator, expectPurchaseError, customFee).then(r => mutex = r)
+	await purchaseContract(hashrateContract, buyerAddress, withValidator, expectPurchaseError, customFee, doubleLumerin).then(r => mutex = r)
 	if (mutex == "Expected Error") { //fails early if mutex is an expected error
 		returnObject = {
 			i0: hashrateContract,
@@ -178,7 +192,7 @@ async function genericPurchaseContract(
 	await contractSendFunction(
 		token.methods.transfer, 
 		buyerAddress, 
-		[hashrateContractAddress,parseInt(contractPrice)]
+		[hashrateContractAddress,parseInt(contractPrice)*doubleLumerin]
 	).then(r => purchaseBlock = parseInt(r["blockNumber"]))
 
 	await contractSendFunction(

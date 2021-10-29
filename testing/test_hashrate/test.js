@@ -5,6 +5,7 @@ let Web3 = require('web3') //web3.js library used to interact with blockchain
 let sleep = require('sleep')
 let tools = require('./tools.js')
 let validatorAddress = "0xD12b787E2F318448AE2Fd04e51540c9cBF822e89";
+let encryption = require('./enrypt.js')
 
 
 //before all the tests run, they should 
@@ -19,7 +20,6 @@ let validatorAddress = "0xD12b787E2F318448AE2Fd04e51540c9cBF822e89";
 
 //all testing will take place on a fresh contract deployment
 describe('tests to ensure contracts uploaded successfully', function() {
-	//this.timeout(180000)
 	this.timeout(120000)
 	let web3, hashrateContractAddress, webfacing, clonefactory, ledger;
 	let accounts, sellerAddress, buyerAddress, token;
@@ -79,18 +79,9 @@ describe('tests to ensure contracts uploaded successfully', function() {
 	//checks to see if the address of the ledger, and clone factory
 	//are what they're expected to be during the deployment process
 	it('check to make sure contracts have correct addresses', function() {
-		assert.equal(
-									webfacing.options.address,
-									JSON.parse(fs.readFileSync('contractAddresses.json'))
-									.webfacingAddress, "webfacing has a bad address")
-		assert.equal(
-									ledger.options.address,
-									JSON.parse(fs.readFileSync('contractAddresses.json'))
-									.ledgerAddress, "ledger has a bad address")
-		assert.equal(
-									clonefactory.options.address,
-									JSON.parse(fs.readFileSync('contractAddresses.json'))
-									.cloneFactoryAddress, "clonefactory has a bad address")
+		assert.equal(webfacing.options.address,JSON.parse(fs.readFileSync('contractAddresses.json')).webfacingAddress, "webfacing has a bad address")
+		assert.equal(ledger.options.address, JSON.parse(fs.readFileSync('contractAddresses.json')).ledgerAddress, "ledger has a bad address")
+		assert.equal(clonefactory.options.address, JSON.parse(fs.readFileSync('contractAddresses.json')).cloneFactoryAddress, "clonefactory has a bad address")
 	})
 
 
@@ -105,7 +96,6 @@ describe('tests to ensure contracts uploaded successfully', function() {
 			//6. check to see if the seller has the lumeirn tokens
 			let ini;
 			let contractAddress;
-			let contractDuration;
 			let contractPrice;
 			let mutex;
 			let hashrateContract;
@@ -139,6 +129,8 @@ describe('tests to ensure contracts uploaded successfully', function() {
 				hashrateContract.methods.setContractCloseOut, 
 				validatorAddress
 			).then(r => mutex = r)
+			console.log('contract closeout called')
+			sleep.sleep(3)
 
 			await tools.contractCallFunction(token.methods.balanceOf, [sellerAddress])
 					.then(r => sellerLumerinAfter =r)
@@ -150,7 +142,7 @@ describe('tests to ensure contracts uploaded successfully', function() {
 					.then(r => contractState =r)
 
 			assert.equal(contractState, '3', `contract is not in a closed state: contract state: ${contractState}`)
-			assert.equal(contractLumerin, '0', 'contract is still funded')
+			assert.equal(contractLumerin, '0', `contract is still funded: contract funds: ${contractLumerin}`)
 			assert.equal(
 				parseInt(buyerLumerinOriginal), 
 				parseInt(buyerLumerinAfter), 
@@ -210,7 +202,6 @@ describe('tests to ensure contracts uploaded successfully', function() {
 	it('#purchase a contract without a validator. Closeout after contract completes', async function() {
 			let ini;
 			let contractAddress;
-			let contractDuration;
 			let contractPrice;
 			let mutex;
 			let hashrateContract;
@@ -221,7 +212,6 @@ describe('tests to ensure contracts uploaded successfully', function() {
 			let contractLumerin;
 			let contractState;
 			let purchaseBlock;
-			let closeOutBlock;
 			await tools.contractCallFunction(webfacing.methods.getListOfContracts).then(
 				r => contractAddress = r)
 			contractAddress = contractAddress[contractAddress.length -1]
@@ -267,10 +257,10 @@ describe('tests to ensure contracts uploaded successfully', function() {
 	})
 
 	it('#purchase a contract without a validator. Closeout 70% of the way done', async function() {
-			let ini,  contractAddress,  contractDuration,  contractPrice,  mutex;
+			let ini,  contractAddress, contractPrice,  mutex;
 			let hashrateContract,  sellerLumerinOriginal,  sellerLumerinAfter;
-			let buyerLumerin,  buyerLumerinOriginal,  contractLumerin,  contractState;
-			let purchaseBlock,  closeoutBlock;
+			let buyerLumerinOriginal,  contractLumerin,  contractState;
+			let purchaseBlock;
 
 		//get the contracts address to test
 			await tools.contractCallFunction(webfacing.methods.getListOfContracts).then(
@@ -315,18 +305,9 @@ describe('tests to ensure contracts uploaded successfully', function() {
 			//2. check to see if the contract is still running
 			let ini;
 			let contractAddress;
-			let contractDuration;
-			let contractPrice;
 			let mutex;
 			let hashrateContract;
-			let sellerLumerinOriginal;
-			let sellerLumerinAfter;
-			let buyerLumerinOriginal;
-			let buyerLumerinAfter;
-			let contractLumerin;
 			let contractState;
-			let purchaseBlock;
-			let closeOutBlock;
 
 			await tools.contractCallFunction(webfacing.methods.getListOfContracts).then(
 				r => contractAddress = r)
@@ -350,18 +331,9 @@ describe('tests to ensure contracts uploaded successfully', function() {
 			//2. check to see if the contract is still running
 			let ini;
 			let contractAddress;
-			let contractDuration;
-			let contractPrice;
 			let mutex;
 			let hashrateContract;
-			let sellerLumerinOriginal;
-			let sellerLumerinAfter;
-			let buyerLumerinOriginal;
-			let buyerLumerinAfter;
-			let contractLumerin;
 			let contractState;
-			let purchaseBlock;
-			let closeOutBlock;
 			await tools.contractCallFunction(webfacing.methods.getListOfContracts).then(
 				r => contractAddress = r)
 			contractAddress = contractAddress[contractAddress.length -1]
@@ -382,18 +354,9 @@ describe('tests to ensure contracts uploaded successfully', function() {
 	it('#purchase a contract with a validator. fail to send validation fee', async function() {
 			let ini;
 			let contractAddress;
-			let contractDuration;
-			let contractPrice;
 			let mutex;
 			let hashrateContract;
-			let sellerLumerinOriginal;
-			let sellerLumerinAfter;
-			let buyerLumerinOriginal;
-			let buyerLumerinAfter;
-			let contractLumerin;
 			let contractState;
-			let purchaseBlock;
-			let closeOutBlock;
 			await tools.contractCallFunction(webfacing.methods.getListOfContracts).then(
 				r => contractAddress = r)
 			contractAddress = contractAddress[contractAddress.length -1]
@@ -410,59 +373,142 @@ describe('tests to ensure contracts uploaded successfully', function() {
 
 			assert.equal(contractState, '0', `contract is not in a available state: contract state: ${contractState}`)
 	})
-	/*
-		//contract lasts 100 seconds, so closeout after 50 seconds
-		describe('#purchase a contract with a validator. fail to wait for block confirmation', function() {
-			let selectedContractToPurchase;
+
+
+	it('#purchase a contract with a validator. send double the expected lumerin', async function() {
+			let ini;
+			let contractAddress;
+			let mutex;
 			let hashrateContract;
-			let percentHashesDone = .33;
+			let contractLumerin;
+			let contractState;
+			let purchaseBlock;
+			await tools.contractCallFunction(webfacing.methods.getListOfContracts).then(
+				r => contractAddress = r)
+			contractAddress = contractAddress[contractAddress.length -1]
 
-			beforeEach('purchase the contract', async function() {
-				let ini;
-				await tools.genericPurchaseContract(
-										web3,ledger, buyerAddress, sellerAddress, validatorAddress, token, 7, true
-				)
-										.then(r => ini = r)
-				selectedContractToPurchase = ini.i0
-				hashrateContract = ini.i1
-				sellerLumerin = ini.i2
-			})
+		console.log('calling purchase')
+			await tools.genericPurchaseContract(
+			web3, ledger, buyerAddress, sellerAddress, contractAddress, token, 0, false, true, true, 1, doubleLumerin=2
+			).then(r => ini = r)
+			await tools.getBlock(web3).then(r => purchaseBlock = parseInt(r))
+			hashrateContract = ini.i0
 
+		console.log('contract purchased')
+			await tools.waitForBlock(10, purchaseBlock, web3).then(r => mutex = r)
 
-			//will fail on setFundContract function
-		})
+		console.log('calling closeout')
+			await tools.contractSendFunction(
+				hashrateContract.methods.setContractCloseOut, 
+				buyerAddress
+			).then(r => closeOutBlock = parseInt(r["blockNumber"]))
+		console.log('called closeout')
 
-		//contract lasts 100 seconds, so closeout after 50 seconds
-		describe('#purchase a contract with a validator. terminate befoe the contract begins to run', function() {
-			let selectedContractToPurchase;
-			let hashrateContract;
-			let percentHashesDone = .33;
+			await tools.contractCallFunction(token.methods.balanceOf, [sellerAddress])
+					.then(r => sellerLumerinAfter =parseInt(r))
+			await tools.contractCallFunction(token.methods.balanceOf, [buyerAddress])
+					.then(r => buyerLumerinAfter =parseInt(r))
+			await tools.contractCallFunction(token.methods.balanceOf, [contractAddress])
+					.then(r => contractLumerin =parseInt(r))
+			await tools.contractCallFunction(hashrateContract.methods.contractState)
+					.then(r => contractState =parseInt(r))
 
-			beforeEach('purchase the contract', async function() {
-				let ini;
-				await tools.genericPurchaseContract(web3,ledger, buyerAddress, sellerAddress, validatorAddress, token, 11, true)
-										.then(r => ini = r)
-				selectedContractToPurchase = ini.i0
-				hashrateContract = ini.i1
-				sellerLumerin = ini.i2
-			})
-		})
-		//
-		//contract lasts 100 seconds, so closeout after 50 seconds
-		describe('#purchase a contract without a validator. terminate befoe the contract begins to run', function() {
-			let selectedContractToPurchase;
-			let hashrateContract;
-			let percentHashesDone = .33;
+			await tools.contractCallFunction(hashrateContract.methods.contractState)
+					.then(r => contractState =parseInt(r))
 
-			beforeEach('purchase the contract', async function() {
-				let ini;
-				await tools.genericPurchaseContract(web3,ledger, buyerAddress, sellerAddress, validatorAddress, token, 12, false)
-										.then(r => ini = r)
-				selectedContractToPurchase = ini.i0
-				hashrateContract = ini.i1
-				sellerLumerin = ini.i2
-			})
-		})
+			assert.equal(contractState, '3', `contract is not in a closed state: contract state: ${contractState}`)
+			assert.equal(contractLumerin, '0', 'contract is still funded')
+		/*
+		 * write tests to ensure that overpayment is 
+		 * sent where it is supposed to be sent
+		 */
 	})
-*/
+
+	it('#purchase a contract without a validator. send double the expected lumerin', async function() {
+			let ini;
+			let contractAddress;
+			let mutex;
+			let hashrateContract;
+			let contractState;
+			let purchaseBlock;
+			await tools.contractCallFunction(webfacing.methods.getListOfContracts).then(
+				r => contractAddress = r)
+			contractAddress = contractAddress[contractAddress.length -1]
+
+		console.log('calling purchase')
+			await tools.genericPurchaseContract(
+			web3, ledger, buyerAddress, sellerAddress, contractAddress, token, 0, false, true, true, 1, doubleLumerin=2
+			).then(r => ini = r)
+			hashrateContract = ini.i0
+
+			await tools.getBlock(web3).then(r => purchaseBlock = parseInt(r))
+			await tools.waitForBlock(10, purchaseBlock, web3).then(r => mutex = r)
+
+			await tools.contractSendFunction(
+				hashrateContract.methods.setContractCloseOut, 
+				buyerAddress
+			).then(r => closeOutBlock = parseInt(r["blockNumber"]))
+
+			await tools.contractCallFunction(token.methods.balanceOf, [sellerAddress])
+					.then(r => sellerLumerinAfter =parseInt(r))
+			await tools.contractCallFunction(token.methods.balanceOf, [buyerAddress])
+					.then(r => buyerLumerinAfter =parseInt(r))
+			await tools.contractCallFunction(token.methods.balanceOf, [contractAddress])
+					.then(r => contractLumerin =parseInt(r))
+			await tools.contractCallFunction(hashrateContract.methods.contractState)
+					.then(r => contractState =parseInt(r))
+
+			await tools.contractCallFunction(hashrateContract.methods.contractState)
+					.then(r => contractState =parseInt(r))
+
+
+			await tools.contractCallFunction(hashrateContract.methods.contractState)
+					.then(r => contractState =parseInt(r))
+
+			assert.equal(contractState, '3', `contract is not in a closed state: contract state: ${contractState}`)
+			assert.equal(contractLumerin, '0', 'contract is still funded')
+		/*
+		 * write tests to ensure that overpayment is 
+		 * sent where it is supposed to be sent
+		 */
+	})
+
+	it('#purchase a contract and verify that data is encrypted successfully', async function() {
+				//steps for test
+			//1. purchase a contract
+			//2. wait for the duration of the contract
+			//3. call the contract closeout function
+			//4. check to see if the contract is in a "complete" state
+			//5. check to see if the contract is no longer funded
+			//6. check to see if the seller has the lumeirn tokens
+			let ini;
+			let contractAddress;
+			let hashrateContract;
+			let purchaseBlock;
+		let poolData;
+			await tools.contractCallFunction(webfacing.methods.getListOfContracts).then(
+				r => contractAddress = r)
+			contractAddress = contractAddress[contractAddress.length -1]
+
+			await tools.genericPurchaseContract(
+			web3, ledger, buyerAddress, sellerAddress, contractAddress, token, 0, true
+			).then(r => ini = r)
+
+			await tools.getBlock(web3).then(r => purchaseBlock = parseInt(r))
+
+			hashrateContract = ini.i0
+
+			await tools.waitForBlock(3, purchaseBlock, web3).then(r => mutex = r)
+
+		//change to get encrypted data
+			await tools.contractCallFunction(hashrateContract.methods.encryptedPoolData).then(
+				r => poolData = r)
+		//buy a contract
+		//check to see if the encrypted data is encrypted
+		let decryptedData
+		await encryption.decrypt(poolData, "7c22ec64023216056a39e91d90f83ac4e296f27c56c9773220e6dab940e6ffe9").then(r => decryptedData = r)
+		assert.notEqual(poolData, "127.0.0.1|8000|Kodee is in arkansas", "the pool data is not encrypted")
+		//decrypt using sellers private key
+		assert.equal(decryptedData, "127.0.0.1|8000|Kodee is in arkansas", `encryption failed, result is ${decryptedData}`)
+	})
 })
