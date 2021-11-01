@@ -3079,51 +3079,15 @@
     "version": "0.8.7+commit.e28d00a7.Emscripten.clang"
   },
   "networks": {
-    "5777": {
-      "events": {},
-      "links": {},
-      "address": "0x1a9B5f9AeB1c8D6C41e1Cb13F747bC171422e028",
-      "transactionHash": "0x254b67f249335baf38cd47937c2da9a59b838a3498d999030460bc3f48850a68"
-    },
-    "1633984091752": {
-      "events": {},
-      "links": {},
-      "address": "0x5f8e26fAcC23FA4cbd87b8d9Dbbd33D5047abDE1",
-      "transactionHash": "0x6fb0df1b009f10586c7351aa643054d10f509fdce1cce6455c5615319f762368"
-    },
-    "1634846925415": {
-      "events": {},
-      "links": {},
-      "address": "0xC89Ce4735882C9F0f0FE26686c53074E09B0D550",
-      "transactionHash": "0xd04fa552ee73dd9650bae6e372943dcdb542ca9b162283f1c9ffbfbf9f58324d"
-    },
-    "1634856755581": {
-      "events": {},
-      "links": {},
-      "address": "0x0290FB167208Af455bB137780163b7B7a9a10C16",
-      "transactionHash": "0x7d6448917a9019d032ee06c72935dc8414829e3fc1da9a5bc4b72581f7406c8a"
-    },
-    "1634917897480": {
-      "events": {},
-      "links": {},
-      "address": "0xe982E462b094850F12AF94d21D470e21bE9D0E9C",
-      "transactionHash": "0xc2f5a0713b8f272cfcdbaa01f1eb355dd0c21bd8c86843d1b7474eccd55ea0f5"
-    },
-    "1635379124164": {
-      "events": {},
-      "links": {},
-      "address": "0xC89Ce4735882C9F0f0FE26686c53074E09B0D550",
-      "transactionHash": "0xd04fa552ee73dd9650bae6e372943dcdb542ca9b162283f1c9ffbfbf9f58324d"
-    },
     "1635791804245": {
       "events": {},
       "links": {},
-      "address": "0xC89Ce4735882C9F0f0FE26686c53074E09B0D550",
-      "transactionHash": "0xd04fa552ee73dd9650bae6e372943dcdb542ca9b162283f1c9ffbfbf9f58324d"
+      "address": "0x630589690929E9cdEFDeF0734717a9eF3Ec7Fcfe",
+      "transactionHash": "0xe0b955f8c0ac1a6dde89abdafa02ff95309e24e7a98874f2873bf05a0b51842b"
     }
   },
   "schemaVersion": "3.4.2",
-  "updatedAt": "2021-11-01T18:43:14.946Z",
+  "updatedAt": "2021-11-01T20:00:12.481Z",
   "networkType": "ethereum",
   "devdoc": {
     "author": "Josh Kean (Lumerin)",
