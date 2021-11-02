@@ -10,11 +10,6 @@ pragma solidity >0.8.0;
 contract Ledger{
 
   address[] rentalContracts; //dynamically allocated list of rental contracts
-  address validator;
-
-  constructor(address _validator) {
-    validator = _validator;
-  }
 
   //function to push an address to storage and update mappings
   //performed after a seller deploys their contract to the blockchain

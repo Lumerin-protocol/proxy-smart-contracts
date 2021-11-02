@@ -3,7 +3,7 @@
 pragma solidity >0.8.0;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+//import "@openzeppelin/contracts/access/Ownable.sol";
 import './Implementation.sol';
 
 /// @title CloneFactory
