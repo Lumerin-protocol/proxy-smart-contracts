@@ -49,7 +49,7 @@ contract WebFacing is Ownable{
                               string memory _encryptedPoolData
 			      )
     public payable { 
-    Implementation(_contract).setPurchaseContract(_encryptedPoolData, _buyer, _validator, _withValidator); 
+    Implementation(_contract).setPurchaseContract{value:msg.value}(_encryptedPoolData, _buyer, _validator, _withValidator); 
     // add in function call to ledger to update contracts buyer variable
     emit contractPurchase(_contract); 
   }
