@@ -60,6 +60,7 @@ contract Implementation is Initializable, Escrow{
 
   event contractPurchased(address _buyer);
   event contractClosed(address caller);
+  event contractFunded(address caller);
   
 
   //need to remove lmn from contract call, also need to remove from webfacing
@@ -105,6 +106,7 @@ contract Implementation is Initializable, Escrow{
     require(approved[buyer] == true, "the contract has not been purchased");
     startingBlockTimestamp = block.timestamp;
     contractState = ContractState.Running;
+    emit contractFunded(msg.sender);
   }
 }
 
