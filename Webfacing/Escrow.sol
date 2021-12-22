@@ -24,6 +24,11 @@ contract Escrow {
         myToken = Lumerin(titanToken);
     }
 
+    //internal function which transfers current hodled tokens into sellers account
+    function getDepositContractHodlingsToSeller(uint remaining) internal {
+	    myToken.transfer(escrow_seller, myToken.balanceOf(address(this))-remaining);
+    }
+
     // @notice This will create a new escrow based on the seller, buyer, and total.
     // @dev Call this in order to make a new contract. Potentially this will have a database within the contract to store/call by 
     //      the validator ONLY.

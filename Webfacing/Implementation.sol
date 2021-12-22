@@ -8,105 +8,142 @@ import "./Escrow.sol";
 
 //MyToken is place holder for actual lumerin token, purely for testing purposes
 contract Implementation is Initializable, Escrow{
-  enum ContractState {
-    Available,
-    Active,
-    Running,
-    Complete
-  }
+	enum ContractState {
+		Available,
+		Running
+	}
 
-  ContractState public contractState; 
-  uint public price; //cost to purchase contract
-  uint public limit; //max th provided
-  uint public speed; //th/s of contract
-  uint public length; //how long the contract will last in seconds
-  uint public port; //port provided by buyer
-  uint public validationFee; //validator fee, may not be included in the contract depending on future state of documentation
-  uint public startingBlockTimestamp; //the timestamp of the block when the contract was purchased
-  address public buyer; //address of the current purchaser of the contract
-  address public seller; //address of the seller of the contract
-  address contractManager; //should be hardcoded somewhere...
-  address penaltyTarget; //will only have a value assigned if a a penalty is called
-  string public encryptedPoolData; //encrypted data for pool target info
+	ContractState public contractState;
+	uint public price; //cost to purchase contract
+	//consider deprecating limit variable since it can be obtained from speed and length/duration
+	uint public limit; //max th provided
+	uint public speed; //th/s of contract
+	uint public length; //how long the contract will last in seconds
+	uint public startingBlockTimestamp; //the timestamp of the block when the contract was purchased
+	address public buyer; //address of the current purchaser of the contract
+	address public seller; //address of the seller of the contract
+	address cloneFactory; //used to limit where the purchase can be made
+	address validator; //validator to be used. Can be set to 0 address if validator not being used
+	string public encryptedPoolData; //encrypted data for pool target info
 
-  mapping(address => bool) approved;
-
-  function initialize(
-    uint _price,
-    uint _limit,
-    uint _speed,
-    uint _length,
-    uint _validationFee,
-    address _seller,
-    address _contractManager,
-    address _lmn
-  ) public initializer(){
-    price = _price;
-    limit = _limit;
-    speed = _speed;
-    length = _length;
-    seller = _seller;
-    validationFee = _validationFee;
-    contractManager = _contractManager;
-    contractState = ContractState.Available;
-    setParameters(_lmn);
-  }
+	event contractPurchased(address indexed _buyer); //make indexed
+	event contractClosed();
+	event purchaseInfoUpdated();
+	event cipherTextUpdated(string newCipherText);
 
 
-  modifier onlyApproved() { //look into replacing this in open zeppelin
-    require(approved[msg.sender] == true, "this address is not allowed to call this function");
-    _;
-  }
+	function initialize(
+		uint _price,
+		uint _limit,
+		uint _speed,
+		uint _length,
+		address _seller,
+		address _lmn,
+		address _cloneFactory, //used to restrict purchasing power to only the clonefactory
+		address _validator
+	) public initializer(){
+		price = _price;
+		limit = _limit;
+		speed = _speed;
+		length = _length;
+		seller = _seller;
+		cloneFactory = _cloneFactory;
+		validator = _validator;
+		contractState = ContractState.Available;
+		/*
+		internal to the escrow contract. Used to initialize lumerin token
+		and move tokens as contract logic dictates
+		*/
+		setParameters(_lmn);
+	}
 
-  event contractPurchased(address _buyer);
-  event contractClosed(address caller);
-  event contractFunded(address caller);
-  
+	//function that the clone factory calls to purchase the contract
+	function setPurchaseContract(
+		string memory _encryptedPoolData,
+		address _buyer
+	)
+	public {
+		require(contractState == ContractState.Available, 
+			"contract is not in an available state"
+		       );
+		require(msg.sender == cloneFactory,
+			"this address is not approved to call the purchase function"
+		       );
+		encryptedPoolData = _encryptedPoolData;
+		buyer = _buyer;
+		startingBlockTimestamp = block.timestamp;
+		contractState = ContractState.Running;
+		createEscrow(seller, buyer, price);
+		emit contractPurchased(msg.sender);
+	}
 
-  //need to remove lmn from contract call, also need to remove from webfacing
-  function setPurchaseContract( string memory _encryptedPoolData, address _buyer, address _validator, bool _withValidator) 
-    payable external {
-    require(contractState == ContractState.Available, "contract is not in an available state");
-    encryptedPoolData = _encryptedPoolData;
-    buyer = _buyer;
-    contractManager = _validator;
-    createEscrow(seller, buyer, price);
-    if (_withValidator == true) {
-      approved[_validator] = true;
-      require(msg.value == validationFee, "validation fee not sent");
-    } 
-	approved[_buyer] = true;
-	approved[seller] = true;
-    emit contractPurchased(msg.sender); //might need to replace this with an additional passed in variable for the contract purchaser
-  }
+	//allows the buyers to update their mining pool information
+	//during the lifecycle of the contract
+	function setUpdateMiningInformation(string memory _newEncryptedPoolData) external {
+		require(msg.sender == buyer, 
+			"this account is not authorized to update the ciphertext information"
+		       );
+		require(contractState == ContractState.Running, 
+			"the contract is not in the running state"
+		       );
+		encryptedPoolData = _newEncryptedPoolData;
+		emit cipherTextUpdated(_newEncryptedPoolData);
+	}
 
 
-  //this is the closeout function which will be called upon successful completion of the contract
-  function setContractCloseOut() external onlyApproved {
-    uint durationOfContract = block.timestamp - startingBlockTimestamp;
-    uint buyerPayOut;
-    uint sellerPayOut;
-    if (durationOfContract >= length) {
-      buyerPayOut = 0;
-    } else {
-      buyerPayOut = uint(price*uint(length-durationOfContract))/uint(length); 
-    }
-    sellerPayOut = price - buyerPayOut;
-    withdrawFunds(sellerPayOut, buyerPayOut);
-    contractState = ContractState.Complete;
-    emit contractClosed(msg.sender);
-  }
+	//function which can edit the cost, length, and hashrate of a given contract
+	function setUpdatePurchaseInformation(
+		uint _price,
+		uint _limit,
+		uint _speed,
+		uint _length
+	) external {
+		require(msg.sender == seller, "this is account is not authorized to update the contract parameters");
+		require(contractState == ContractState.Available, "this is account is not in the available state");
+		price = _price;
+		limit = _limit;
+		speed = _speed;
+		length = _length;
+		emit purchaseInfoUpdated();
+	}
 
-  //function which checks to see if lumerin has been sent to the contracts address
-  //this call is necessary since somebody could fund a contract with lumerin before setPurchaseContract
-  //and then another person could call the setPurchaseContract function, essentially "stealing" the contract
-  function setFundContract() external {
-    //if escrow is fully funded, set contract state to running
-    require(dueAmount() == 0, "lumerin tokens need to be sent to the contract");
-    require(approved[buyer] == true, "the contract has not been purchased");
-    startingBlockTimestamp = block.timestamp;
-    contractState = ContractState.Running;
-    emit contractFunded(msg.sender);
-  }
+
+	//temporarily set buyer to seller until contract is purchased again
+	function setContractVariableUpdate() internal {
+		buyer = seller;
+		encryptedPoolData = "";
+		contractState = ContractState.Available;
+	}
+
+
+	function setContractCloseOut(uint closeOutType) external {
+		if (closeOutType == 0) {
+			require(msg.sender == buyer || msg.sender == validator, "this account is not authorized to trigger an early closeout");
+			uint durationOfContract = block.timestamp - startingBlockTimestamp;
+			uint buyerPayOut = uint(price*uint(length-durationOfContract))/uint(length);
+			uint sellerPayOut = price - buyerPayOut;
+			withdrawFunds(sellerPayOut, buyerPayOut);
+			setContractVariableUpdate();
+			emit contractClosed();
+		} else if (closeOutType == 1) {
+			uint durationOfContract = block.timestamp - startingBlockTimestamp;
+			uint buyerPayOut = uint(price*uint(length-durationOfContract))/uint(length);
+			require(msg.sender == seller, "this account is not authorized to trigger a mid-contract closeout");
+			getDepositContractHodlingsToSeller(buyerPayOut);
+		} else if (closeOutType == 2 || closeOutType == 3) {
+			uint durationOfContract = block.timestamp - startingBlockTimestamp;
+			require(durationOfContract >= length, "the contract has yet to be carried to term");
+			if (closeOutType == 3) {
+				uint buyerPayOut = 0;
+				uint sellerPayOut = price;
+				withdrawFunds(sellerPayOut, buyerPayOut);
+			}
+			setContractVariableUpdate();
+			emit contractClosed();
+		} else {
+			require(closeOutType < 4, "you must make a selection between 0 and 3");
+		}
+	}
+
 }
 
