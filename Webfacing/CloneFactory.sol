@@ -30,6 +30,7 @@ contract CloneFactory {
 	}
 
 	event contractCreated(address indexed _address); //emitted whenever a contract is created
+	event clonefactoryContractPurchased(address indexed _address); //emitted whenever a contract is purchased
 
 	//function to create a new Implementation contract
 	function setCreateNewRentalContract(
@@ -60,6 +61,7 @@ contract CloneFactory {
 		targetContract.setPurchaseContract(
 			_cipherText, msg.sender
 		);
+		emit clonefactoryContractPurchased(contractAddress);
 	}
 
 

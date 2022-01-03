@@ -96,14 +96,17 @@ contract Implementation is Initializable, Escrow{
 		uint _price,
 		uint _limit,
 		uint _speed,
-		uint _length
+		uint _length,
+		uint _closeoutType
 	) external {
 		require(msg.sender == seller, "this is account is not authorized to update the contract parameters");
-		require(contractState == ContractState.Available, "this is account is not in the available state");
+		require(contractState == ContractState.Running, "this is account is not in the running state");
+		require(_closeoutType == 2 || _closeoutType == 3, "you can only use closeout options 2 or 3");
 		price = _price;
 		limit = _limit;
 		speed = _speed;
 		length = _length;
+		setContractCloseOut(_closeoutType);
 		emit purchaseInfoUpdated();
 	}
 
@@ -116,7 +119,7 @@ contract Implementation is Initializable, Escrow{
 	}
 
 
-	function setContractCloseOut(uint closeOutType) external {
+	function setContractCloseOut(uint closeOutType) public {
 		if (closeOutType == 0) {
 			require(msg.sender == buyer || msg.sender == validator, "this account is not authorized to trigger an early closeout");
 			uint durationOfContract = block.timestamp - startingBlockTimestamp;
