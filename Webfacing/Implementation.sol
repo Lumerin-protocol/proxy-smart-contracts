@@ -57,6 +57,28 @@ contract Implementation is Initializable, Escrow{
 		setParameters(_lmn);
 	}
 
+	//for demo purposes, returns all public variables
+	function getPublicVariables() 
+		public 
+		view 
+		returns (
+			ContractState,
+			uint,
+			uint,
+			uint,
+			uint,
+			string memory
+		) {
+			return (
+				contractState,
+				price,
+				limit,
+				speed,
+				length,
+				encryptedPoolData
+			);
+		}
+
 	//function that the clone factory calls to purchase the contract
 	function setPurchaseContract(
 		string memory _encryptedPoolData,
