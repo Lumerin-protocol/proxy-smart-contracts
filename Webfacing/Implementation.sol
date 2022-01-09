@@ -67,6 +67,9 @@ contract Implementation is Initializable, Escrow{
 			uint,
 			uint,
 			uint,
+			uint,
+			address,
+			address,
 			string memory
 		) {
 			return (
@@ -75,6 +78,9 @@ contract Implementation is Initializable, Escrow{
 				limit,
 				speed,
 				length,
+				startingBlockTimestamp,
+				buyer,
+				seller,
 				encryptedPoolData
 			);
 		}
