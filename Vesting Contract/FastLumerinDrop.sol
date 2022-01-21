@@ -65,7 +65,7 @@ contract FastLumerinDrop {
     }
     function Claim() external {
         address incoming = msg.sender;
-        require(whitelist[incoming].qty > 0, 'Must be whitelisted!');
+        require(whitelist[incoming].qty > 0, 'Must be whitelisted with an active Claim amount!');
             Lumerin.transfer(incoming, whitelist[incoming].qty);
             emit TransferSent(incoming, incoming, whitelist[incoming].qty);
             
