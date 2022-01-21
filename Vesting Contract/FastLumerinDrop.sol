@@ -46,7 +46,7 @@ contract FastLumerinDrop {
         }
     }
     function updateWallet (address walletAddr, uint _qty) internal {
-        require(walletAddr == msg.sender, 'Unable to update wallet!');
+        require(walletAddr != msg.sender, 'Unable to update wallet!');
         whitelist[walletAddr].qty = _qty;
     }
     function updateWallets (address walletAddr, uint _qty) external onlyOwner {
