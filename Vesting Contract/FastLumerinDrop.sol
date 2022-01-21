@@ -8,14 +8,12 @@ pragma solidity ^0.8.0;
  * @author Lance Seidman (Titan Mining/Lumerin Protocol)
 */
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 contract FastLumerinDrop {
-   
-    using SafeERC20 for IERC20;
+
     address public owner;
     uint walletCount;
  
-    IERC20 Lumerin = IERC20(0xA24eCB5873D9dc76bA1cFED82B2A61831375AC72);
+    IERC20 Lumerin = IERC20(0x0);
 
     event TransferReceived(address _from, uint _amount);
     event TransferSent(address _from, address _destAddr, uint _amount);
