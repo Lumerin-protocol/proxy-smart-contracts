@@ -15,10 +15,10 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract FastLumerinDrop {
-    address public owner;
+    address owner;
     uint walletCount;
  
-    IERC20 Lumerin = IERC20(0x5aA51cCa07610560db4eEF8df2d1eAc0Fa2f57fB);
+    IERC20 Lumerin = IERC20(0x4b1D0b9F081468D780Ca1d5d79132b64301085d1);
 
     event TransferReceived(address _from, uint _amount);
     event TransferSent(address _from, address _destAddr, uint _amount);
@@ -67,7 +67,7 @@ contract FastLumerinDrop {
     function VestingTokenBalance() view public returns (uint) {
         return Lumerin.balanceOf(address(this));
     }
-    function Claim() external {
+    function Claim() external payable {
         address incoming = msg.sender;
         require(whitelist[incoming].qty > 0 || whitelist[incoming].wallet != incoming || whitelist[incoming].status != 1 || whitelist[incoming].status != 2, 'Must be whitelisted with a Balance or without Pending Claims!');
         uint qtyWidthdrawl = whitelist[incoming].qty;
@@ -77,7 +77,7 @@ contract FastLumerinDrop {
         updateWallet(incoming,0);
         emit TransferSent(incoming, incoming, whitelist[incoming].qty);  
     } 
-    function TransferLumerin(address to, uint amount) external onlyOwner{
+    function TransferLumerin(address to, uint amount) external onlyOwner payable{
         require(msg.sender == owner, "Contract Owner can transfer Tokens only!"); 
         uint256 LumerinBalance = Lumerin.balanceOf(address(this));
         require(amount <= LumerinBalance, "Token balance is too low!");
