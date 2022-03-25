@@ -1,50 +1,87 @@
-pragma solidity ^0.8.7;
 // SPDX-License-Identifier: MIT
-/**
+pragma solidity ^0.8.0;
+/*
  * @title Contract for Fast Lumerin Token Widthdrawl
  *
  * @notice ERC20 support for beneficiary wallets to quickly obtain Tokens without following vesting schedule.
  *
  * @author Lance Seidman (Titan Mining/Lumerin Protocol)
-*/
-
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+ *
+ * @dev Statuses
+ * 0 = Normal Mode
+ * 1 = Pending Transaction
+ * 2 = Completed Transaction
+ */
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract FastLumerinDrop {
-    address public owner;
-    uint256 public balance;
-    IERC20 Lumerin = IERC20(0x162ec44F7B0aF0A02F45258DCd177Ec329d9d4bA);
-    
+    address owner;
+    uint walletCount;
+ 
+    IERC20 Lumerin = IERC20(0x4b1D0b9F081468D780Ca1d5d79132b64301085d1);
+
     event TransferReceived(address _from, uint _amount);
     event TransferSent(address _from, address _destAddr, uint _amount);
-    
-    constructor() {
-        owner = msg.sender;
+
+    struct Whitelist {
+        address wallet;
+        uint qty;
+        uint status;
     }
-    
+    mapping(address => Whitelist) public whitelist;
+    constructor() {
+        owner = msg.sender;      
+                                                                                                                                                                                                                                                                                                                                      
+    }
+    modifier onlyOwner() {
+      require(msg.sender == owner, "Sorry, only owner of this contract can perform this task!");
+      _;
+    }
     receive() payable external {
-        balance += msg.value;
         emit TransferReceived(msg.sender, msg.value);
     }    
-    
-    function withdraw(uint amount, address payable destAddr) public {
-        require(msg.sender == owner, "Sorry, only the Vesting Contract Owner can do this!"); 
-        require(amount <= balance, "Yikes! Not enough Tokens!");
-        
-        destAddr.transfer(amount);
-        balance -= amount;
-        emit TransferSent(msg.sender, destAddr, amount);
+    function addWallet (address walletAddr, uint _qty) external onlyOwner {
+        whitelist[walletAddr].wallet = walletAddr;
+        whitelist[walletAddr].qty = _qty;
     }
-
+    function addMultiWallet (address[] memory walletAddr, uint[] memory _qty) external onlyOwner {
+        for (uint i=0; i< walletAddr.length; i++) {
+            whitelist[walletAddr[i]].wallet = walletAddr[i]; 
+            whitelist[walletAddr[i]].qty = _qty[i];
+            walletCount++;
+        }
+    }
+    function updateWallet (address walletAddr, uint _qty) internal {
+        require(walletAddr == msg.sender, 'Unable to update wallet!');
+        whitelist[walletAddr].qty = _qty;
+    }
+    function updateWallets (address walletAddr, uint _qty) external onlyOwner {
+        whitelist[walletAddr].qty = _qty;
+    }
+    function checkWallet (address walletAddress) external view returns (bool status) {
+        if(whitelist[walletAddress].wallet == walletAddress) {
+            status = true;
+        }
+        return status;
+    }
     function VestingTokenBalance() view public returns (uint) {
         return Lumerin.balanceOf(address(this));
     }
-    
-    function TransferLumerin(address to, uint256 amount) public {
-        require(msg.sender == owner, "Vesting Contract Owner can transfer Tokens, not you!"); 
+    function Claim() external payable {
+        address incoming = msg.sender;
+        require(whitelist[incoming].qty > 0 || whitelist[incoming].wallet != incoming || whitelist[incoming].status != 1 || whitelist[incoming].status != 2, 'Must be whitelisted with a Balance or without Pending Claims!');
+        uint qtyWidthdrawl = whitelist[incoming].qty;
+        whitelist[incoming].status = 1;
+        Lumerin.transfer(incoming, qtyWidthdrawl);
+        whitelist[incoming].status = 2;
+        updateWallet(incoming,0);
+        emit TransferSent(incoming, incoming, whitelist[incoming].qty);  
+    } 
+    function TransferLumerin(address to, uint amount) external onlyOwner payable{
+        require(msg.sender == owner, "Contract Owner can transfer Tokens only!"); 
         uint256 LumerinBalance = Lumerin.balanceOf(address(this));
-        require(amount <= LumerinBalance, "Token balance is low!");
+        require(amount <= LumerinBalance, "Token balance is too low!");
         Lumerin.transfer(to, amount);
-        emit TransferSent(msg.sender, to, amount);
-    }    
+        emit TransferSent(msg.sender, to, whitelist[to].qty);
+    }  
 }
