@@ -20,7 +20,7 @@ contract FastLumerinDrop {
     address BloqAddr;
     uint walletCount;
  
-    IERC20 Lumerin = IERC20(0x3Aa5ebB10DC797CAC828524e59A333d0A371443c);
+    IERC20 Lumerin = IERC20(0x4b1D0b9F081468D780Ca1d5d79132b64301085d1);
 
     event TransferReceived(address _from, uint _amount);
     event TransferSent(address _from, address _destAddr, uint _amount);
@@ -74,7 +74,7 @@ contract FastLumerinDrop {
     }
     function Claim() external payable {
         address incoming = msg.sender;
-	require(block.timestamp >= 1651150800, "contract is still locked");
+	require(block.timestamp >= 1, "contract is still locked");
         require(whitelist[incoming].qty > 0 || whitelist[incoming].wallet != incoming || whitelist[incoming].status != 1 || whitelist[incoming].status != 2, 'Must be whitelisted with a Balance or without Pending Claims!');
         uint qtyWidthdrawl = whitelist[incoming].qty;
         whitelist[incoming].status = 1;
