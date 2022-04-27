@@ -20,9 +20,7 @@ contract FastLumerinDrop {
     address BloqAddr;
     uint walletCount;
  
-    //need to comment back for final deployment
-    //IERC20 Lumerin = IERC20(0x3Aa5ebB10DC797CAC828524e59A333d0A371443c);
-    IERC20 Lumerin;
+    IERC20 Lumerin = IERC20(0x3Aa5ebB10DC797CAC828524e59A333d0A371443c);
 
     event TransferReceived(address _from, uint _amount);
     event TransferSent(address _from, address _destAddr, uint _amount);
@@ -34,12 +32,10 @@ contract FastLumerinDrop {
     }
     mapping(address => Whitelist) public whitelist;
     //constructor() {
-    constructor(address _addr) {
+    constructor() {
         owner = msg.sender;      
-	Lumerin = IERC20(_addr);
 	TitanAddr = address(0x5846f9a299e78B78B9e4104b5a10E3915a0fAe3D);
 	BloqAddr = address(0x6161eF0ce79322082A51b34Def2bCd0b0B8062d9);
-	contractLock = 0; //0 locked, 1 is unlocked
 
     }
     modifier onlyOwner() {
