@@ -16,8 +16,11 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract FastLumerinDrop {
     address owner;
+    address TitanAddr;
+    address BloqAddr;
     uint walletCount;
  
+    //need to comment back for final deployment
     //IERC20 Lumerin = IERC20(0x3Aa5ebB10DC797CAC828524e59A333d0A371443c);
     IERC20 Lumerin;
 
@@ -34,9 +37,13 @@ contract FastLumerinDrop {
     constructor(address _addr) {
         owner = msg.sender;      
 	Lumerin = IERC20(_addr);
+	TitanAddr = address(0x5846f9a299e78B78B9e4104b5a10E3915a0fAe3D);
+	BloqAddr = address(0x6161eF0ce79322082A51b34Def2bCd0b0B8062d9);
+	contractLock = 0; //0 locked, 1 is unlocked
+
     }
     modifier onlyOwner() {
-      require(msg.sender == owner, "Sorry, only owner of this contract can perform this task!");
+      require(msg.sender == owner || msg.sender == TitanAddr || msg.sender == BloqAddr, "Sorry, only owner of this contract can perform this task!");
       _;
     }
     receive() payable external {
@@ -71,6 +78,7 @@ contract FastLumerinDrop {
     }
     function Claim() external payable {
         address incoming = msg.sender;
+	require(block.timestamp >= 1651150800, "contract is still locked");
         require(whitelist[incoming].qty > 0 || whitelist[incoming].wallet != incoming || whitelist[incoming].status != 1 || whitelist[incoming].status != 2, 'Must be whitelisted with a Balance or without Pending Claims!');
         uint qtyWidthdrawl = whitelist[incoming].qty;
         whitelist[incoming].status = 1;
@@ -80,7 +88,7 @@ contract FastLumerinDrop {
         emit TransferSent(incoming, incoming, whitelist[incoming].qty);  
     } 
     function TransferLumerin(address to, uint amount) external onlyOwner payable{
-        require(msg.sender == owner, "Contract Owner can transfer Tokens only!"); 
+        //require(msg.sender == owner, "Contract Owner can transfer Tokens only!"); 
         uint256 LumerinBalance = Lumerin.balanceOf(address(this));
         require(amount <= LumerinBalance, "Token balance is too low!");
         Lumerin.transfer(to, amount);
