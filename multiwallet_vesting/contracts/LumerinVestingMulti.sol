@@ -10,37 +10,64 @@ It assumes monthly cliffs and multiple users from multiple tranches
 pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
-import "hardhat/console.sol";
 import "./VestingWalletMulti.sol";
 
 
 contract LumerinVestingMulti is VestingWalletMulti{
-	uint[] vestingTranche1; //will have 4 dates of 5/28, 6/28, 7/28, and 8/28
-	uint[] vestingTranche2; //will only have 1 date of 5/28
-	uint[] vestingSeed; //vests from 6/28/22 to 5/28/23
-	uint[] vestingCorporate; //vests from 9/28/22 to 8/28/24
-	address lumerin;
+	//will have 4 dates of 5/28, 6/28, 7/28, and 8/28
+	uint[] vestingTranche1 = [1653760800, 1656439200, 1659031200, 1661709600]; 
+	//will only have 1 date of 5/28
+	uint[] vestingTranche2 = [1653760800];
+	//vests from 6/28/22 to 5/28/23
+	uint[] vestingSeed = [
+						1656439200,
+						1659031200,
+						1661709600,
+						1664388000,
+						1666980000,
+						1669662000,
+						1672254000,
+						1674932400,
+						1677610800,
+						1680026400,
+						1682704800,
+						1685296800
+	]; 
+	//vests from 9/28/22 to 8/28/24
+	uint[] vestingCorporate = [
+						1664388000,
+						1666980000,
+						1669662000,
+						1672254000,
+						1674932400,
+						1677610800,
+						1680026400,
+						1682704800,
+						1685296800,
+						1687975200,
+						1690567200,
+						1693245600,
+						1695924000,
+						1698516000,
+						1701198000,
+						1703790000,
+						1706468400,
+						1709146800,
+						1711648800,
+						1714327200,
+						1716919200,
+						1719597600,
+						1722189600,
+						1724868000
+	]; 
+	address lumerin = address(0x4b1D0b9F081468D780Ca1d5d79132b64301085d1);
 	address owner;
 	address titanMuSig = address(0x5846f9a299e78B78B9e4104b5a10E3915a0fAe3D);
 	address bloqMuSig = address(0x6161eF0ce79322082A51b34Def2bCd0b0B8062d9);
-	constructor (
-		address _lumerin, 
-		uint[] memory _vestingTranche1,
-		uint[] memory _vestingTranche2,
-		uint[] memory _vestingSeed,
-		uint[] memory _vestingCorporate
-	) VestingWalletMulti(
+	constructor () VestingWalletMulti(
 		lumerin
 	) {
 		owner = msg.sender;
-		lumerin = _lumerin;
-		vestingTranche1 = _vestingTranche1;
-		vestingTranche2 = _vestingTranche2;
-		vestingSeed = _vestingSeed;
-		vestingCorporate = _vestingCorporate;
 	}
 
 
@@ -62,16 +89,6 @@ contract LumerinVestingMulti is VestingWalletMulti{
 		for (uint i = 0; i < _claiment.length; i++) {
 			setAddAddressToVestingSchedule(_claiment[i], _vestingMonths[i], _vestingAmount[i]);
 		}
-	}
-
-	//test function to replace block.timestamp with provided input. not to be used on final contract
-	function releaseTest(uint _time) public {
-		_isVesting[msg.sender] == true;
-		uint256 releasable = vestedAmount(msg.sender, uint64(_time)) - released();
-		_erc20Released[msg.sender] += releasable;
-		emit ERC20Released(lumerin, releasable);
-		SafeERC20.safeTransfer(IERC20(lumerin), msg.sender, releasable);
-		_isVesting[msg.sender] = false;
 	}
 
 	function Claim() public {
@@ -121,15 +138,13 @@ contract LumerinVestingMulti is VestingWalletMulti{
 		_erc20Released[_claiment] = 0;
 	}
 
-	function updateClaimentValues(address _claiment, uint _vestingAmount) public onlyOwner{
-		_erc20VestingAmount[_claiment] = _vestingAmount;
-	}
-
-	function obtainVestingInformation() public view returns (uint256[3] memory) {
-		uint256[3] memory data = [uint256(1),uint256(2),uint256(3)];
+	function obtainVestingInformation(address _claiment) public view returns (uint256[2] memory) {
+		//index 0 returns the claimable amount
+		//index 1 returns the value remaining to be vested
+		uint256 releaseableAmount = vestedAmount(_claiment, uint64(block.timestamp)) - released();
+		uint256 remaining = _erc20VestingAmount[_claiment] - _erc20Released[_claiment];
+		uint256[2] memory data = [releaseableAmount,remaining];
 		return data;
 	}
-		
-
 }
 
