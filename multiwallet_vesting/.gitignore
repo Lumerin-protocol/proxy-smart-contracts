@@ -1,0 +1,13 @@
+.DS*
+artifacts/
+cache/
+deployments/
+hardhat.config.js
+node_modules/
+package-lock.json
+scripts/*.csv
+scripts/*.ods
+scripts/*.txt
+test/*.csv
+test/*.ods
+test/*.txt
