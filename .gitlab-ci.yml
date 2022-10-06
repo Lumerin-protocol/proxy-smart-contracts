@@ -1,0 +1,72 @@
+stages:
+  - test
+  - build
+  - release
+  - deploy-goerli
+  - deploy-mainnet
+
+# lint:
+#   variables:
+#     DOCKER_DRIVER: overlay2
+#     DOCKER_HOST: tcp://docker:2376
+#     DOCKER_TLS_CERTDIR: "/certs"
+#     DOCKER_TLS_VERIFY: 1
+#     DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+#   stage: test
+#   tags:
+#     - devops
+#     - bedrock
+#     - titanio-dev
+#     - docker
+#   only:
+#     - branches
+#   image: golangci/golangci-lint:v1.49
+#   script:
+#     - golangci-lint run -v
+
+compile-clonefactory:
+  stage: build
+  image: node:alpine
+  script:
+    - cd ./Goerli/clonefactory/ && yarn install && yarn compile
+  artifacts:
+    paths:
+      - abi
+      - artifacts
+      - cache
+      - node_modules
+
+compile-lumerintoken:
+  stage: build
+  image: node:alpine
+  script:
+    - cd ./Goerli/lumerintoken/ && yarn install && yarn compile
+  artifacts:
+    paths:
+      - abi
+      - artifacts
+      - cache
+      - node_modules
+
+build-clonefactory-go:
+  stage: build
+  needs: ["compile-clonefactory"]
+  image: ethereum/client-go:alltools-stable
+  script: cd ./Goerli/clonefactory && ./bindings-golang.sh
+  artifacts:
+    paths:
+      - go
+
+deploy-clonefactory:
+  variables:
+    LUMERIN_TOKEN_ADDR: ""
+  stage: release
+  needs: ["compile-clonefactory"]
+  script:
+    - cd ./Goerli/clonefactory/ && yarn deploy
+
+deploy-go-bindings:
+  stage: release
+  needs: ["build-clonefactory-go"]
+  script:
+    - cd ./Goerli/clonefactory/ && ./release-go-bindings.sh
