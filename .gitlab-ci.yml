@@ -26,7 +26,7 @@ stages:
 
 compile-lumerintoken:
   stage: build
-  image: node:alpine
+  image: node:14-buster
   script:
     - cd ./Goerli/lumerintoken/ && yarn install && yarn compile
   artifacts:
@@ -38,7 +38,7 @@ compile-lumerintoken:
 
 compile-clonefactory:
   stage: build
-  image: node:alpine
+  image: node:14-buster
   script:
     - cd ./Goerli/clonefactory/ && yarn install && yarn compile
   artifacts:
@@ -60,6 +60,8 @@ build-clonefactory-go:
 deploy-lumerintoken:
   stage: release
   needs: ["compile-lumerintoken"]
+  image: node:14-buster
+  when: manual
   script:
     - cd ./Goerli/clonefactory/ && yarn deploy
 
@@ -68,11 +70,15 @@ deploy-clonefactory:
     LUMERIN_TOKEN_ADDR: ""
   stage: release
   needs: ["compile-clonefactory"]
+  image: node:14-buster
+  when: manual
   script:
     - cd ./Goerli/clonefactory/ && yarn deploy
 
 deploy-go-bindings:
   stage: release
   needs: ["build-clonefactory-go"]
+  image: node:14-buster
+  when: manual
   script:
     - cd ./Goerli/clonefactory/ && ./release-go-bindings.sh
