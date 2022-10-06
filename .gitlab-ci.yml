@@ -24,11 +24,11 @@ stages:
 #   script:
 #     - golangci-lint run -v
 
-compile-clonefactory:
+compile-lumerintoken:
   stage: build
   image: node:alpine
   script:
-    - cd ./Goerli/clonefactory/ && yarn install && yarn compile
+    - cd ./Goerli/lumerintoken/ && yarn install && yarn compile
   artifacts:
     paths:
       - abi
@@ -36,11 +36,11 @@ compile-clonefactory:
       - cache
       - node_modules
 
-compile-lumerintoken:
+compile-clonefactory:
   stage: build
   image: node:alpine
   script:
-    - cd ./Goerli/lumerintoken/ && yarn install && yarn compile
+    - cd ./Goerli/clonefactory/ && yarn install && yarn compile
   artifacts:
     paths:
       - abi
