@@ -27,6 +27,7 @@ stages:
 compile-lumerintoken:
   stage: build
   image: node:14-buster
+  environment: goerli
   script:
     - cd ./Goerli/lumerintoken/ && yarn install && yarn compile
   artifacts:
@@ -39,6 +40,7 @@ compile-lumerintoken:
 compile-clonefactory:
   stage: build
   image: node:14-buster
+  environment: goerli
   script:
     - cd ./Goerli/clonefactory/ && yarn install && yarn compile
   artifacts:
@@ -61,7 +63,10 @@ deploy-lumerintoken:
   stage: release
   needs: ["compile-lumerintoken"]
   image: node:14-buster
+  environment: goerli
   when: manual
+  only:
+    - main
   script:
     - cd ./Goerli/clonefactory/ && yarn deploy
 
@@ -71,7 +76,10 @@ deploy-clonefactory:
   stage: release
   needs: ["compile-clonefactory"]
   image: node:14-buster
+  environment: goerli
   when: manual
+  only:
+    - main
   script:
     - cd ./Goerli/clonefactory/ && yarn deploy
 
@@ -80,5 +88,7 @@ deploy-go-bindings:
   needs: ["build-clonefactory-go"]
   image: node:14-buster
   when: manual
+  only:
+    - main
   script:
     - cd ./Goerli/clonefactory/ && ./release-go-bindings.sh
