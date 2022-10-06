@@ -4,7 +4,8 @@
     "compile": "hardhat compile",
     "deploy": "hardhat ./scripts/deploy.js",
     "build:go": "./bindings-golang.sh",
-    "test": "hardhat test --network hardhat tests/*.js"
+    "test": "hardhat test --network hardhat tests/*.js",
+    "clean": "rm -rf abi artifacts cache"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.5",

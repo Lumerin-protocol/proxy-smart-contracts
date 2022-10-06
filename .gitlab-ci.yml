@@ -31,10 +31,10 @@ compile-lumerintoken:
     - cd ./Goerli/lumerintoken/ && yarn install && yarn compile
   artifacts:
     paths:
-      - abi
-      - artifacts
-      - cache
-      - node_modules
+      - Goerli/lumerintoken/abi
+      - Goerli/lumerintoken/artifacts
+      - Goerli/lumerintoken/cache
+      - Goerli/lumerintoken/node_modules
 
 compile-clonefactory:
   stage: build
@@ -43,10 +43,10 @@ compile-clonefactory:
     - cd ./Goerli/clonefactory/ && yarn install && yarn compile
   artifacts:
     paths:
-      - abi
-      - artifacts
-      - cache
-      - node_modules
+      - Goerli/clonefactory/abi
+      - Goerli/clonefactory/artifacts
+      - Goerli/clonefactory/cache
+      - Goerli/clonefactory/node_modules
 
 build-clonefactory-go:
   stage: build
@@ -55,7 +55,7 @@ build-clonefactory-go:
   script: cd ./Goerli/clonefactory && ./bindings-golang.sh
   artifacts:
     paths:
-      - go
+      - Goerli/clonefactory/go
 
 deploy-lumerintoken:
   stage: release

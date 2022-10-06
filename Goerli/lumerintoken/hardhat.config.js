@@ -11,7 +11,7 @@ module.exports = {
     hardhat: {},
     gorelli: {
       url: process.env.NODE_URL,
-      accounts: JSON.parse(process.env.LUMERIN_TOKEN_ACCOUNTS),
+      accounts: JSON.parse(process.env.LUMERIN_TOKEN_ACCOUNTS || "[]"),
       gasPrice: "auto",
       gas: "auto",
     },
