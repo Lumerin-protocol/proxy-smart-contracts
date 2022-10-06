@@ -57,6 +57,12 @@ build-clonefactory-go:
     paths:
       - go
 
+deploy-lumerintoken:
+  stage: release
+  needs: ["compile-lumerintoken"]
+  script:
+    - cd ./Goerli/clonefactory/ && yarn deploy
+
 deploy-clonefactory:
   variables:
     LUMERIN_TOKEN_ADDR: ""
