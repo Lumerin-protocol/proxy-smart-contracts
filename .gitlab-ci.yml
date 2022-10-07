@@ -1,28 +1,22 @@
 stages:
   - test
   - build
-  - release
+  - release-bindings
   - deploy-goerli
   - deploy-mainnet
 
-# lint:
-#   variables:
-#     DOCKER_DRIVER: overlay2
-#     DOCKER_HOST: tcp://docker:2376
-#     DOCKER_TLS_CERTDIR: "/certs"
-#     DOCKER_TLS_VERIFY: 1
-#     DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
-#   stage: test
-#   tags:
-#     - devops
-#     - bedrock
-#     - titanio-dev
-#     - docker
-#   only:
-#     - branches
-#   image: golangci/golangci-lint:v1.49
-#   script:
-#     - golangci-lint run -v
+test:
+  stage: test
+  image: node:14-buster
+  only:
+    - branches
+  script:
+    - cd ./Goerli/clonefactory/ && yarn install && yarn test
+    - cd ./Goerli/lumerintoken/ && yarn install && yarn test
+  artifacts:
+    paths:
+      - Goerli/lumerintoken/node_modules
+      - Goerli/clonefactory/node_modules
 
 compile-lumerintoken:
   stage: build
@@ -39,6 +33,7 @@ compile-lumerintoken:
 compile-clonefactory:
   stage: build
   image: node:14-buster
+  needs: ["test"]
   script:
     - cd ./Goerli/clonefactory/ && yarn install && yarn compile
   artifacts:
@@ -58,7 +53,7 @@ build-clonefactory-go:
       - Goerli/clonefactory/go
 
 deploy-lumerintoken:
-  stage: release
+  stage: release-goerli
   needs: ["compile-lumerintoken"]
   image: node:14-buster
   environment: goerli
@@ -71,7 +66,7 @@ deploy-lumerintoken:
 deploy-clonefactory:
   variables:
     LUMERIN_TOKEN_ADDR: ""
-  stage: release
+  stage: release-goerli
   needs: ["compile-clonefactory"]
   image: node:14-buster
   environment: goerli
@@ -81,8 +76,8 @@ deploy-clonefactory:
   script:
     - cd ./Goerli/clonefactory/ && yarn deploy
 
-deploy-go-bindings:
-  stage: release
+release-go-bindings:
+  stage: release-bindings
   needs: ["build-clonefactory-go"]
   image: node:14-buster
   when: manual
