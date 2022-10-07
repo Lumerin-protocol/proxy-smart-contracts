@@ -27,7 +27,6 @@ stages:
 compile-lumerintoken:
   stage: build
   image: node:14-buster
-  environment: goerli
   script:
     - cd ./Goerli/lumerintoken/ && yarn install && yarn compile
   artifacts:
@@ -40,7 +39,6 @@ compile-lumerintoken:
 compile-clonefactory:
   stage: build
   image: node:14-buster
-  environment: goerli
   script:
     - cd ./Goerli/clonefactory/ && yarn install && yarn compile
   artifacts:
