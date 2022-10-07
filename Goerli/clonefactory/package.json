@@ -3,7 +3,7 @@
   "scripts": {
     "compile": "hardhat compile",
     "deploy": "hardhat ./scripts/deploy.js",
-    "build:go": "./bindings-golang.sh",
+    "build:go": "./bindings-go.sh",
     "test": "hardhat test --network hardhat tests/*.js",
     "clean": "rm -rf abi artifacts cache"
   },

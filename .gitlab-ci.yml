@@ -5,6 +5,10 @@ stages:
   - deploy-goerli
   - deploy-mainnet
 
+before_script:
+  - mkdir ~/.ssh
+  - ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
+
 test:
   stage: test
   image: node:14-buster
@@ -48,10 +52,19 @@ build-clonefactory-go:
   stage: build
   needs: ["compile-clonefactory"]
   image: ethereum/client-go:alltools-stable
-  script: cd ./Goerli/clonefactory && ./bindings-golang.sh
+  script: cd ./Goerli/clonefactory && ./bindings-go.sh
   artifacts:
     paths:
-      - Goerli/clonefactory/go
+      - Goerli/clonefactory/bindings-go
+
+build-clonefactory-js:
+  stage: build
+  needs: ["compile-clonefactory"]
+  image: ethereum/client-go:alltools-stable
+  script: cd ./Goerli/clonefactory && ./bindings-go.sh
+  artifacts:
+    paths:
+      - Goerli/clonefactory/bindings-go
 
 deploy-lumerintoken:
   stage: deploy-goerli
@@ -59,8 +72,8 @@ deploy-lumerintoken:
   image: node:14-buster
   environment: goerli
   when: manual
-  only:
-    - main
+  # only:
+  #   - main
   script:
     - cd ./Goerli/clonefactory/ && yarn deploy
 
@@ -72,8 +85,8 @@ deploy-clonefactory:
   image: node:14-buster
   environment: goerli
   when: manual
-  only:
-    - main
+  # only:
+  #   - main
   script:
     - cd ./Goerli/clonefactory/ && yarn deploy
 
@@ -82,7 +95,23 @@ release-go-bindings:
   needs: ["build-clonefactory-go"]
   image: node:14-buster
   when: manual
-  only:
-    - main
+  # only:
+  #   - main
   script:
+    - cp $SSH_KEY_CLONEFACTORY_BINDINGS_GO ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - make release-go
+    - cd ./Goerli/clonefactory/ && ./release-go-bindings.sh
+
+release-js-bindings:
+  stage: release-bindings
+  needs: ["build-clonefactory-go"]
+  image: node:14-buster
+  when: manual
+  # only:
+  #   - main
+  script:
+    - cp $SSH_KEY_CLONEFACTORY_BINDINGS_JS ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - make release-js
     - cd ./Goerli/clonefactory/ && ./release-go-bindings.sh
