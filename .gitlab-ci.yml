@@ -53,7 +53,7 @@ build-clonefactory-go:
       - Goerli/clonefactory/go
 
 deploy-lumerintoken:
-  stage: release-goerli
+  stage: deploy-goerli
   needs: ["compile-lumerintoken"]
   image: node:14-buster
   environment: goerli
@@ -66,7 +66,7 @@ deploy-lumerintoken:
 deploy-clonefactory:
   variables:
     LUMERIN_TOKEN_ADDR: ""
-  stage: release-goerli
+  stage: deploy-goerli
   needs: ["compile-clonefactory"]
   image: node:14-buster
   environment: goerli
