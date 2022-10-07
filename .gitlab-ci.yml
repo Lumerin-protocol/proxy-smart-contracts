@@ -100,8 +100,7 @@ release-go-bindings:
   script:
     - cp $SSH_KEY_CLONEFACTORY_BINDINGS_GO ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
-    - make release-go
-    - cd ./Goerli/clonefactory/ && ./release-go-bindings.sh
+    - cd ./Goerli/clonefactory/ && make release-go
 
 release-js-bindings:
   stage: release-bindings
@@ -117,5 +116,4 @@ release-js-bindings:
   script:
     - cp $SSH_KEY_CLONEFACTORY_BINDINGS_JS ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
-    - make release-js
-    - cd ./Goerli/clonefactory/ && ./release-go-bindings.sh
+    - cd ./Goerli/clonefactory/ && make release-js
