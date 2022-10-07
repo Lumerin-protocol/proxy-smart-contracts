@@ -5,11 +5,6 @@ stages:
   - deploy-goerli
   - deploy-mainnet
 
-before_script:
-  - apt-get -yq update && apt-get -yqq install openssh-client
-  - mkdir ~/.ssh
-  - ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
-
 test:
   stage: test
   image: node:14-buster
@@ -98,6 +93,10 @@ release-go-bindings:
   when: manual
   # only:
   #   - main
+  before_script:
+    - apt-get -yq update && apt-get -yqq install openssh-client
+    - mkdir ~/.ssh
+    - ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
   script:
     - cp $SSH_KEY_CLONEFACTORY_BINDINGS_GO ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
@@ -111,6 +110,10 @@ release-js-bindings:
   when: manual
   # only:
   #   - main
+  before_script:
+    - apt-get -yq update && apt-get -yqq install openssh-client
+    - mkdir ~/.ssh
+    - ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
   script:
     - cp $SSH_KEY_CLONEFACTORY_BINDINGS_JS ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
