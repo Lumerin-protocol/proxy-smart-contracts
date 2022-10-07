@@ -6,6 +6,7 @@ stages:
   - deploy-mainnet
 
 before_script:
+  - apt-get -yq update && apt-get -yqq install openssh-client
   - mkdir ~/.ssh
   - ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
 
