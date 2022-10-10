@@ -11,7 +11,7 @@ release-js:
 release-git:
 	cd $(path) \
 		&& git init \
-		&& git branch -m main \
+		&& git checkout -b main \
 		&& git config --local user.email "lumerin@titan.io" \
 		&& git config --local user.name	"Lumerin Bot" \
 		&& git remote add origin $(remote) \
