@@ -4,7 +4,7 @@
     "compile": "hardhat compile",
     "deploy": "hardhat ./scripts/deploy.js",
     "build:go": "./bindings-go.sh",
-    "test": "hardhat test --network hardhat tests/*.js",
+    "test": "npx hardhat node & hardhat test --network hardhat tests/*.js",
     "clean": "rm -rf abi artifacts cache"
   },
   "devDependencies": {
