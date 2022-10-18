@@ -1,68 +1,112 @@
-pragma solidity >= 0.8.0;
+pragma solidity >=0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "./LumerinToken.sol";
+import "./PoE.sol";
 
-//contract must be sent lumerin from the address in the currently running faucet
 contract Faucet {
-    address tokenAddress = address(0x04fa90c64DAeEe83B22501c790D39B8B9f53878a);
-    address proofOfExistence = address(0xE8B919615541c2Dda71EBc9d2B09E5349D3723A8); //actual address
-    address owner;
-    uint transferAmount = 100;
-    uint cooldownPeriod = 24*60*60; //one days worth of seconds
-    mapping(address => uint) claimBlock;
-    ERC20 token = ERC20(tokenAddress);
-    ERC20 existance = ERC20(proofOfExistence);
+    /*
+       this is a token faucet
+       it allows people to claim tokens in a controlled manner
+       */
+      address owner;
+      uint public cooldownPeriod;
+      uint public startOfDay;
+      uint public dailyLimitCount;
+      uint public txAmount;
+      uint public gethAmount;
+      mapping(address => uint) lastClaimed;
+      Lumerin lumerin;
+      POE poe;
 
-    constructor() {
-        owner = msg.sender;
-    }
+      constructor() payable {
+          owner = payable(msg.sender);
+          startOfDay = block.timestamp;
+          dailyLimitCount = 0;
+          cooldownPeriod = 24*60*60;
+          lumerin = Lumerin(0xF3aCe2847F01D3ef1025c7070579611091A6422D); //lumerin token address
+          poe = POE(0xe8bb848CC4ad094Ee1De2689D416B783c1294246); //poe token address
+          txAmount = 10*10**lumerin.decimals();
+          gethAmount = 5e16;
+      }
 
-    modifier timeLock() {
-        require(claimBlock[msg.sender]+cooldownPeriod < block.timestamp, "not enough time has passed");
+      modifier canClaim {
+          require(lastClaimed[msg.sender] + cooldownPeriod <= block.timestamp, "you need to wait before claiming");
+          _;
+      }
+
+      modifier doesExist {
+          require(poe.balanceOf(msg.sender) == 1, "you need to have a proof of existance token");
+          _;
+      }
+
+      modifier onlyOwner {
+        require(msg.sender == owner, "you are not authorized to call this function");
         _;
-    }
+      }
 
-    modifier isRealPerson() {
-        require(existance.balanceOf(msg.sender) == 1, "you do not exist, perhaps you're a vampire?");
+      modifier dailyLimit {
+        require(dailyLimitCount < 800, "the daily limit of test lumerin has been distributed");
         _;
-    }
+      }
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "you thief! keep ur dirty paws off of our administrative functions");
-        _;
-    }
+      receive() external payable {}
 
-    function withdraw() public timeLock isRealPerson{
-        //send lumerin to recipient
-        claimBlock[msg.sender] = block.timestamp;
-        token.transfer(msg.sender, transferAmount*10**token.decimals());
-    }
+      //function to allow people to claim a set amount of tokens 
+      //checks to make sure that they have a proof of existance token
+      //checks to make sure they haven't claime in the cooldown period
+      function claim() public canClaim doesExist dailyLimit {
+      //function claim() public {
+          lumerin.transfer(msg.sender, txAmount);
+          payable(msg.sender).transfer(gethAmount);//sends amount in wei to recipient
+          lastClaimed[msg.sender] = block.timestamp;
+          dailyLimitCount = dailyLimitCount + 10;
+          refreshDailyLimit();
+      }
 
+      //allows the owner of this contract to send tokens to the claiment
+      function supervisedClaim(address _claiment) public onlyOwner dailyLimit {
+          require(lastClaimed[_claiment] + cooldownPeriod <= block.timestamp, "you need to wait before claiming");
+          require(poe.balanceOf(_claiment) == 1, "you need to have a proof of existance token");
+          lumerin.transfer(_claiment, txAmount);
+          lastClaimed[_claiment] = block.timestamp;
+          payable(_claiment).transfer(gethAmount);//sends amount in wei to recipient
+          dailyLimitCount = dailyLimitCount + 10;
+          refreshDailyLimit();
+      }
 
-    //admin functions
-    function changeOwner() external onlyOwner {
-        owner = msg.sender;
-    }
+      function refreshDailyLimit() internal {
+        if (startOfDay + 24*60*60 < block.timestamp) {
+          startOfDay = block.timestamp;
+          dailyLimitCount = 0;
+        }
+      }
 
-    function resetClaimBlock(address _customer) external onlyOwner {
-        claimBlock[_customer] = 0;
-    }
+      function setUpdateCooldownPeriod(uint _cooldownPeriod) public onlyOwner {
+          cooldownPeriod = _cooldownPeriod;
+      }
 
-    function changeTransferAmount(uint _x) external onlyOwner {
-        transferAmount = _x;
-    }
+      function setUpdateGWEIAmount(uint _gwei) public onlyOwner {
+          gethAmount = _gwei;
+      }
 
-    function changeCooldownTime(uint _x) external onlyOwner {
-        cooldownPeriod = _x;
-    }
+      function setUpdateTxAmount(uint _txAmount) public onlyOwner {
+          txAmount = _txAmount*10**lumerin.decimals();
+      }
 
-    function changeLMRAddress(address _lumerin) external onlyOwner {
-        tokenAddress = _lumerin;
-        ERC20 token = ERC20(tokenAddress);
-    }
+      function setUpdateLumerin(address _lmr) public onlyOwner {
+        lumerin = Lumerin(_lmr);
+      }
 
-    function changePOEAddress(address _poe) external onlyOwner {
-        proofOfExistence = _poe;
-        ERC20 existance = ERC20(proofOfExistence);
-    }
+      function setUpdateOwner(address _newOwner) public onlyOwner {
+        owner = _newOwner;
+      }
+
+      function setTransferLumerin(address _to, uint _amount) public onlyOwner {
+        lumerin.transfer(_to, _amount);
+      }
+
+      function emptyGeth() public onlyOwner {
+          payable(owner).transfer(address(this).balance);//sends amount in wei to recipient
+      }
+
 }
