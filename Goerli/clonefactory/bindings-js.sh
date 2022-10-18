@@ -3,7 +3,7 @@ PTH="./bindings-js"
 rm -rf $PTH
 mkdir -p $PTH
 
-cp ./templates/js $PTH
+cp -r ./templates/js/ $PTH
 cp ./abi/CloneFactory.json $PTH/src/abi
 cp ./abi/Implementation.json $PTH/src/abi
 cp ./abi/Lumerin.json $PTH/src/abi
