@@ -1,0 +1,13 @@
+{
+  "name": "clonefactory-bindinds-js",
+  "version": "0.0.1",
+  "scripts": {
+    "generate": "rm -f ./src/CloneFactory.ts && abi-types-generator './src/CloneFactory.json' --output='./src'",
+    "build": "rm -rf ./dist && tsc"
+  },
+  "devDependencies": {
+    "ethereum-abi-types-generator": "^1.3.2",
+    "typescript": "^4.8.4",
+    "web3": "^1.8.0"
+  }
+}

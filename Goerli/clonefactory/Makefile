@@ -4,9 +4,12 @@ release-go:
 	make release-git path="bindings-go" remote="git@github.com:Lumerin-protocol/clonefactory-go-bindings.git"
 	echo "Go bindings released"
 
-release-js:
-	make release-git path="pkg/nodejs" remote="git@github.com:Lumerin-protocol/clonefactory-js-bindings.git"
-	echo "JS bindings released"
+# release-js:
+# 	make release-git path="pkg/nodejs" remote="git@github.com:Lumerin-protocol/clonefactory-js-bindings.git"
+# 	echo "JS bindings released"
+
+release-js-npm:
+	./templates/js/release.sh $(version) $(token)
 
 release-git:
 	cd $(path) \

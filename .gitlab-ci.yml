@@ -57,10 +57,10 @@ build-clonefactory-js:
   stage: build
   needs: ["compile-clonefactory"]
   image: ethereum/client-go:alltools-stable
-  script: cd ./Goerli/clonefactory && ./bindings-go.sh
+  script: cd ./Goerli/clonefactory && ./bindings-js.sh
   artifacts:
     paths:
-      - Goerli/clonefactory/bindings-go
+      - Goerli/clonefactory/bindings-js
 
 deploy-lumerintoken:
   stage: deploy-goerli
@@ -114,6 +114,4 @@ release-js-bindings:
     - mkdir ~/.ssh
     - ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
   script:
-    - cp "$SSH_KEY_CLONEFACTORY_BINDINGS_JS" "~/.ssh/id_rsa"
-    - chmod 600 ~/.ssh/id_rsa
-    - cd ./Goerli/clonefactory/ && make release-js
+    - cd ./Goerli/clonefactory/ && make release-js token='$NPM_TOKEN'

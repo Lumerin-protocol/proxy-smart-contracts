@@ -5,7 +5,7 @@
     "deploy": "hardhat ./scripts/deploy.js",
     "build:go": "./bindings-go.sh",
     "test": "npx hardhat node & hardhat test --network hardhat tests/*.js",
-    "clean": "rm -rf abi artifacts cache"
+    "clean": "rm -rf abi artifacts cache bindings-go"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.5",
