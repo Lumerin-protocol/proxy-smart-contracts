@@ -1,4 +1,4 @@
 node_modules
-src/CloneFactory.json
-src/CloneFactory.ts
+src/abi
+src/generated-types
 dist
