@@ -57,7 +57,7 @@ build-clonefactory-js:
   stage: build
   needs: ["compile-clonefactory"]
   image: node:14-buster
-  script: cd ./Goerli/clonefactory && ./bindings-js.sh
+  script: cd ./Goerli/clonefactory && ls -la && ./bindings-js.sh
   artifacts:
     paths:
       - Goerli/clonefactory/bindings-js
