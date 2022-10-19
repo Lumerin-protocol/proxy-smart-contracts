@@ -3,9 +3,10 @@ PTH="./bindings-js"
 rm -rf "$PTH"
 mkdir -p "$PTH"
 
-ls -la "./templates/js/"
+# copy project template
 cp -R "./templates/js/." "$PTH"
-ls -la $PTH
+
+# copy abi's
 mkdir -p "$PTH/src/abi"
 cp ./abi/CloneFactory.json $PTH/src/abi
 cp ./abi/Implementation.json $PTH/src/abi
@@ -13,8 +14,7 @@ cp ./abi/Lumerin.json $PTH/src/abi
 
 cd $PTH
 
-ls -la
-
+# install build dependencies
 yarn
 
 # build typing from abi
