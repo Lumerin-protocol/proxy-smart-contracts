@@ -86,7 +86,7 @@ deploy-clonefactory:
   script:
     - cd ./Goerli/clonefactory/ && yarn deploy
 
-release-go-bindings:
+release-contracts-go:
   stage: release-bindings
   needs: ["build-clonefactory-go"]
   image: node:14-buster
@@ -98,11 +98,11 @@ release-go-bindings:
     - mkdir ~/.ssh
     - ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
   script:
-    - cp $SSH_KEY_CLONEFACTORY_BINDINGS_GO ~/.ssh/id_rsa
+    - cp $SSH_KEY_CONTRACTS_GO ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - cd ./Goerli/clonefactory/ && make release-go
 
-release-js-bindings:
+release-contracts-js:
   stage: release-bindings
   needs: ["build-clonefactory-go"]
   image: node:14-buster
@@ -114,4 +114,6 @@ release-js-bindings:
     - mkdir ~/.ssh
     - ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
   script:
-    - cd ./Goerli/clonefactory/ && make release-js token='$NPM_TOKEN'
+    - cp $SSH_KEY_CONTRACTS_JS ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - cd ./Goerli/clonefactory/ && make release-js

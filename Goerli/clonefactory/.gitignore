@@ -6,9 +6,11 @@ cache
 typechain
 ./test/test.js
 
-#Hardhat files
+# hardhat files
 cache
 artifacts
 abi
+
+# generated code
 bindings-go
 bindings-js

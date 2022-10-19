@@ -1,4 +1,4 @@
 node_modules
-src/abi
-src/generated-types
-dist
+
+# excluding source code, only dist should be commited
+src

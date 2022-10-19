@@ -1,18 +1,20 @@
 version := $(shell cat ./VERSION)
 
 release-go:
-	make release-git path="bindings-go" remote="git@github.com:Lumerin-protocol/clonefactory-go-bindings.git"
-	echo "Go bindings released"
+	make release-git path="bindings-go" remote="git@github.com:Lumerin-protocol/contracts-go.git"
+	echo "contracts-go released"
 
-# release-js:
-# 	make release-git path="pkg/nodejs" remote="git@github.com:Lumerin-protocol/clonefactory-js-bindings.git"
-# 	echo "JS bindings released"
+release-js:
+	cd bindings-js && yarn version --new-version $(version) --no-git-tag-version
+	make release-git path="bindings-js" remote="git@github.com:Lumerin-protocol/contracts-js.git"
+	echo "contracts-js released"
 
-release-js-npm:
-	./templates/js/release.sh $(version) $(token)
+# release-js-npm:
+# 	./templates/js/release.sh $(version) $(token)
 
 release-git:
 	cd $(path) \
+		&& rm -rf .git \
 		&& git init \
 		&& git checkout -b main \
 		&& git config --local user.email "lumerin@titan.io" \
