@@ -7,9 +7,13 @@
     "generate": "rm -rf ./src/generated-types && mkdir -p ./src/generated-types && abi-types-generator './src/abi/CloneFactory.json' --output='./src/generated-types' && abi-types-generator './src/abi/Lumerin.json' --output='./src/generated-types' && abi-types-generator './src/abi/Implementation.json' --output='./src/generated-types'",
     "build": "rm -rf ./dist && tsc"
   },
+  "dependencies": {
+    "ethereum-abi-types-generator": "^1.3.2"
+  },
   "devDependencies": {
-    "ethereum-abi-types-generator": "^1.3.2",
-    "typescript": "^4.8.4",
-    "web3": "^1.8.0"
+    "typescript": "^4.8.4"
+  },
+  "peerDependencies": {
+    "web3": ">1.x"
   }
 }
