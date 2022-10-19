@@ -50,6 +50,7 @@ build-clonefactory-go:
   image: ethereum/client-go:alltools-stable
   script: cd ./Goerli/clonefactory && ./bindings-go.sh
   artifacts:
+    untracked: true
     paths:
       - Goerli/clonefactory/bindings-go
 
@@ -59,6 +60,7 @@ build-clonefactory-js:
   image: node:14-buster
   script: cd ./Goerli/clonefactory && ./bindings-js.sh
   artifacts:
+    untracked: true
     paths:
       - Goerli/clonefactory/bindings-js
 
