@@ -106,7 +106,7 @@ release-contracts-go:
 
 release-contracts-js:
   stage: release-bindings
-  needs: ["build-clonefactory-go"]
+  needs: ["build-clonefactory-js"]
   image: node:14-buster
   when: manual
   # only:
