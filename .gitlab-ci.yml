@@ -56,7 +56,7 @@ build-clonefactory-go:
 build-clonefactory-js:
   stage: build
   needs: ["compile-clonefactory"]
-  image: ethereum/client-go:alltools-stable
+  image: node:14-buster
   script: cd ./Goerli/clonefactory && ./bindings-js.sh
   artifacts:
     paths:
