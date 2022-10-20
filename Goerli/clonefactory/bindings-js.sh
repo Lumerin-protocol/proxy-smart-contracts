@@ -5,6 +5,7 @@ mkdir -p "$PTH"
 
 # copy project template
 cp -R "./templates/js/." "$PTH"
+mv "$PTH/.gitignore-template" "$PTH/.gitignore"
 
 # copy abi's
 mkdir -p "$PTH/src/abi"
