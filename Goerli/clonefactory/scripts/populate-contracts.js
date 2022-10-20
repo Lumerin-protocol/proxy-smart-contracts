@@ -81,10 +81,19 @@ let populateContracts = async function () {
         c["speed"],
         c["length"],
         process.env.VALIDATOR_TOKEN_ADDR,
-        ""
+        "",
+        {
+          gasLimit: 100000,
+        }
       );
     await contractCreate.wait();
+    console.log(`created contract ${contractCreate.address}`);
   }
 };
 
-populateContracts();
+populateContracts()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

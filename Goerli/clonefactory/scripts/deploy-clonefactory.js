@@ -14,6 +14,8 @@ async function main() {
     process.env.POE_TOKEN_ADDR
   );
 
+  await cloneFactory.deployed();
+
   console.log("Clone Factory address:", cloneFactory.address);
 }
 
