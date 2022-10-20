@@ -2,9 +2,10 @@
   "name": "hardhat-project",
   "scripts": {
     "compile": "hardhat compile",
-    "deploy-clonefactory": "hardhat ./scripts/deploy-clonefactory.js",
-    "deploy-lumerin": "hardhat ./scripts/deploy-clonefactory.js",
-    "deploy-faucet": "hardhat ./scripts/deploy-faucet.js",
+    "deploy-clonefactory": "hardhat run ./scripts/deploy-clonefactory.js",
+    "deploy-lumerin": "hardhat run ./scripts/deploy-lumerin.js",
+    "deploy-faucet": "hardhat run ./scripts/deploy-faucet.js",
+    "populate-contracts": "hardhat run ./scripts/populate-contracts.js",
     "build:go": "./bindings-go.sh",
     "test": "npx hardhat node & hardhat test --network hardhat tests/*.js",
     "clean": "rm -rf abi artifacts cache bindings-go"
