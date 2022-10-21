@@ -22,10 +22,10 @@ populate-contracts:
 	hardhat run --network goerli ./scripts/populate-contracts.js
 
 build-go:
-	./bindings-go.sh
+	./build-go.sh
 
 build-js:
-	./bindings-js.sh
+	./build-js.sh
 
 release-go:
 	make release-git path="bindings-go" remote="git@github.com:Lumerin-protocol/contracts-go.git"
