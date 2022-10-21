@@ -1,5 +1,5 @@
 #!/bin/sh
-PTH="./bindings-js"
+PTH="./build-js"
 rm -rf "$PTH"
 mkdir -p "$PTH"
 

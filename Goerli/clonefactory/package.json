@@ -2,13 +2,7 @@
   "name": "hardhat-project",
   "scripts": {
     "compile": "hardhat compile",
-    "deploy-clonefactory": "hardhat run --network goerli ./scripts/deploy-clonefactory.js",
-    "deploy-lumerin": "hardhat run --network goerli ./scripts/deploy-lumerin.js",
-    "deploy-faucet": "hardhat run --network goerli ./scripts/deploy-faucet.js",
-    "populate-contracts": "hardhat run --network goerli ./scripts/populate-contracts.js",
-    "build:go": "./bindings-go.sh",
-    "test": "npx hardhat node & hardhat test --network hardhat tests/*.js",
-    "clean": "rm -rf abi artifacts cache bindings-go"
+    "test": "npx hardhat node & hardhat test --network hardhat tests/*.js"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.5",

@@ -5,6 +5,16 @@ stages:
   - deploy-goerli
   - deploy-mainnet
 
+# Sets ENV_NAME=ENV_VALUE in shell and gitlab ci project ci/cd variables
+# TODO: support scoped variables by adding
+# --form environment_scope=$CI_ENVIRONMENT_SLUG
+# --form filter[environment_scope]=$CI_ENVIRONMENT_SLUG
+.set-env: &set-env >
+  declare "$ENV_NAME=$ENV_VALUE" &&
+  curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_TOKEN" 
+    "$CI_API_V4_URL/projects/$CI_PROJECT_ID/variables/$ENV_NAME" 
+    --form "value=$ENV_VALUE"
+
 test:
   stage: test
   image: node:14-buster
@@ -12,8 +22,7 @@ test:
   only:
     - branches
   script:
-    - cd ./Goerli/clonefactory/ && yarn install && yarn test
-    - cd ./Goerli/lumerintoken/ && yarn install && yarn test
+    - cd ./Goerli/clonefactory/ && yarn install && make test
   artifacts:
     paths:
       - Goerli/lumerintoken/node_modules
@@ -24,7 +33,7 @@ compile-contracts:
   image: node:14-buster
   needs: ["test"]
   script:
-    - cd ./Goerli/clonefactory/ && yarn install && yarn compile
+    - cd ./Goerli/clonefactory/ && yarn install && make compile
   artifacts:
     paths:
       - Goerli/clonefactory/abi
@@ -36,7 +45,7 @@ build-contracts-go:
   stage: build
   needs: ["compile-contracts"]
   image: ethereum/client-go:alltools-stable
-  script: cd ./Goerli/clonefactory && ./bindings-go.sh
+  script: cd ./Goerli/clonefactory && make build-go
   artifacts:
     untracked: true
     paths:
@@ -46,13 +55,13 @@ build-contracts-js:
   stage: build
   needs: ["compile-contracts"]
   image: node:14-buster
-  script: cd ./Goerli/clonefactory && ./bindings-js.sh
+  script: cd ./Goerli/clonefactory && make build-js
   artifacts:
     untracked: true
     paths:
       - Goerli/clonefactory/bindings-js
 
-deploy-lumerintoken:
+deploy-lumerintoken-clonefactory:
   stage: deploy-goerli
   needs: ["compile-contracts"]
   image: node:14-buster
@@ -61,7 +70,14 @@ deploy-lumerintoken:
   # only:
   #   - main
   script:
-    - cd ./Goerli/clonefactory/ && yarn deploy-lumerin
+    - cd ./Goerli/clonefactory/ &&
+      make deploy-lumerin &&
+      export ENV_NAME="LUMERIN_TOKEN_ADDR" ENV_VALUE=$(cat lumerin-addr.tmp)
+    - *set-env
+    - make deploy-clonefactory
+    - export ENV_NAME=CLONEFACTORY_ADDR ENV_VALUE=$(cat clonefactory-addr.tmp)
+    - *set-env
+    - make populate-contracts
 
 deploy-clonefactory:
   variables:
@@ -74,7 +90,14 @@ deploy-clonefactory:
   # only:
   #   - main
   script:
-    - cd ./Goerli/clonefactory/ && yarn deploy-clonefactory
+    - cd ./Goerli/clonefactory/ &&
+      make deploy-lumerin &&
+      export ENV_NAME="LUMERIN_TOKEN_ADDR" ENV_VALUE=$(cat lumerin-addr.tmp)
+    - *set-env
+    - make deploy-clonefactory
+    - export ENV_NAME="CLONEFACTORY_ADDR" ENV_VALUE=$(cat clonefactory-addr.tmp)
+    - *set-env
+    - make populate-contracts
 
 release-contracts-go:
   stage: release-bindings

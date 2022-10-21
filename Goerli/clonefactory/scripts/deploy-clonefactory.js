@@ -13,10 +13,10 @@ async function main() {
     process.env.VALIDATOR_TOKEN_ADDR,
     process.env.POE_TOKEN_ADDR
   );
-
   await cloneFactory.deployed();
 
   console.log("Clone Factory address:", cloneFactory.address);
+  fs.writeFileSync("faucet-addr.tmp", String(faucet.address));
 }
 
 main()

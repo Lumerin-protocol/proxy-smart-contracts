@@ -1,5 +1,5 @@
 #!/bin/sh
-PTH="./bindings-go"
+PTH="./build-go"
 rm -rf "$PTH"
 
 mkdir -p "$PTH/clonefactory"

@@ -5,6 +5,7 @@
 // will compile your contracts, add the Hardhat Runtime Environment's members to the
 // global scope, and execute the script.
 const hre = require("hardhat");
+const fs = require("fs");
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -13,15 +14,17 @@ async function main() {
 
   console.log("Account balance:", (await deployer.getBalance()).toString());
 
-  const Lumerin = await ethers.getContractFactory("Faucet");
-  const lumerin = await Lumerin.deploy();
-  await lumerin.deployed();
-  console.log("Faucet address:", lumerin.address);
+  const Faucet = await ethers.getContractFactory("Faucet");
+  const faucet = await Faucet.deploy();
+  await faucet.deployed();
+
+  console.log("Faucet address:", faucet.address);
+  fs.writeFileSync("faucet-addr.tmp", String(faucet.address));
 }
 
-// We recommend this pattern to be able to use async/await everywhere
-// and properly handle errors.
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

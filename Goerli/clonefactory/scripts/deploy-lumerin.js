@@ -1,4 +1,5 @@
 require("dotenv").config();
+const fs = require("fs");
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -11,6 +12,7 @@ async function main() {
   await lumerin.deployed();
 
   console.log("Lumerin address:", lumerin.address);
+  fs.writeFileSync("lumerin-addr.tmp", String(lumerin.address));
 }
 
 main()

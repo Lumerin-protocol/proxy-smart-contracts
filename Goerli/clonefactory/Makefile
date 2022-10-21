@@ -1,5 +1,32 @@
 version := $(shell cat ./VERSION)
 
+clean:
+	rm -rf abi artifacts cache bindings-go bindings-js
+
+test:
+	yarn hardhat node & yarn hardhat test --network hardhat tests/*.js
+
+compile:
+	yarn hardhat compile
+
+deploy-lumerin:
+	yarn hardhat run --network goerli ./scripts/deploy-lumerin.js
+
+deploy-clonefactory:
+	yarn hardhat run --network goerli ./scripts/deploy-clonefactory.js
+
+deploy-faucet:
+	yarn hardhat run --network goerli ./scripts/deploy-faucet.js
+
+populate-contracts:
+	hardhat run --network goerli ./scripts/populate-contracts.js
+
+build-go:
+	./bindings-go.sh
+
+build-js:
+	./bindings-js.sh
+
 release-go:
 	make release-git path="bindings-go" remote="git@github.com:Lumerin-protocol/contracts-go.git"
 	echo "contracts-go released"

@@ -1,13 +1,10 @@
 require("dotenv").config();
-let { ethers } = require("hardhat");
+const { ethers } = require("hardhat");
 
-let seller;
-let cloneFactory;
-
-let populateContracts = async function () {
-  let CloneFactory = await ethers.getContractFactory("CloneFactory");
-  [seller] = await ethers.getSigners();
-  cloneFactory = await CloneFactory.attach(process.env.CLONEFACTORY_ADDR);
+const main = async function () {
+  const CloneFactory = await ethers.getContractFactory("CloneFactory");
+  const [seller] = await ethers.getSigners();
+  const cloneFactory = await CloneFactory.attach(process.env.CLONEFACTORY_ADDR);
   //deploying with the validator as the address collecting titans lumerin
 
   let variableList = [
@@ -83,15 +80,17 @@ let populateContracts = async function () {
         process.env.VALIDATOR_TOKEN_ADDR,
         "",
         {
-          gasLimit: 100000,
+          gasLimit: 10000000,
+          nonce: 1,
         }
       );
+
     await contractCreate.wait();
-    console.log(`created contract ${contractCreate.address}`);
+    console.log(`created contract`, contractCreate);
   }
 };
 
-populateContracts()
+main()
   .then(() => process.exit(0))
   .catch((err) => {
     console.error(err);
