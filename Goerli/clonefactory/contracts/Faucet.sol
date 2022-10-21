@@ -1,7 +1,6 @@
 pragma solidity >=0.8.0;
 
 import "./LumerinToken.sol";
-import "./PoE.sol";
 
 contract Faucet {
     /*
@@ -16,26 +15,19 @@ contract Faucet {
       uint public gethAmount;
       mapping(address => uint) lastClaimed;
       Lumerin lumerin;
-      POE poe;
 
-      constructor() payable {
+      constructor(address _lmr) payable {
           owner = payable(msg.sender);
           startOfDay = block.timestamp;
           dailyLimitCount = 0;
           cooldownPeriod = 24*60*60;
-          lumerin = Lumerin(0xF3aCe2847F01D3ef1025c7070579611091A6422D); //lumerin token address
-          poe = POE(0xe8bb848CC4ad094Ee1De2689D416B783c1294246); //poe token address
+          lumerin = Lumerin(_lmr); //lumerin token address
           txAmount = 10*10**lumerin.decimals();
           gethAmount = 5e16;
       }
 
       modifier canClaim {
           require(lastClaimed[msg.sender] + cooldownPeriod <= block.timestamp, "you need to wait before claiming");
-          _;
-      }
-
-      modifier doesExist {
-          require(poe.balanceOf(msg.sender) == 1, "you need to have a proof of existance token");
           _;
       }
 
@@ -54,8 +46,7 @@ contract Faucet {
       //function to allow people to claim a set amount of tokens 
       //checks to make sure that they have a proof of existance token
       //checks to make sure they haven't claime in the cooldown period
-      function claim() public canClaim doesExist dailyLimit {
-      //function claim() public {
+      function claim() public canClaim dailyLimit {
           lumerin.transfer(msg.sender, txAmount);
           payable(msg.sender).transfer(gethAmount);//sends amount in wei to recipient
           lastClaimed[msg.sender] = block.timestamp;
@@ -66,10 +57,9 @@ contract Faucet {
       //allows the owner of this contract to send tokens to the claiment
       function supervisedClaim(address _claiment) public onlyOwner dailyLimit {
           require(lastClaimed[_claiment] + cooldownPeriod <= block.timestamp, "you need to wait before claiming");
-          require(poe.balanceOf(_claiment) == 1, "you need to have a proof of existance token");
           lumerin.transfer(_claiment, txAmount);
-          lastClaimed[_claiment] = block.timestamp;
           payable(_claiment).transfer(gethAmount);//sends amount in wei to recipient
+          lastClaimed[_claiment] = block.timestamp;
           dailyLimitCount = dailyLimitCount + 10;
           refreshDailyLimit();
       }
