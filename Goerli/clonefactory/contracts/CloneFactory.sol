@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./Implementation.sol";
 import "./LumerinToken.sol";
-import "./PoE.sol";
 
 /// @title CloneFactory
 /// @author Josh Kean (Lumerin)
@@ -21,17 +20,15 @@ contract CloneFactory {
     address owner;
     address[] public rentalContracts; //dynamically allocated list of rental contracts
     Lumerin lumerin;
-    POE poe;
 
     //constructor(address _lmn, address _validator, address _proofOfExistance) {
-    constructor(address _lmn, address _validator, address _poe) {
+    constructor(address _lmn, address _validator) {
         Implementation _imp = new Implementation();
         baseImplementation = address(_imp);
         lmnDeploy = _lmn; //deployed address of lumeirn token
         validator = _validator;
         lumerin = Lumerin(_lmn);
         owner = msg.sender;
-        poe = POE(_poe);
     }
 
     event contractCreated(address indexed _address, string _pubkey); //emitted whenever a contract is created
@@ -39,11 +36,6 @@ contract CloneFactory {
 
     modifier onlyOwner() {
         require(msg.sender == owner, "you are not authorized");
-        _;
-    }
-
-    modifier onlyReal() {
-        require(poe.balanceOf(msg.sender) == 1, "you are not verified as a real person");
         _;
     }
 
@@ -55,7 +47,7 @@ contract CloneFactory {
         uint256 _length,
         address _validator,
         string memory _pubKey
-    ) external onlyReal returns (address) {
+    ) external returns (address) {
         address _newContract = Clones.clone(baseImplementation);
         Implementation(_newContract).initialize(
             _price,
@@ -77,7 +69,7 @@ contract CloneFactory {
     function setPurchaseRentalContract (
         address contractAddress,
         string memory _cipherText
-    ) onlyReal external {
+    ) external {
         Implementation targetContract = Implementation(contractAddress);
         uint256 _price = targetContract.price();
         require(
