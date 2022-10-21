@@ -45,7 +45,7 @@ build-contracts-go:
   stage: build
   needs: ["compile-contracts"]
   image: ethereum/client-go:alltools-stable
-  script: cd ./Goerli/clonefactory && make build-go
+  script: cd ./Goerli/clonefactory && ./build-go.sh
   artifacts:
     untracked: true
     paths:
