@@ -90,10 +90,7 @@ deploy-clonefactory:
   # only:
   #   - main
   script:
-    - cd ./Goerli/clonefactory/ &&
-      make deploy-lumerin &&
-      export ENV_NAME="LUMERIN_TOKEN_ADDR" ENV_VALUE=$(cat lumerin-addr.tmp)
-    - *set-env
+    - cd ./Goerli/clonefactory/
     - make deploy-clonefactory
     - export ENV_NAME="CLONEFACTORY_ADDR" ENV_VALUE=$(cat clonefactory-addr.tmp)
     - *set-env
