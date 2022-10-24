@@ -17,7 +17,7 @@ async function main() {
   await cloneFactory.deployed();
 
   console.log("Clone Factory address:", cloneFactory.address);
-  fs.writeFileSync("faucet-addr.tmp", String(faucet.address));
+  fs.writeFileSync("clonefactory-addr.tmp", String(cloneFactory.address));
 }
 
 main()
