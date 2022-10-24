@@ -9,11 +9,11 @@ stages:
 # TODO: support scoped variables by adding
 # --form environment_scope=$CI_ENVIRONMENT_SLUG
 # --form filter[environment_scope]=$CI_ENVIRONMENT_SLUG
-.set-env: &set-env >
-  declare "$ENV_NAME=$ENV_VALUE" &&
-  curl --request PUT --header "PRIVATE-TOKEN: $GITLAB_TOKEN" 
-    "$CI_API_V4_URL/projects/$CI_PROJECT_ID/variables/$ENV_NAME" 
-    --form "value=$ENV_VALUE"
+.set-env: &set-env
+  - "declare '$ENV_NAME=$ENV_VALUE' && \
+    curl --request PUT --header 'PRIVATE-TOKEN: $GITLAB_TOKEN' \
+    '$CI_API_V4_URL/projects/$CI_PROJECT_ID/variables/$ENV_NAME' \
+    --form 'value=$ENV_VALUE'"
 
 test:
   stage: test
