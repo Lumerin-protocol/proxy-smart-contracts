@@ -11,8 +11,7 @@ async function main() {
   const CloneFactory = await ethers.getContractFactory("CloneFactory");
   const cloneFactory = await CloneFactory.deploy(
     process.env.LUMERIN_TOKEN_ADDR,
-    process.env.VALIDATOR_TOKEN_ADDR,
-    process.env.POE_TOKEN_ADDR
+    process.env.VALIDATOR_TOKEN_ADDR
   );
   await cloneFactory.deployed();
 
