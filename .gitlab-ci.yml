@@ -110,23 +110,29 @@ deploy-lumerintoken-lmn:
   # only:
   #   - main
   script:
-    - cd ./Goerli/clonefactory/ &&
-      make deploy-lumerin &&
-      export ENV_NAME="LUMERIN_TOKEN_ADDR" ENV_VALUE=$(cat lumerin-addr.tmp) ENV_ENV="lmn"
+    - cd ./Goerli/clonefactory/
+    - make deploy-lumerin
+    - export ENV_NAME="LUMERIN_TOKEN_ADDR" ENV_VALUE=$(cat lumerin-addr.tmp) ENV_ENV="lmn"
     - *set-env
 
 deploy-clonefactory-dev:
   <<: *deploy_clonefactory_template
+  environment:
+    name: dev
   # only:
   #   - dev
 
 deploy-clonefactory-stg:
   <<: *deploy_clonefactory_template
+  environment:
+    name: stg
   # only:
   #   - stg
 
 deploy-clonefactory-lmn:
   <<: *deploy_clonefactory_template
+  environment:
+    name: lmn
   # only:
   #   - main
 
