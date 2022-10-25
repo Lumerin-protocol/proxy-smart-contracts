@@ -97,7 +97,9 @@ deploy-clonefactory-dev:
   stage: deploy-goerli
   needs: ["compile-contracts"]
   image: node:14-buster
-  environment: dev
+  environment:
+    name: dev
+    url: $DYNAMIC_ENVIRONMENT_URL
   when: manual
   # only:
   #   - main
@@ -108,6 +110,11 @@ deploy-clonefactory-dev:
     - export ENV_NAME="CLONEFACTORY_ADDR" ENV_VALUE=$(cat clonefactory-addr.tmp) ENV_ENV="dev"
     - *set-env
     # - make populate-contracts
+    - export DYNAMIC_ENVIRONMENT_URL="https://goerli.etherscan.io/address/$(cat clonefactory-addr.tmp)"
+    - echo "DYNAMIC_ENVIRONMENT_URL=$DYNAMIC_ENVIRONMENT_URL" >> deploy.env
+  artifacts:
+    reports:
+      dotenv: deploy.env
 
 deploy-clonefactory-stg:
   variables:
