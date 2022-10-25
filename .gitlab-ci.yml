@@ -11,7 +11,7 @@ stages:
 # ENV_ENV - variable environment (leave unset for all of the environments)
 .set-env: &set-env
   - echo "Setting env variable $ENV_NAME=$ENV_VALUE in $ENV_ENV environment"
-  - if [ -z "$ENV_ENV" ]; then $ENV_ENV="*" fi
+  - if [ -z "$ENV_ENV" ]; then export ENV_ENV="*"; fi
   - 'declare "$ENV_NAME=$ENV_VALUE" &&
     curl -sS --request PUT --header "PRIVATE-TOKEN: $GITLAB_TOKEN"
     "$CI_API_V4_URL/projects/$CI_PROJECT_ID/variables/$ENV_NAME"
