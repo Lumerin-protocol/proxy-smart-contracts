@@ -5,9 +5,10 @@ const fs = require("fs");
 async function main() {
   const [deployer] = await ethers.getSigners();
 
-  console.log("Deploying contracts with the account:", deployer.address);
-
+  console.log("Deploying CLONEFACTORY with the account:", deployer.address);
   console.log("Account balance:", (await deployer.getBalance()).toString());
+  console.log("LUMERIN address:", process.env.LUMERIN_TOKEN_ADDR);
+  console.log("VALIDATOR address:", process.env.VALIDATOR_TOKEN_ADDR);
 
   const CloneFactory = await ethers.getContractFactory("CloneFactory");
   const cloneFactory = await CloneFactory.deploy(
@@ -16,7 +17,7 @@ async function main() {
   );
   await cloneFactory.deployed();
 
-  console.log("Clone Factory address:", cloneFactory.address);
+  console.log("CLONEFACTORY address:", cloneFactory.address);
   fs.writeFileSync("clonefactory-addr.tmp", String(cloneFactory.address));
 }
 
