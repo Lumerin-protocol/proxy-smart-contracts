@@ -101,18 +101,20 @@ deploy-lumerintoken-dev-stg:
     - export ENV_NAME="LUMERIN_TOKEN_ADDR" ENV_VALUE=$(cat lumerin-addr.tmp)
     - *set-env
 
-deploy-lumerintoken-lmn:
-  stage: deploy-contracts
-  needs: ["compile-contracts"]
-  image: node:14-buster
-  when: manual
-  # only:
-  #   - main
-  script:
-    - cd ./Goerli/clonefactory/
-    - make deploy-lumerin
-    - export ENV_NAME="LUMERIN_TOKEN_ADDR" ENV_VALUE=$(cat lumerin-addr.tmp) ENV_ENV="lmn"
-    - *set-env
+# Will be used only when we will have a separate lumerin token for LMN environment
+#
+# deploy-lumerintoken-lmn:
+#   stage: deploy-contracts
+#   needs: ["compile-contracts"]
+#   image: node:14-buster
+#   when: manual
+#   only:
+#     - main
+#   script:
+#     - cd ./Goerli/clonefactory/
+#     - make deploy-lumerin
+#     - export ENV_NAME="LUMERIN_TOKEN_ADDR" ENV_VALUE=$(cat lumerin-addr.tmp) ENV_ENV="lmn"
+#     - *set-env
 
 deploy-clonefactory-dev:
   <<: *deploy_clonefactory_template
