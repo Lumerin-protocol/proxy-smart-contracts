@@ -73,9 +73,10 @@ deploy-lumerintoken-dev-stg:
   # only:
   #   - main
   script:
-    - cd ./Goerli/clonefactory/ &&
-      make deploy-lumerin &&
-      export ENV_NAME="LUMERIN_TOKEN_ADDR" ENV_VALUE=$(cat lumerin-addr.tmp)
+    - cd ./Goerli/clonefactory/
+    # - make deploy-lumerin
+    - echo "TEST" >> lumerin-addr.tmp
+    - export ENV_NAME="LUMERIN_TOKEN_ADDR" ENV_VALUE=$(cat lumerin-addr.tmp)
     - *set-env
 
 deploy-lumerintoken-lmn:
@@ -97,9 +98,6 @@ deploy-clonefactory-dev:
   stage: deploy-goerli
   needs: ["compile-contracts"]
   image: node:14-buster
-  environment:
-    name: dev
-    url: $DYNAMIC_ENVIRONMENT_URL
   when: manual
   # only:
   #   - main
@@ -111,10 +109,14 @@ deploy-clonefactory-dev:
     - *set-env
     # - make populate-contracts
     - export DYNAMIC_ENVIRONMENT_URL="https://goerli.etherscan.io/address/$(cat clonefactory-addr.tmp)"
+    - cd ../..
     - echo "DYNAMIC_ENVIRONMENT_URL=$DYNAMIC_ENVIRONMENT_URL" >> deploy.env
   artifacts:
     reports:
       dotenv: deploy.env
+  environment:
+    name: dev
+    url: $DYNAMIC_ENVIRONMENT_URL
 
 deploy-clonefactory-stg:
   variables:
