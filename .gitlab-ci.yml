@@ -2,8 +2,7 @@ stages:
   - test
   - build
   - release-bindings
-  - deploy-goerli
-  - deploy-mainnet
+  - deploy-contracts
 
 # Sets ENV_NAME=ENV_VALUE in shell and gitlab ci project ci/cd variables
 # ENV_NAME - variable name
@@ -20,9 +19,11 @@ stages:
     --form "filter[environment_scope]=$ENV_ENV"'
   - unset ENV_NAME ENV_VALUE ENV_ENV
 
-.deploy_clonefactory_template:
-  &deploy_clonefactory_template # Hidden yaml configuration that defines an anchor named 'job_configuration'
-  stage: deploy-goerli
+# Deploys clonefactory to the blockchain using env variables from the corresponding environment
+# Updates the envieronment url to the etherscan url of the contract
+# The environment.name should be overriden by the real job.
+.deploy_clonefactory_template: &deploy_clonefactory_template
+  stage: deploy-contracts
   needs: ["compile-contracts"]
   image: node:14-buster
   when: manual
@@ -34,11 +35,10 @@ stages:
     url: $DYNAMIC_ENVIRONMENT_URL
   script:
     - cd ./Goerli/clonefactory/
-    # - make deploy-clonefactory
-    - echo "test-value" > clonefactory-addr.tmp
+    - make deploy-clonefactory
     - export ENV_NAME="CLONEFACTORY_ADDR" ENV_VALUE=$(cat clonefactory-addr.tmp) ENV_ENV=$CI_ENVIRONMENT_SLUG
     - *set-env
-    # - make populate-contracts
+    - make populate-contracts
     - export DYNAMIC_ENVIRONMENT_URL="https://goerli.etherscan.io/address/$(cat clonefactory-addr.tmp)"
     - cd ../..
     - echo "DYNAMIC_ENVIRONMENT_URL=$DYNAMIC_ENVIRONMENT_URL" >> deploy.env
@@ -89,7 +89,7 @@ build-contracts-js:
       - Goerli/clonefactory/bindings-js
 
 deploy-lumerintoken-dev-stg:
-  stage: deploy-goerli
+  stage: deploy-contracts
   needs: ["compile-contracts"]
   image: node:14-buster
   when: manual
@@ -97,13 +97,12 @@ deploy-lumerintoken-dev-stg:
   #   - main
   script:
     - cd ./Goerli/clonefactory/
-    # - make deploy-lumerin
-    - echo "TEST" >> lumerin-addr.tmp
+    - make deploy-lumerin
     - export ENV_NAME="LUMERIN_TOKEN_ADDR" ENV_VALUE=$(cat lumerin-addr.tmp)
     - *set-env
 
 deploy-lumerintoken-lmn:
-  stage: deploy-goerli
+  stage: deploy-contracts
   needs: ["compile-contracts"]
   image: node:14-buster
   when: manual
