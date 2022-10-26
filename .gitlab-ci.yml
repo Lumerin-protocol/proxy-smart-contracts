@@ -46,7 +46,6 @@ stages:
 
 .deploy_hr_contracts_template: &deploy_hr_contracts_template
   stage: deploy-hr-contracts
-  needs: ["deploy-contracts"]
   image: node:14-buster
   when: manual
   environment:
@@ -151,6 +150,7 @@ deploy-clonefactory-lmn:
 
 deploy-hr-contracts-dev:
   <<: *deploy_hr_contracts_template
+  needs: ["deploy-clonefactory-dev"]
   environment:
     name: dev
   # only:
@@ -158,6 +158,7 @@ deploy-hr-contracts-dev:
 
 deploy-hr-contracts-stg:
   <<: *deploy_hr_contracts_template
+  needs: ["deploy-clonefactory-stg"]
   environment:
     name: stg
   # only:
@@ -165,6 +166,7 @@ deploy-hr-contracts-stg:
 
 deploy-hr-contracts-lmn:
   <<: *deploy_hr_contracts_template
+  needs: ["deploy-clonefactory-lmn"]
   environment:
     name: lmn
   # only:
