@@ -19,7 +19,7 @@ deploy-faucet:
 	yarn hardhat run --network goerli ./scripts/deploy-faucet.js
 
 populate-contracts:
-	hardhat run --network goerli ./scripts/populate-contracts.js
+	yarn hardhat run --network goerli ./scripts/populate-contracts.js
 
 build-go:
 	./build-go.sh

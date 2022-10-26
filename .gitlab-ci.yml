@@ -3,6 +3,7 @@ stages:
   - build
   - release-bindings
   - deploy-contracts
+  - deploy-hr-contracts
 
 # Sets ENV_NAME=ENV_VALUE in shell and in gitlab ci group variables
 # ENV_NAME - variable name
@@ -42,6 +43,17 @@ stages:
     - export DYNAMIC_ENVIRONMENT_URL="https://goerli.etherscan.io/address/$(cat clonefactory-addr.tmp)"
     - cd ../..
     - echo "DYNAMIC_ENVIRONMENT_URL=$DYNAMIC_ENVIRONMENT_URL" >> deploy.env
+
+.deploy_hr_contracts_template: &deploy_hr_contracts_template
+  stage: deploy-hr-contracts
+  needs: ["deploy-contracts"]
+  image: node:14-buster
+  when: manual
+  environment:
+    name: dev
+  script:
+    - cd ./Goerli/clonefactory/
+    - make populate-contracts
 
 test:
   stage: test
@@ -132,6 +144,27 @@ deploy-clonefactory-stg:
 
 deploy-clonefactory-lmn:
   <<: *deploy_clonefactory_template
+  environment:
+    name: lmn
+  # only:
+  #   - main
+
+deploy-hr-contracts-dev:
+  <<: *deploy_hr_contracts_template
+  environment:
+    name: dev
+  # only:
+  #   - dev
+
+deploy-hr-contracts-stg:
+  <<: *deploy_hr_contracts_template
+  environment:
+    name: stg
+  # only:
+  #   - stg
+
+deploy-hr-contracts-lmn:
+  <<: *deploy_hr_contracts_template
   environment:
     name: lmn
   # only:
