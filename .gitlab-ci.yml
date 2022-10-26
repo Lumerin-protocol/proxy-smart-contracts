@@ -3,7 +3,10 @@ stages:
   - build
   - release-bindings
   - deploy-contracts
-  - deploy-hr-contracts
+  - populate-hr-contracts
+
+variables:
+  CI_GROUP_ID: "15533332" # id of the proxy group
 
 # Sets ENV_NAME=ENV_VALUE in shell and in gitlab ci group variables
 # ENV_NAME - variable name
@@ -12,8 +15,8 @@ stages:
 .set-env: &set-env
   - echo "Setting env variable $ENV_NAME=$ENV_VALUE in $ENV_ENV environment"
   - if [ -z "$ENV_ENV" ]; then export ENV_ENV="*"; fi
-  - 'declare "$ENV_NAME=$ENV_VALUE" &&
-    curl -sS --request PUT --header "PRIVATE-TOKEN: $GITLAB_TOKEN"
+  - declare "$ENV_NAME=$ENV_VALUE"
+  - 'curl -sS --request PUT --header "PRIVATE-TOKEN: $GITLAB_TOKEN"
     "$CI_API_V4_URL/groups/$CI_GROUP_ID/variables/$ENV_NAME"
     --form "value=$ENV_VALUE"
     --form "environment_scope=$ENV_ENV"
@@ -45,7 +48,7 @@ stages:
     - echo "DYNAMIC_ENVIRONMENT_URL=$DYNAMIC_ENVIRONMENT_URL" >> deploy.env
 
 .deploy_hr_contracts_template: &deploy_hr_contracts_template
-  stage: deploy-hr-contracts
+  stage: populate-hr-contracts
   image: node:14-buster
   when: manual
   environment:
@@ -148,7 +151,7 @@ deploy-clonefactory-lmn:
   # only:
   #   - main
 
-deploy-hr-contracts-dev:
+populate-hr-contracts-dev:
   <<: *deploy_hr_contracts_template
   needs: ["deploy-clonefactory-dev"]
   environment:
@@ -156,7 +159,7 @@ deploy-hr-contracts-dev:
   # only:
   #   - dev
 
-deploy-hr-contracts-stg:
+populate-hr-contracts-stg:
   <<: *deploy_hr_contracts_template
   needs: ["deploy-clonefactory-stg"]
   environment:
@@ -164,7 +167,7 @@ deploy-hr-contracts-stg:
   # only:
   #   - stg
 
-deploy-hr-contracts-lmn:
+populate-hr-contracts-lmn:
   <<: *deploy_hr_contracts_template
   needs: ["deploy-clonefactory-lmn"]
   environment:
