@@ -10,7 +10,7 @@ module.exports = {
   networks: {
     hardhat: {},
     gorelli: {
-      url: process.env.NODE_URL,
+      url: process.env.ETH_NODE_ADDRESS,
       accounts: JSON.parse(process.env.LUMERIN_TOKEN_ACCOUNTS || "[]"),
       gasPrice: "auto",
       gas: "auto",

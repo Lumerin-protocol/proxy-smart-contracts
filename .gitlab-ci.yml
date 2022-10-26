@@ -4,7 +4,7 @@ stages:
   - release-bindings
   - deploy-contracts
 
-# Sets ENV_NAME=ENV_VALUE in shell and gitlab ci project ci/cd variables
+# Sets ENV_NAME=ENV_VALUE in shell and in gitlab ci group variables
 # ENV_NAME - variable name
 # ENV_VALUE - variable value
 # ENV_ENV - variable environment (leave unset for all of the environments)
@@ -13,7 +13,7 @@ stages:
   - if [ -z "$ENV_ENV" ]; then export ENV_ENV="*"; fi
   - 'declare "$ENV_NAME=$ENV_VALUE" &&
     curl -sS --request PUT --header "PRIVATE-TOKEN: $GITLAB_TOKEN"
-    "$CI_API_V4_URL/projects/$CI_PROJECT_ID/variables/$ENV_NAME"
+    "$CI_API_V4_URL/groups/$CI_GROUP_ID/variables/$ENV_NAME"
     --form "value=$ENV_VALUE"
     --form "environment_scope=$ENV_ENV"
     --form "filter[environment_scope]=$ENV_ENV"'
@@ -36,7 +36,7 @@ stages:
   script:
     - cd ./Goerli/clonefactory/
     - make deploy-clonefactory
-    - export ENV_NAME="CLONEFACTORY_ADDR" ENV_VALUE=$(cat clonefactory-addr.tmp) ENV_ENV=$CI_ENVIRONMENT_SLUG
+    - export ENV_NAME="CLONE_FACTORY_ADDRESS" ENV_VALUE=$(cat clonefactory-addr.tmp) ENV_ENV=$CI_ENVIRONMENT_SLUG
     - *set-env
     - make populate-contracts
     - export DYNAMIC_ENVIRONMENT_URL="https://goerli.etherscan.io/address/$(cat clonefactory-addr.tmp)"
@@ -98,7 +98,7 @@ deploy-lumerintoken-dev-stg:
   script:
     - cd ./Goerli/clonefactory/
     - make deploy-lumerin
-    - export ENV_NAME="LUMERIN_TOKEN_ADDR" ENV_VALUE=$(cat lumerin-addr.tmp)
+    - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp)
     - *set-env
 
 # Will be used only when we will have a separate lumerin token for LMN environment
@@ -113,7 +113,7 @@ deploy-lumerintoken-dev-stg:
 #   script:
 #     - cd ./Goerli/clonefactory/
 #     - make deploy-lumerin
-#     - export ENV_NAME="LUMERIN_TOKEN_ADDR" ENV_VALUE=$(cat lumerin-addr.tmp) ENV_ENV="lmn"
+#     - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp) ENV_ENV="lmn"
 #     - *set-env
 
 deploy-clonefactory-dev:

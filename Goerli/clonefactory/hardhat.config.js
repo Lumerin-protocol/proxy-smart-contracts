@@ -28,8 +28,8 @@ module.exports = {
       },
     },
     goerli: {
-      url: process.env.NODE_URL,
-      accounts: JSON.parse(process.env.CLONE_FACTORY_ACCOUNTS || "[]"),
+      url: process.env.ETH_NODE_ADDRESS,
+      accounts: [process.env.CONTRACTS_OWNER_PRIVATE_KEY],
       gasPrice: "auto",
       gas: "auto",
     },
