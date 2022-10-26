@@ -16,7 +16,7 @@ variables:
   - echo "Setting env variable $ENV_NAME=$ENV_VALUE in $ENV_ENV environment"
   - if [ -z "$ENV_ENV" ]; then export ENV_ENV="*"; fi
   - declare "$ENV_NAME=$ENV_VALUE"
-  - 'curl -sS --request PUT --header "PRIVATE-TOKEN: $GITLAB_TOKEN"
+  - 'curl -sS --fail --request PUT --header "PRIVATE-TOKEN: $GITLAB_TOKEN"
     "$CI_API_V4_URL/groups/$CI_GROUP_ID/variables/$ENV_NAME"
     --form "value=$ENV_VALUE"
     --form "environment_scope=$ENV_ENV"
