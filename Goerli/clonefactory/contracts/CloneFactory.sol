@@ -113,7 +113,7 @@ contract CloneFactory {
         return whitelist[_address];
     }
 
-    function noMoreWhitelist() external onlyOwner {
+    function setChangeNoMoreWhitelist() external onlyOwner {
         noMoreWhitelist = true;
     }
 }
