@@ -16,8 +16,6 @@ function buildContractsList(env) {
   return contracts;
 }
 
-module.exports.buildContractsList = buildContractsList;
-
 function teraHashesToHashesPerSecond(teraHashes) {
   return teraHashes * 1000000000000;
 }
@@ -42,4 +40,7 @@ const marketplaceConfig = {
       : [{ speed: 100, length: 6, price: 2, count: 5 }],
 };
 //meant for tests only
-module.exports.marketplaceConfig = marketplaceConfig
+module.exports = {
+  marketplaceConfig: marketplaceConfig,
+  buildContractsList: buildContractsList,
+};
