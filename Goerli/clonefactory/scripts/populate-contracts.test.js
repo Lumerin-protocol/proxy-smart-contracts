@@ -6,11 +6,11 @@ const {
 } = require("./populate-contracts-lib");
 
 //setup
-const prodConfig = marketplaceConfig.getContractOptions("production");
-const devConfig = marketplaceConfig.getContractOptions("development");
+const prodConfig = marketplaceConfig.getContractOptions(true);
+const devConfig = marketplaceConfig.getContractOptions(false);
 
-const productionContractsList = buildContractsList("production");
-const developmentContractsList = buildContractsList("development");
+const productionContractsList = buildContractsList(true);
+const developmentContractsList = buildContractsList(false);
 
 //contract lengths should match
 const productionConfiguredContractCount = prodConfig.reduce(

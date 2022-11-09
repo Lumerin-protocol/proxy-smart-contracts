@@ -39,7 +39,7 @@ const main = async function () {
   }
 };
 
-const variableList = buildContractsList(process.env.NODE_ENV)
+const variableList = buildContractsList(process.env.BUILD_FULL_MARKETPLACE === "true")
 
 main()
   .then(() => process.exit(0))

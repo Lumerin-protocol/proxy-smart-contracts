@@ -1,7 +1,7 @@
-function buildContractsList(env) {
+function buildContractsList(buildFullMarketplace) {
   let contracts = [];
 
-  marketplaceConfig.getContractOptions(env).forEach((config) => {
+  marketplaceConfig.getContractOptions(buildFullMarketplace).forEach((config) => {
     const { count, ...contract } = config;
 
     for (i = 0; i < count; i++) {
@@ -29,8 +29,8 @@ function hoursToSeconds(hours) {
 }
 
 const marketplaceConfig = {
-  getContractOptions: (env) =>
-    env === "production"
+  getContractOptions: (buildFullMarketplace) =>
+  buildFullMarketplace
       ? [
           { speed: 100, length: 6, price: 2, count: 1 },
           { speed: 100, length: 24, price: 2, count: 38 },
