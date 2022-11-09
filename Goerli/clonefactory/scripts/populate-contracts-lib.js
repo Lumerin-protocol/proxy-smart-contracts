@@ -17,11 +17,11 @@ function buildContractsList(env) {
 }
 
 function teraHashesToHashesPerSecond(teraHashes) {
-  return teraHashes * 1000000000000;
+  return teraHashes * Math.pow(10, 12);
 }
 
 function louMarinToLou(louMarin) {
-  return louMarin * 100000000;
+  return louMarin * Math.pow(10, 8);
 }
 
 function hoursToSeconds(hours) {
