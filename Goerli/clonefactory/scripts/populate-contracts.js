@@ -18,6 +18,10 @@ const main = async function () {
   /*
    * variables should be a list of arrays
    */
+
+  let addToWhitelist = await cloneFactory.connect(seller).setAddToWhitelist(seller.address)
+  await addToWhitelist().wait()
+
   for (let c of variableList) {
     let contractCreate = await cloneFactory
       .connect(seller)
