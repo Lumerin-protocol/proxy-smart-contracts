@@ -1,0 +1,208 @@
+stages:
+  - test
+  - build
+  - release-bindings
+  - deploy-contracts
+  - populate-hr-contracts
+
+variables:
+  CI_GROUP_ID: "15533332" # id of the proxy group
+
+# Sets ENV_NAME=ENV_VALUE in shell and in gitlab ci group variables
+# ENV_NAME - variable name
+# ENV_VALUE - variable value
+# ENV_ENV - variable environment (leave unset for all of the environments)
+.set-env: &set-env
+  - echo "Setting env variable $ENV_NAME=$ENV_VALUE in $ENV_ENV environment"
+  - if [ -z "$ENV_ENV" ]; then export ENV_ENV="*"; fi
+  - declare "$ENV_NAME=$ENV_VALUE"
+  - 'curl -sS --fail --request PUT --header "PRIVATE-TOKEN: $GITLAB_TOKEN"
+    "$CI_API_V4_URL/groups/$CI_GROUP_ID/variables/$ENV_NAME"
+    --form "value=$ENV_VALUE"
+    --form "environment_scope=$ENV_ENV"
+    --form "filter[environment_scope]=$ENV_ENV"'
+  - unset ENV_NAME ENV_VALUE ENV_ENV
+
+# Deploys clonefactory to the blockchain using env variables from the corresponding environment
+# Updates the envieronment url to the etherscan url of the contract
+# The environment.name should be overriden by the real job.
+.deploy_clonefactory_template: &deploy_clonefactory_template
+  stage: deploy-contracts
+  needs: ["compile-contracts"]
+  image: node:14-buster
+  when: manual
+  artifacts:
+    reports:
+      dotenv: deploy.env
+  environment:
+    name: dev
+    url: $DYNAMIC_ENVIRONMENT_URL
+  script:
+    - cd ./Goerli/clonefactory/
+    - make deploy-clonefactory
+    - export ENV_NAME="CLONE_FACTORY_ADDRESS" ENV_VALUE=$(cat clonefactory-addr.tmp) ENV_ENV=$CI_ENVIRONMENT_SLUG
+    - *set-env
+    - make populate-contracts
+    - export DYNAMIC_ENVIRONMENT_URL="https://goerli.etherscan.io/address/$(cat clonefactory-addr.tmp)"
+    - cd ../..
+    - echo "DYNAMIC_ENVIRONMENT_URL=$DYNAMIC_ENVIRONMENT_URL" >> deploy.env
+
+.deploy_hr_contracts_template: &deploy_hr_contracts_template
+  stage: populate-hr-contracts
+  image: node:14-buster
+  when: manual
+  environment:
+    name: dev
+  script:
+    - cd ./Goerli/clonefactory/
+    - make populate-contracts
+
+test:
+  stage: test
+  image: node:14-buster
+  allow_failure: true
+  only:
+    - branches
+  script:
+    - cd ./Goerli/clonefactory/ && yarn install && make test
+  artifacts:
+    paths:
+      - Goerli/clonefactory/node_modules
+
+compile-contracts:
+  stage: build
+  image: node:14-buster
+  needs: ["test"]
+  script:
+    - cd ./Goerli/clonefactory/ && yarn install && make compile
+  artifacts:
+    paths:
+      - Goerli/clonefactory/abi
+      - Goerli/clonefactory/artifacts
+      - Goerli/clonefactory/cache
+      - Goerli/clonefactory/node_modules
+
+build-contracts-go:
+  stage: build
+  needs: ["compile-contracts"]
+  image: ethereum/client-go:alltools-stable
+  script: cd ./Goerli/clonefactory && ./build-go.sh
+  artifacts:
+    untracked: true
+    paths:
+      - Goerli/clonefactory/bindings-go
+
+build-contracts-js:
+  stage: build
+  needs: ["compile-contracts"]
+  image: node:14-buster
+  script: cd ./Goerli/clonefactory && make build-js
+  artifacts:
+    untracked: true
+    paths:
+      - Goerli/clonefactory/bindings-js
+
+deploy-lumerintoken-dev-stg:
+  stage: deploy-contracts
+  needs: ["compile-contracts"]
+  image: node:14-buster
+  when: manual
+  # only:
+  #   - main
+  script:
+    - cd ./Goerli/clonefactory/
+    - make deploy-lumerin
+    - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp)
+    - *set-env
+
+# Will be used only when we will have a separate lumerin token for LMN environment
+#
+# deploy-lumerintoken-lmn:
+#   stage: deploy-contracts
+#   needs: ["compile-contracts"]
+#   image: node:14-buster
+#   when: manual
+#   only:
+#     - main
+#   script:
+#     - cd ./Goerli/clonefactory/
+#     - make deploy-lumerin
+#     - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp) ENV_ENV="lmn"
+#     - *set-env
+
+deploy-clonefactory-dev:
+  <<: *deploy_clonefactory_template
+  environment:
+    name: dev
+  # only:
+  #   - dev
+
+deploy-clonefactory-stg:
+  <<: *deploy_clonefactory_template
+  environment:
+    name: stg
+  # only:
+  #   - stg
+
+deploy-clonefactory-lmn:
+  <<: *deploy_clonefactory_template
+  environment:
+    name: lmn
+  # only:
+  #   - main
+
+populate-hr-contracts-dev:
+  <<: *deploy_hr_contracts_template
+  needs: ["deploy-clonefactory-dev"]
+  environment:
+    name: dev
+  # only:
+  #   - dev
+
+populate-hr-contracts-stg:
+  <<: *deploy_hr_contracts_template
+  needs: ["deploy-clonefactory-stg"]
+  environment:
+    name: stg
+  # only:
+  #   - stg
+
+populate-hr-contracts-lmn:
+  <<: *deploy_hr_contracts_template
+  needs: ["deploy-clonefactory-lmn"]
+  environment:
+    name: lmn
+  # only:
+  #   - main
+
+release-contracts-go:
+  stage: release-bindings
+  needs: ["build-contracts-go"]
+  image: node:14-buster
+  when: manual
+  # only:
+  #   - main
+  before_script:
+    - apt-get -yq update && apt-get -yqq install openssh-client
+    - mkdir ~/.ssh
+    - ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
+  script:
+    - cp $SSH_KEY_CONTRACTS_GO ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - cd ./Goerli/clonefactory/ && make release-go
+
+release-contracts-js:
+  stage: release-bindings
+  needs: ["build-contracts-js"]
+  image: node:14-buster
+  when: manual
+  # only:
+  #   - main
+  before_script:
+    - apt-get -yq update && apt-get -yqq install openssh-client
+    - mkdir ~/.ssh
+    - ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
+  script:
+    - cp $SSH_KEY_CONTRACTS_JS ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - cd ./Goerli/clonefactory/ && make release-js

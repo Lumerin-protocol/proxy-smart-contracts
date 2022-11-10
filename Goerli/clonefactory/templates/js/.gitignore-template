@@ -1,0 +1,4 @@
+node_modules
+
+# excluding source code, only dist should be commited
+src
