@@ -33,7 +33,7 @@ const main = async function () {
       );
 
     await contractCreate.wait();
-    console.log(`created contract`, contractCreate);
+    console.log(`contract created, tx hash:`, contractCreate.hash);
   }
 };
 
