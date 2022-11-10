@@ -30,7 +30,6 @@ const main = async function () {
         "",
         {
           gasLimit: 10000000,
-          nonce: 1,
         }
       );
 
@@ -39,7 +38,9 @@ const main = async function () {
   }
 };
 
-const variableList = buildContractsList(process.env.BUILD_FULL_MARKETPLACE === "true")
+const variableList = buildContractsList(
+  process.env.BUILD_FULL_MARKETPLACE === "true"
+);
 
 main()
   .then(() => process.exit(0))
