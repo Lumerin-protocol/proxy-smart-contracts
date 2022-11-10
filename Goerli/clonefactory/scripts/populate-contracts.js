@@ -13,23 +13,23 @@ const main = async function () {
   console.log("Account balance:", (await seller.getBalance()).toString());
   console.log("CLONEFACTORY address:", process.env.CLONE_FACTORY_ADDRESS);
 
-  //deploying with the validator as the address collecting titans lumerin
+  let addToWhitelist = await cloneFactory
+    .connect(seller)
+    .setAddToWhitelist(seller.address);
+  await addToWhitelist.wait();
 
-  /*
-   * variables should be a list of arrays
-   */
-
-  let addToWhitelist = await cloneFactory.connect(seller).setAddToWhitelist(seller.address)
-  await addToWhitelist().wait()
+  const variableList = buildContractsList(
+    process.env.BUILD_FULL_MARKETPLACE === "true"
+  );
 
   for (let c of variableList) {
     let contractCreate = await cloneFactory
       .connect(seller)
       .setCreateNewRentalContract(
-        c["price"],
+        c.price,
         0,
-        c["speed"],
-        c["length"],
+        c.speed,
+        c.length,
         process.env.VALIDATOR_ADDRESS,
         "",
         {
@@ -41,10 +41,6 @@ const main = async function () {
     console.log(`created contract`, contractCreate);
   }
 };
-
-const variableList = buildContractsList(
-  process.env.BUILD_FULL_MARKETPLACE === "true"
-);
 
 main()
   .then(() => process.exit(0))
