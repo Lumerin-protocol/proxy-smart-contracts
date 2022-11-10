@@ -17,3 +17,5 @@ testing/test_hashrate/.DS_Store
 testing/test_hashrate/.gitkeep
 testing/test_hashrate/ganache_logs/
 testing/test_hashrate/hooka.js
+
+.DS_Store
