@@ -63,12 +63,10 @@ variables:
   environment:
     name: dev
   script:
-    - echo $CLONE_FACTORY_WHITELIST_ADDRESSES
     - cd ./Goerli/clonefactory/
     - make whitelist-clonefactory
 
 test:
-  when: manual
   stage: test
   image: node:14-buster
   allow_failure: true
@@ -81,7 +79,6 @@ test:
       - Goerli/clonefactory/node_modules
 
 compile-contracts:
-  when: manual
   stage: build
   image: node:14-buster
   needs: ["test"]
@@ -165,7 +162,7 @@ deploy-clonefactory-lmn:
 
 whitelist-clonefactory-dev:
   <<: *whitelist_clonefactory_template
-  # needs: ["compile-contracts"]
+  needs: ["compile-contracts"]
   environment:
     name: dev
   # only:
