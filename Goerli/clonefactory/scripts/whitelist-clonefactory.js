@@ -2,8 +2,10 @@ require("dotenv").config();
 const { ethers } = require("hardhat");
 
 async function main() {
+  let whitelistedAddresses
+  
   try{
-    const whitelistedAddresses = JSON.parse(process.env.CLONE_FACTORY_WHITELIST_ADDRESSES)
+    whitelistedAddresses = JSON.parse(process.env.CLONE_FACTORY_WHITELIST_ADDRESSES)
     if (!Array.isArray(whitelistedAddresses)){
       throw new Error("Is not a valid array")
     }
