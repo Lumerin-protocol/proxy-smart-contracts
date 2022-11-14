@@ -25,9 +25,12 @@ contract Implementation is Initializable, Escrow {
     string public encryptedPoolData; //encrypted data for pool target info
 
     event contractPurchased(address indexed _buyer); //make indexed
-    event contractClosed();
+    event contractClosed(address indexed _buyer);
     event purchaseInfoUpdated();
     event cipherTextUpdated(string newCipherText);
+
+    mapping(address => bool) public contractClosedGood;
+    mapping(address => bool) public contractClosedBad;
 
     function initialize(
         uint256 _price,
@@ -167,35 +170,41 @@ contract Implementation is Initializable, Escrow {
 
     function setContractCloseOut(uint256 closeOutType) public {
         if (closeOutType == 0) {
-            //this is a function call to be triggered by the buyer, seller or validator
+            //this is a function call to be triggered by the buyer or validator
             //in the event that a contract needs to be canceled early for any reason
-            //require(
-            //    msg.sender == buyer || msg.sender == seller || msg.sender == validator,
-            //    "this account is not authorized to trigger an early closeout"
-            //);
+            require(
+                msg.sender == buyer || msg.sender == validator,
+                "this account is not authorized to trigger an early closeout"
+            );
             uint256 buyerPayout = buyerPayoutCalc();
             withdrawFunds(price - buyerPayout, buyerPayout);
             setContractVariableUpdate();
-            emit contractClosed();
+            if (contractClosedBad[buyer] == false) {
+                contractClosedBad[buyer] = true;
+            }
+            emit contractClosed(buyer);
         } else if (closeOutType == 1) {
             //this is a function call for the seller to withdraw their funds
             //at any time during the smart contracts lifecycle
-            //require(
-            //    msg.sender == seller,
-            //    "this account is not authorized to trigger a mid-contract closeout"
-            //);
+            require(
+                msg.sender == seller,
+                "this account is not authorized to trigger a mid-contract closeout"
+            );
 
             getDepositContractHodlingsToSeller(price - buyerPayoutCalc());
         } else if (closeOutType == 2 || closeOutType == 3) {
-            //require(
-            //    block.timestamp - startingBlockTimestamp >= length,
-            //    "the contract has yet to be carried to term"
-            //);
+            require(
+                block.timestamp - startingBlockTimestamp >= length,
+                "the contract has yet to be carried to term"
+            );
             if (closeOutType == 3) {
                 withdrawFunds(myToken.balanceOf(address(this)), 0);
             }
             setContractVariableUpdate();
-            emit contractClosed();
+            emit contractClosed(buyer);
+            if (contractClosedGood[buyer] == false) {
+                contractClosedGood[buyer] = true;
+            }
         } else {
             require(
                 closeOutType < 4,
