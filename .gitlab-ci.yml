@@ -67,30 +67,32 @@ variables:
     - cd ./Goerli/clonefactory/
     - make whitelist-clonefactory
 
-# test:
-#   stage: test
-#   image: node:14-buster
-#   allow_failure: true
-#   only:
-#     - branches
-#   script:
-#     - cd ./Goerli/clonefactory/ && yarn install && make test
-#   artifacts:
-#     paths:
-#       - Goerli/clonefactory/node_modules
+test:
+  when: manual
+  stage: test
+  image: node:14-buster
+  allow_failure: true
+  only:
+    - branches
+  script:
+    - cd ./Goerli/clonefactory/ && yarn install && make test
+  artifacts:
+    paths:
+      - Goerli/clonefactory/node_modules
 
-# compile-contracts:
-#   stage: build
-#   image: node:14-buster
-#   needs: ["test"]
-#   script:
-#     - cd ./Goerli/clonefactory/ && yarn install && make compile
-#   artifacts:
-#     paths:
-#       - Goerli/clonefactory/abi
-#       - Goerli/clonefactory/artifacts
-#       - Goerli/clonefactory/cache
-#       - Goerli/clonefactory/node_modules
+compile-contracts:
+  when: manual
+  stage: build
+  image: node:14-buster
+  needs: ["test"]
+  script:
+    - cd ./Goerli/clonefactory/ && yarn install && make compile
+  artifacts:
+    paths:
+      - Goerli/clonefactory/abi
+      - Goerli/clonefactory/artifacts
+      - Goerli/clonefactory/cache
+      - Goerli/clonefactory/node_modules
 
 build-contracts-go:
   stage: build
@@ -163,7 +165,7 @@ deploy-clonefactory-lmn:
 
 whitelist-clonefactory-dev:
   <<: *whitelist_clonefactory_template
-  needs: ["compile-contracts"]
+  # needs: ["compile-contracts"]
   environment:
     name: dev
   # only:
