@@ -3,6 +3,7 @@ stages:
   - build
   - release-bindings
   - deploy-contracts
+  - whitelist-clonefactory
   - populate-hr-contracts
 
 variables:
@@ -32,8 +33,7 @@ variables:
   - unset ENV_NAME ENV_VALUE ENV_ENV
 
 # Deploys clonefactory to the blockchain using env variables from the corresponding environment
-# Updates the envieronment url to the etherscan url of the contract
-# The environment.name should be overriden by the real job.
+# Updates the environment url to the etherscan url of the contract
 .deploy_clonefactory_template: &deploy_clonefactory_template
   stage: deploy-contracts
   needs: ["compile-contracts"]
@@ -43,7 +43,7 @@ variables:
     reports:
       dotenv: deploy.env
   environment:
-    name: dev
+    name: dev # The environment.name should be overriden
     url: $DYNAMIC_ENVIRONMENT_URL
   script:
     - cd ./Goerli/clonefactory/
@@ -64,6 +64,17 @@ variables:
     - cd ./Goerli/clonefactory/
     - make populate-contracts
 
+.whitelist_clonefactory_template: &whitelist_clonefactory_template
+  stage: whitelist-clonefactory
+  image: node:14-buster
+  when: manual
+  environment:
+    name: dev
+    action: prepare
+  script:
+    - cd ./Goerli/clonefactory/
+    - make whitelist-clonefactory
+
 test:
   stage: test
   image: node:14-buster
@@ -80,6 +91,9 @@ compile-contracts:
   stage: build
   image: node:14-buster
   needs: ["test"]
+  environment:
+    name: dev
+    action: prepare
   script:
     - cd ./Goerli/clonefactory/ && yarn install && make compile
   artifacts:
@@ -157,6 +171,30 @@ deploy-clonefactory-lmn:
     name: lmn
   # only:
   #   - main
+
+whitelist-clonefactory-dev:
+  <<: *whitelist_clonefactory_template
+  needs: ["compile-contracts"]
+  environment:
+    name: dev
+  # only:
+  #   - dev
+
+whitelist-clonefactory-stg:
+  <<: *whitelist_clonefactory_template
+  needs: ["compile-contracts"]
+  environment:
+    name: stg
+  # only:
+  #   - stg
+
+whitelist-clonefactory-lmn:
+  <<: *whitelist_clonefactory_template
+  needs: ["compile-contracts"]
+  environment:
+    name: lmn
+  # only:
+  #   - lmn
 
 populate-hr-contracts-dev:
   <<: *deploy_hr_contracts_template

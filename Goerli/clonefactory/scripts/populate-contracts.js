@@ -5,18 +5,13 @@ const { ethers } = require("hardhat");
 const main = async function () {
   const CloneFactory = await ethers.getContractFactory("CloneFactory");
   const [seller] = await ethers.getSigners();
-  const cloneFactory = await CloneFactory.attach(
+  const cloneFactory =  CloneFactory.attach(
     process.env.CLONE_FACTORY_ADDRESS
   );
 
   console.log("Deploying contracts with the seller account:", seller.address);
   console.log("Account balance:", (await seller.getBalance()).toString());
   console.log("CLONEFACTORY address:", process.env.CLONE_FACTORY_ADDRESS);
-
-  let addToWhitelist = await cloneFactory
-    .connect(seller)
-    .setAddToWhitelist(seller.address);
-  await addToWhitelist.wait();
 
   const variableList = buildContractsList(
     process.env.BUILD_FULL_MARKETPLACE === "true"
@@ -38,7 +33,7 @@ const main = async function () {
       );
 
     await contractCreate.wait();
-    console.log(`created contract`, contractCreate);
+    console.log(`contract created, tx hash:`, contractCreate.hash);
   }
 };
 

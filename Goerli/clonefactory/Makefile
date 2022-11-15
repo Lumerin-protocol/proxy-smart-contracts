@@ -21,6 +21,9 @@ deploy-faucet:
 populate-contracts:
 	yarn hardhat run --network goerli ./scripts/populate-contracts.js
 
+whitelist-clonefactory:
+	yarn hardhat run --network goerli ./scripts/whitelist-clonefactory.js
+
 build-go:
 	./build-go.sh
 
