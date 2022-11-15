@@ -12,15 +12,23 @@ variables:
 # ENV_NAME - variable name
 # ENV_VALUE - variable value
 # ENV_ENV - variable environment (leave unset for all of the environments)
+#
+# Gitlab api has a bug: PUT is not working correctly with environment field
+# https://gitlab.com/gitlab-org/gitlab/-/issues/9912
+# DELETE+POST is used instead
 .set-env: &set-env
   - echo "Setting env variable $ENV_NAME=$ENV_VALUE in $ENV_ENV environment"
   - if [ -z "$ENV_ENV" ]; then export ENV_ENV="*"; fi
-  - declare "$ENV_NAME=$ENV_VALUE"
-  - 'curl -sS --fail --request PUT --header "PRIVATE-TOKEN: $GITLAB_TOKEN"
-    "$CI_API_V4_URL/groups/$CI_GROUP_ID/variables/$ENV_NAME"
+  - declare "$ENV_NAME=$ENV_VALUE" # sets env variable to the value also in the local shell
+  - 'curl -sS --request DELETE 
+    --header "PRIVATE-TOKEN: $GITLAB_TOKEN"
+    "$CI_API_V4_URL/groups/$CI_GROUP_ID/variables/$ENV_NAME?filter\[environment_scope\]=$ENV_ENV"'
+  - 'curl -sS --fail --request POST 
+    --header "PRIVATE-TOKEN: $GITLAB_TOKEN"
+    "$CI_API_V4_URL/groups/$CI_GROUP_ID/variables"
+    --form "key=$ENV_NAME"
     --form "value=$ENV_VALUE"
-    --form "environment_scope=$ENV_ENV"
-    --form "filter[environment_scope]=$ENV_ENV"'
+    --form "environment_scope=$ENV_ENV"'
   - unset ENV_NAME ENV_VALUE ENV_ENV
 
 # Deploys clonefactory to the blockchain using env variables from the corresponding environment
