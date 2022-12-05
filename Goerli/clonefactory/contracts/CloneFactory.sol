@@ -43,7 +43,7 @@ contract CloneFactory {
     }
 
     modifier onlyInWhitelist() {
-        require(whitelist[msg.sender] == true || noMoreWhitelist == true, "you are not an approved seller on this marketplace");
+        //require(whitelist[msg.sender] == true || noMoreWhitelist == true, "you are not an approved seller on this marketplace");
         _;
     }
 
