@@ -11,7 +11,6 @@ import "./LumerinToken.sol";
 /// @author Josh Kean (Lumerin)
 /// @notice Variables passed into contract initializer are subject to change based on the design of the hashrate contract
 
-
 //CloneFactory now responsible for minting, purchasing, and tracking contracts
 contract CloneFactory {
     address baseImplementation;
@@ -21,8 +20,8 @@ contract CloneFactory {
     address owner;
     address[] public rentalContracts; //dynamically allocated list of rental contracts
     bool noMoreWhitelist;
-    Lumerin lumerin;
     mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
+    Lumerin lumerin;
 
     constructor(address _lmn, address _validator) {
         Implementation _imp = new Implementation();
@@ -117,5 +116,3 @@ contract CloneFactory {
         noMoreWhitelist = true;
     }
 }
-
-

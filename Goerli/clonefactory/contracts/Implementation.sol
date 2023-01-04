@@ -4,9 +4,10 @@ pragma solidity >0.8.0;
 
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "./Escrow.sol";
+import "./Common.sol";
 
 //MyToken is place holder for actual lumerin token, purely for testing purposes
-contract Implementation is Initializable, Escrow {
+contract Implementation is Initializable, Escrow, Common {
     enum ContractState {
         Available,
         Running
@@ -24,13 +25,28 @@ contract Implementation is Initializable, Escrow {
     address validator; //validator to be used. Can be set to 0 address if validator not being used
     string public encryptedPoolData; //encrypted data for pool target info
 
+    Common.SellerHistory[] public sellerHistory;
+    /*1. call the clonefactory get contract
+    2. for each contract, call sellerHistory
+    3. get the inf
+    */
+
+    struct PurchaseInfo {
+        bool goodCloseout;
+        uint256 _purchaseTime;
+        uint256 endingTime;
+        uint256 _price;
+        uint256 _speed;
+        uint256 _length;
+    }
+
+
     event contractPurchased(address indexed _buyer); //make indexed
     event contractClosed(address indexed _buyer);
     event purchaseInfoUpdated();
     event cipherTextUpdated(string newCipherText);
 
-    mapping(address => bool) public contractClosedGood;
-    mapping(address => bool) public contractClosedBad;
+    mapping(address => PurchaseInfo[]) public buyerTracking;
 
     function initialize(
         uint256 _price,
@@ -178,10 +194,9 @@ contract Implementation is Initializable, Escrow {
             );
             uint256 buyerPayout = buyerPayoutCalc();
             withdrawFunds(price - buyerPayout, buyerPayout);
+            buyerTracking[buyer].push(PurchaseInfo(false,startingBlockTimestamp, block.timestamp, price, speed, length));
+            sellerHistory.push(Common.SellerHistory(false,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
             setContractVariableUpdate();
-            if (contractClosedBad[buyer] == false) {
-                contractClosedBad[buyer] = true;
-            }
             emit contractClosed(buyer);
         } else if (closeOutType == 1) {
             //this is a function call for the seller to withdraw their funds
@@ -200,16 +215,21 @@ contract Implementation is Initializable, Escrow {
             if (closeOutType == 3) {
                 withdrawFunds(myToken.balanceOf(address(this)), 0);
             }
+
+            buyerTracking[buyer].push(PurchaseInfo(true,startingBlockTimestamp, block.timestamp, price, speed, length));
+            sellerHistory.push(Common.SellerHistory(true,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
             setContractVariableUpdate();
             emit contractClosed(buyer);
-            if (contractClosedGood[buyer] == false) {
-                contractClosedGood[buyer] = true;
-            }
         } else {
             require(
                 closeOutType < 4,
                 "you must make a selection between 0 and 3"
             );
         }
+    }
+
+    function getSellerHistory() external view returns (SellerHistory[] memory) {
+        SellerHistory[] memory _sellerHistory = sellerHistory;
+        return _sellerHistory;
     }
 }
