@@ -56,3 +56,12 @@ release-git:
 		&& git merge origin/main --strategy=ours --allow-unrelated-histories -m "release: $(version)" \
 		&& git tag -a v$(version) -m "release $(version)"\
 		&& git push -u --tags --set-upstream origin main
+	
+node-local:
+	yarn hardhat node --config hardhat-local.config.js
+
+deploy-local:
+	yarn hardhat run --network localhost --config hardhat-local.config.js ./scripts/deploy-lumerin.js 
+	LUMERIN_TOKEN_ADDRESS="$$(cat lumerin-addr.tmp)" VALIDATOR_ADDRESS="$$(cat lumerin-addr.tmp)" yarn hardhat run --network localhost --config hardhat-local.config.js ./scripts/deploy-clonefactory.js 
+	CLONE_FACTORY_WHITELIST_ADDRESSES="[\"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266\"]" CLONE_FACTORY_ADDRESS="$$(cat clonefactory-addr.tmp)" yarn hardhat run --network localhost --config hardhat-local.config.js ./scripts/whitelist-clonefactory.js
+	CLONE_FACTORY_ADDRESS="$$(cat clonefactory-addr.tmp)" VALIDATOR_ADDRESS="$$(cat lumerin-addr.tmp)" yarn hardhat run --network localhost --config hardhat-local.config.js ./scripts/populate-contracts.js 
