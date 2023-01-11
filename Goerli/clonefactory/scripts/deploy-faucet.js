@@ -10,12 +10,12 @@ const { ethers } = require("hardhat");
 async function main() {
   const [deployer] = await ethers.getSigners();
 
-  console.log("Deploying contracts with the account:", deployer.address);
-
+  console.log("Deploying FAUCET with the account:", deployer.address);
   console.log("Account balance:", (await deployer.getBalance()).toString());
+  console.log("LUMERIN address:", process.env.LUMERIN_TOKEN_ADDRESS);
 
   const Faucet = await ethers.getContractFactory("Faucet");
-  const faucet = await Faucet.deploy();
+  const faucet = await Faucet.deploy(process.env.LUMERIN_TOKEN_ADDRESS);
   await faucet.deployed();
 
   console.log("Faucet address:", faucet.address);

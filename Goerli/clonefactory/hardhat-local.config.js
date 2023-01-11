@@ -1,5 +1,6 @@
 require("@nomiclabs/hardhat-waffle");
 require("@nomiclabs/hardhat-etherscan");
+require("hardhat-abi-exporter");
 require("dotenv").config();
 
 // You need to export an object to set up your config
@@ -16,5 +17,12 @@ module.exports = {
         auto: true,
       },
     },
+  },
+  abiExporter: {
+    path: "./abi",
+    runOnCompile: true,
+    clear: true,
+    flat: true,
+    spacing: 2,
   },
 };

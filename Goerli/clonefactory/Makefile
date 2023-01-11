@@ -7,7 +7,7 @@ test:
 	yarn hardhat node & yarn hardhat test --network hardhat tests/*.js
 
 compile:
-	yarn hardhat compile
+	yarn hardhat compile --config hardhat-local.config.js
 
 deploy-lumerin:
 	yarn hardhat run --network goerli ./scripts/deploy-lumerin.js
@@ -61,7 +61,8 @@ node-local:
 	yarn hardhat node --config hardhat-local.config.js
 
 deploy-local:
-	yarn hardhat run --network localhost --config hardhat-local.config.js ./scripts/deploy-lumerin.js 
+	yarn hardhat run --network localhost --config hardhat-local.config.js ./scripts/deploy-lumerin.js
+	LUMERIN_TOKEN_ADDRESS="$$(cat lumerin-addr.tmp)" yarn hardhat run --network localhost --config hardhat-local.config.js ./scripts/deploy-faucet.js 
 	LUMERIN_TOKEN_ADDRESS="$$(cat lumerin-addr.tmp)" VALIDATOR_ADDRESS="$$(cat lumerin-addr.tmp)" yarn hardhat run --network localhost --config hardhat-local.config.js ./scripts/deploy-clonefactory.js 
-	CLONE_FACTORY_WHITELIST_ADDRESSES="[\"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266\"]" CLONE_FACTORY_ADDRESS="$$(cat clonefactory-addr.tmp)" yarn hardhat run --network localhost --config hardhat-local.config.js ./scripts/whitelist-clonefactory.js
+	CLONE_FACTORY_WHITELIST_ADDRESSES="[\"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266\",\"0x70997970C51812dc3A010C7d01b50e0d17dc79C8\"]" CLONE_FACTORY_ADDRESS="$$(cat clonefactory-addr.tmp)" yarn hardhat run --network localhost --config hardhat-local.config.js ./scripts/whitelist-clonefactory.js
 	CLONE_FACTORY_ADDRESS="$$(cat clonefactory-addr.tmp)" VALIDATOR_ADDRESS="$$(cat lumerin-addr.tmp)" yarn hardhat run --network localhost --config hardhat-local.config.js ./scripts/populate-contracts.js 
