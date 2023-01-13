@@ -7,7 +7,7 @@ test:
 	yarn hardhat node & yarn hardhat test --network hardhat tests/*.js
 
 compile:
-	yarn hardhat compile --config hardhat-local.config.js
+	yarn hardhat compile --config hardhat-base.config.js
 
 deploy-lumerin:
 	yarn hardhat run --network goerli ./scripts/deploy-lumerin.js
@@ -58,7 +58,7 @@ release-git:
 		&& git push -u --tags --set-upstream origin main
 	
 node-local:
-	yarn hardhat node --config hardhat-local.config.js
+	yarn hardhat node --config hardhat-base.config.js
 
 node-local-deploy:
 	./node-local-deploy.sh

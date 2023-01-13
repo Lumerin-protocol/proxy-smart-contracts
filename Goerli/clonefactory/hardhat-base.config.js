@@ -3,8 +3,7 @@ require("@nomiclabs/hardhat-etherscan");
 require("hardhat-abi-exporter");
 require("dotenv").config();
 
-// You need to export an object to set up your config
-// Go to https://hardhat.org/config/ to learn more
+// Base config is used for local deployment and/or contract build
 
 /**
  * @type import('hardhat/config').HardhatUserConfig
