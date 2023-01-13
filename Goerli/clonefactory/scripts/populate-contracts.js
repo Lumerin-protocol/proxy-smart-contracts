@@ -12,6 +12,7 @@ const main = async function () {
   console.log("Deploying contracts with the seller account:", seller.address);
   console.log("Account balance:", (await seller.getBalance()).toString());
   console.log("CLONEFACTORY address:", process.env.CLONE_FACTORY_ADDRESS);
+  console.log("VALIDATOR address:", process.env.VALIDATOR_ADDRESS)
 
   const variableList = buildContractsList(
     process.env.BUILD_FULL_MARKETPLACE === "true"
