@@ -4,10 +4,9 @@ pragma solidity >0.8.0;
 
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "./Escrow.sol";
-import "./Common.sol";
 
 //MyToken is place holder for actual lumerin token, purely for testing purposes
-contract Implementation is Initializable, Escrow, Common {
+contract Implementation is Initializable, Escrow {
     enum ContractState {
         Available,
         Running
@@ -24,8 +23,19 @@ contract Implementation is Initializable, Escrow, Common {
     address cloneFactory; //used to limit where the purchase can be made
     address validator; //validator to be used. Can be set to 0 address if validator not being used
     string public encryptedPoolData; //encrypted data for pool target info
+    string public pubKey; //encrypted data for pool target info
 
-    Common.SellerHistory[] public sellerHistory;
+    struct SellerHistory {
+        bool goodCloseout;
+        uint256 _purchaseTime;
+        uint256 endingTime;
+        uint256 _price;
+        uint256 _speed;
+        uint256 _length;
+        address _buyer;
+    }
+
+    SellerHistory[] public sellerHistory;
     /*1. call the clonefactory get contract
     2. for each contract, call sellerHistory
     3. get the inf
@@ -56,7 +66,8 @@ contract Implementation is Initializable, Escrow, Common {
         address _seller,
         address _lmn,
         address _cloneFactory, //used to restrict purchasing power to only the clonefactory
-        address _validator
+        address _validator,
+        string memory _pubKey
     ) public initializer {
         price = _price;
         limit = _limit;
@@ -66,6 +77,7 @@ contract Implementation is Initializable, Escrow, Common {
         cloneFactory = _cloneFactory;
         validator = _validator;
         contractState = ContractState.Available;
+        pubKey = _pubKey;
         setParameters(_lmn);
     }
 
@@ -195,7 +207,7 @@ contract Implementation is Initializable, Escrow, Common {
             uint256 buyerPayout = buyerPayoutCalc();
             withdrawFunds(price - buyerPayout, buyerPayout);
             buyerTracking[buyer].push(PurchaseInfo(false,startingBlockTimestamp, block.timestamp, price, speed, length));
-            sellerHistory.push(Common.SellerHistory(false,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
+            sellerHistory.push(SellerHistory(false,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
             setContractVariableUpdate();
             emit contractClosed(buyer);
         } else if (closeOutType == 1) {
@@ -217,19 +229,27 @@ contract Implementation is Initializable, Escrow, Common {
             }
 
             buyerTracking[buyer].push(PurchaseInfo(true,startingBlockTimestamp, block.timestamp, price, speed, length));
-            sellerHistory.push(Common.SellerHistory(true,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
+            sellerHistory.push(SellerHistory(true,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
             setContractVariableUpdate();
             emit contractClosed(buyer);
+        } else if (closeOutType == 4) {
+            require(
+                block.timestamp - startingBlockTimestamp >= length,
+                "the contract has yet to be carried to term"
+            );
+            require(
+                msg.sender == cloneFactory,
+                "only the clonefactory can call this method"
+            );
+            buyerTracking[buyer].push(PurchaseInfo(true,startingBlockTimestamp, block.timestamp, price, speed, length));
+            sellerHistory.push(SellerHistory(true,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
+            withdrawFunds(myToken.balanceOf(address(this)), 0);
+
         } else {
             require(
-                closeOutType < 4,
+                closeOutType < 5,
                 "you must make a selection between 0 and 3"
             );
         }
-    }
-
-    function getSellerHistory() external view returns (SellerHistory[] memory) {
-        SellerHistory[] memory _sellerHistory = sellerHistory;
-        return _sellerHistory;
     }
 }

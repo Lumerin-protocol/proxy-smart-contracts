@@ -21,6 +21,7 @@ contract CloneFactory {
     address[] public rentalContracts; //dynamically allocated list of rental contracts
     bool noMoreWhitelist;
     mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
+    mapping(address => bool) public isContractDead; //if returns true, contract has been canceled by either the seller or lumerin foundation
     Lumerin lumerin;
 
     constructor(address _lmn, address _validator) {
@@ -64,7 +65,8 @@ contract CloneFactory {
             msg.sender,
             lmnDeploy,
             address(this),
-            _validator
+            _validator,
+            _pubKey
         );
         rentalContracts.push(_newContract); //add clone to list of contracts
         emit contractCreated(_newContract, _pubKey); //broadcasts a new contract and the pubkey to use for encryption
@@ -114,5 +116,9 @@ contract CloneFactory {
 
     function setChangeNoMoreWhitelist() external onlyOwner {
         noMoreWhitelist = true;
+    }
+
+    function setContractAsDead(address _contract) public {
+        address contractOwner = Implementation(_contract).seller();
     }
 }
