@@ -21,10 +21,10 @@ variables:
   - echo "Setting env variable $ENV_NAME=$ENV_VALUE in $ENV_ENV environment"
   - if [ -z "$ENV_ENV" ]; then export ENV_ENV="*"; fi
   - declare "$ENV_NAME=$ENV_VALUE" # sets env variable to the value also in the local shell
-  - 'curl -sS --request DELETE 
+  - 'curl -sS --request DELETE
     --header "PRIVATE-TOKEN: $GITLAB_TOKEN"
     "$CI_API_V4_URL/groups/$CI_GROUP_ID/variables/$ENV_NAME?filter\[environment_scope\]=$ENV_ENV"'
-  - 'curl -sS --fail --request POST 
+  - 'curl -sS --fail --request POST
     --header "PRIVATE-TOKEN: $GITLAB_TOKEN"
     "$CI_API_V4_URL/groups/$CI_GROUP_ID/variables"
     --form "key=$ENV_NAME"
@@ -111,7 +111,7 @@ build-contracts-go:
   artifacts:
     untracked: true
     paths:
-      - Goerli/clonefactory/bindings-go
+      - Goerli/clonefactory/build-go
 
 build-contracts-js:
   stage: build
@@ -121,7 +121,7 @@ build-contracts-js:
   artifacts:
     untracked: true
     paths:
-      - Goerli/clonefactory/bindings-js
+      - Goerli/clonefactory/build-js
 
 deploy-lumerintoken-dev-stg:
   stage: deploy-contracts

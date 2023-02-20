@@ -21,11 +21,13 @@ const factory = <T>(web3: Web3, address: string, abi: any): T => {
   return contract;
 };
 
-export const CloneFactory = (web3: Web3, address: string): CloneFactoryContext => 
+export const CloneFactory = (web3: Web3, address: string): CloneFactoryContext =>
   factory(web3, address, CloneFactoryAbi);
 
-export const Implementation = (web3: Web3, address: string): ImplementationContext => 
+export const Implementation = (web3: Web3, address: string): ImplementationContext =>
   factory(web3, address, ImplementationAbi);
-  
+
 export const Lumerin = (web3: Web3, address: string): LumerinContext =>
   factory(web3, address, LumerinAbi);
+
+export { CloneFactoryContext, ImplementationContext, LumerinContext }
