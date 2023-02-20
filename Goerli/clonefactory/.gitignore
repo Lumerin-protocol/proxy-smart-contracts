@@ -12,6 +12,6 @@ artifacts
 abi
 
 # generated code
-bindings-go
-bindings-js
+build-go
+build-js
 *.tmp
