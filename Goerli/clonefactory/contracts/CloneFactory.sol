@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./Implementation.sol";
 import "./LumerinToken.sol";
+import "./Common.sol";
 
 /// @title CloneFactory
 /// @author Josh Kean (Lumerin)
@@ -18,10 +19,11 @@ contract CloneFactory {
     address lmnDeploy;
     address webfacingAddress;
     address owner;
+    address marketPlaceFeeRecipient; //address where the marketplace fee's are sent
     address[] public rentalContracts; //dynamically allocated list of rental contracts
-    bool noMoreWhitelist;
+    bool public noMoreWhitelist;
     mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
-    mapping(address => bool) public isContractDead; //if returns true, contract has been canceled by either the seller or lumerin foundation
+    mapping(address => bool) public isContractDead; // keeps track of contracts that are no longer valid
     Lumerin lumerin;
 
     constructor(address _lmn, address _validator) {
@@ -31,7 +33,7 @@ contract CloneFactory {
         validator = _validator;
         lumerin = Lumerin(_lmn);
         owner = msg.sender;
-        noMoreWhitelist = false;
+        marketPlaceFeeRecipient = msg.sender;
     }
 
     event contractCreated(address indexed _address, string _pubkey); //emitted whenever a contract is created
@@ -55,7 +57,7 @@ contract CloneFactory {
         uint256 _length,
         address _validator,
         string memory _pubKey
-    ) onlyInWhitelist external returns (address) {
+    ) external onlyInWhitelist returns (address) {
         address _newContract = Clones.clone(baseImplementation);
         Implementation(_newContract).initialize(
             _price,
@@ -78,11 +80,12 @@ contract CloneFactory {
     function setPurchaseRentalContract (
         address contractAddress,
         string memory _cipherText
-    ) external {
+    ) onlyInWhitelist external {
         Implementation targetContract = Implementation(contractAddress);
         uint256 _price = targetContract.price();
+        uint256 _marketplaceFee = _price/100;
         require(
-            lumerin.allowance(msg.sender, address(this)) >= _price,
+            lumerin.allowance(msg.sender, address(this)) >= _price+_marketplaceFee,
             "not authorized to spend required funds"
         );
         bool tokensTransfered = lumerin.transferFrom(
@@ -90,7 +93,14 @@ contract CloneFactory {
             contractAddress,
             _price
         );
+
+        bool feeTransfer = lumerin.transferFrom(
+            msg.sender,
+            marketPlaceFeeRecipient,
+            _marketplaceFee
+        );
         require(tokensTransfered, "lumeirn tranfer failed");
+        require(feeTransfer, "marketplace fee not paid");
         targetContract.setPurchaseContract(_cipherText, msg.sender);
         emit clonefactoryContractPurchased(contractAddress);
     }
@@ -111,14 +121,26 @@ contract CloneFactory {
     }
 
     function checkWhitelist(address _address) external view returns (bool) {
+        if (noMoreWhitelist == true) {
+            return true;
+        }
         return whitelist[_address];
     }
 
-    function setChangeNoMoreWhitelist() external onlyOwner {
+    function setDisableWhitelist() external onlyOwner {
         noMoreWhitelist = true;
     }
 
-    function setContractAsDead(address _contract) public {
-        address contractOwner = Implementation(_contract).seller();
+    function setChangeMarketplaceRecipient(address _newRecipient) external onlyOwner {
+        marketPlaceFeeRecipient = _newRecipient;
+    }
+
+    function setContractAsDead(address _contract, bool closeout) public {
+        Implementation _tempContract = Implementation(_contract);
+        require (msg.sender == owner || msg.sender == _tempContract.seller(), "you arent approved to mark this contract as dead");
+        isContractDead[_contract] = true;
+        if (closeout) {
+            _tempContract.setContractCloseOut(4);
+        }
     }
 }
