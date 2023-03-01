@@ -112,7 +112,9 @@ contract Implementation is Initializable, Escrow {
     //function that the clone factory calls to purchase the contract
     function setPurchaseContract(
         string memory _encryptedPoolData,
-        address _buyer
+        address _buyer,
+        address marketPlaceFeeRecipient, 
+        uint256 marketplaceFee
     ) public {
         require(
             contractState == ContractState.Available,
@@ -126,7 +128,7 @@ contract Implementation is Initializable, Escrow {
         buyer = _buyer;
         startingBlockTimestamp = block.timestamp;
         contractState = ContractState.Running;
-        createEscrow(seller, buyer, price);
+        createEscrow(seller, buyer, price, marketPlaceFeeRecipient, marketplaceFee);
         emit contractPurchased(msg.sender);
     }
 
@@ -252,4 +254,6 @@ contract Implementation is Initializable, Escrow {
             );
         }
     }
+
+
 }

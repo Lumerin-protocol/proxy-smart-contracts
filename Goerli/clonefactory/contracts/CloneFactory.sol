@@ -99,9 +99,10 @@ contract CloneFactory {
             marketPlaceFeeRecipient,
             _marketplaceFee
         );
-        require(tokensTransfered, "lumeirn tranfer failed");
+        require(tokensTransfered, "lumerin transfer failed");
         require(feeTransfer, "marketplace fee not paid");
-        targetContract.setPurchaseContract(_cipherText, msg.sender);
+        targetContract.setPurchaseContract(_cipherText, msg.sender, marketPlaceFeeRecipient, _marketplaceFee);
+
         emit clonefactoryContractPurchased(contractAddress);
     }
 

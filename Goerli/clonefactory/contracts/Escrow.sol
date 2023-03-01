@@ -13,6 +13,9 @@ contract Escrow is ReentrancyGuard {
     address public escrow_seller; // Entity to receive funds...
     uint256 public contractTotal; // How much should be escrowed...
     uint256 public receivedTotal; // Optional; Keep a balance for how much has been received...
+    uint256 marketplaceFee; // amount of fee to be sent to the fee recipient (marketPlaceFeeRecipient)
+    address marketPlaceFeeRecipient; //address where the marketplace fee's are sent
+
     Lumerin myToken;
 
     //internal function which will be called by the hashrate contract
@@ -23,8 +26,13 @@ contract Escrow is ReentrancyGuard {
     //internal function which transfers current hodled tokens into sellers account
     function getDepositContractHodlingsToSeller(uint256 remaining) internal {
         myToken.transfer(
+            marketPlaceFeeRecipient,
+            marketplaceFee
+        );
+
+        myToken.transfer(
             escrow_seller,
-            myToken.balanceOf(address(this)) - remaining
+            myToken.balanceOf(address(this)) - remaining - marketplaceFee
         );
     }
 
@@ -33,11 +41,15 @@ contract Escrow is ReentrancyGuard {
     function createEscrow(
         address _escrow_seller,
         address _escrow_purchaser,
-        uint256 _lumerinTotal
+        uint256 _lumerinTotal,
+        address _marketPlaceFeeRecipient, 
+        uint256 _marketplaceFee
     ) internal {
         escrow_seller = _escrow_seller;
         escrow_purchaser = _escrow_purchaser;
         contractTotal = _lumerinTotal;
+        marketPlaceFeeRecipient = _marketPlaceFeeRecipient;
+        marketplaceFee = _marketplaceFee;
     }
 
     // @notice Find out how much is left to fullfill the Escrow to say it's funded.
