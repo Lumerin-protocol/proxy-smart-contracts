@@ -23,19 +23,6 @@ contract Escrow is ReentrancyGuard {
         myToken = Lumerin(_titanToken);
     }
 
-    //internal function which transfers current hodled tokens into sellers account
-    function getDepositContractHodlingsToSeller(uint256 remaining) internal {
-        myToken.transfer(
-            marketPlaceFeeRecipient,
-            marketplaceFee
-        );
-
-        myToken.transfer(
-            escrow_seller,
-            myToken.balanceOf(address(this)) - remaining - marketplaceFee
-        );
-    }
-
     // @notice This will create a new escrow based on the seller, buyer, and total.
     // @dev Call this in order to make a new contract.
     function createEscrow(
@@ -75,9 +62,37 @@ contract Escrow is ReentrancyGuard {
         internal
         nonReentrant
     {
-        myToken.transfer(escrow_seller, _seller);
+        extractFee(_seller);
+        myToken.transfer(escrow_seller, _seller - calculateFee(_seller));
         if (_buyer != 0) {
             myToken.transfer(escrow_purchaser, _buyer);
         }
+    }
+
+    //internal function which transfers current hodled tokens into sellers account
+    function getDepositContractHodlingsToSeller(uint256 remaining) internal {
+
+        uint256 balance = myToken.balanceOf(address(this)) - remaining;
+        uint256 fee = calculateFee(balance);
+        uint256 transferrableBalance = balance - fee;
+
+        extractFee(fee);
+
+        myToken.transfer(
+            escrow_seller,
+            transferrableBalance
+        );
+    }
+
+    function extractFee(uint256 revenue) internal {
+        transferFeeToFeeRecipient(calculateFee(revenue));
+    }
+
+    function transferFeeToFeeRecipient(uint256 fee) internal {
+        myToken.transfer(marketPlaceFeeRecipient, fee);
+    }
+
+    function calculateFee(uint256 revenue) internal returns (uint256) {
+        return revenue / 100;
     }
 }
