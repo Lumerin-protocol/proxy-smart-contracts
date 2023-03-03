@@ -114,7 +114,7 @@ contract Implementation is Initializable, Escrow {
         string memory _encryptedPoolData,
         address _buyer,
         address marketPlaceFeeRecipient, 
-        uint256 marketplaceFee
+        uint256 marketplaceFeeRate
     ) public {
         require(
             contractState == ContractState.Available,
@@ -128,7 +128,7 @@ contract Implementation is Initializable, Escrow {
         buyer = _buyer;
         startingBlockTimestamp = block.timestamp;
         contractState = ContractState.Running;
-        createEscrow(seller, buyer, price, marketPlaceFeeRecipient, marketplaceFee);
+        createEscrow(seller, buyer, price, marketPlaceFeeRecipient, marketplaceFeeRate);
         emit contractPurchased(msg.sender);
     }
 

@@ -2,7 +2,10 @@
   "name": "hardhat-project",
   "scripts": {
     "compile": "hardhat compile",
-    "test": "npx hardhat node & hardhat test --network hardhat tests/*.js"
+    "reset": "npx kill-port 8545 && npx hardhat node --port 8545",
+    "dev": "npx hardhat node --port 8545",
+    "test": "hardhat test --network hardhat tests/*.js",
+    "test-local": "hardhat test --network localhost tests/*.js"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.5",

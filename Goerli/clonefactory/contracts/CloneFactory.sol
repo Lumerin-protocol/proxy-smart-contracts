@@ -3,6 +3,7 @@
 pragma solidity >0.8.0;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./Implementation.sol";
 import "./LumerinToken.sol";
@@ -21,12 +22,14 @@ contract CloneFactory {
     address owner;
     address marketPlaceFeeRecipient; //address where the marketplace fee's are sent
     address[] public rentalContracts; //dynamically allocated list of rental contracts
+    uint256 public buyerFeeFactor; //fee to be paid to the marketplace
+    uint256 public sellerFeeFactor; //fee to be paid to the marketplace
     bool public noMoreWhitelist;
     mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
     mapping(address => bool) public isContractDead; // keeps track of contracts that are no longer valid
     Lumerin lumerin;
 
-    constructor(address _lmn, address _validator) {
+    constructor(address _lmn, address _validator, uint256 _buyerFeeFactor, uint256 _sellerFeeFactor) {
         Implementation _imp = new Implementation();
         baseImplementation = address(_imp);
         lmnDeploy = _lmn; //deployed address of lumeirn token
@@ -34,6 +37,8 @@ contract CloneFactory {
         lumerin = Lumerin(_lmn);
         owner = msg.sender;
         marketPlaceFeeRecipient = msg.sender;
+        buyerFeeFactor = _buyerFeeFactor;
+        sellerFeeFactor = _sellerFeeFactor;
     }
 
     event contractCreated(address indexed _address, string _pubkey); //emitted whenever a contract is created
@@ -83,10 +88,17 @@ contract CloneFactory {
     ) onlyInWhitelist external {
         Implementation targetContract = Implementation(contractAddress);
         uint256 _price = targetContract.price();
-        uint256 _marketplaceFee = _price/100;
+        uint256 _marketplaceFee = _price/buyerFeeFactor;
+
+        uint256 requiredAllowance = _price + _marketplaceFee;
+        uint256 actualAllowance = lumerin.allowance(msg.sender, address(this));
+        string memory requiredAllowanceSegment = Strings.toString(requiredAllowance);
+        string memory actualAllowanceSegment = Strings.toString(actualAllowance);
+        string memory message = string(abi.encodePacked("not authorized to spend required funds: ", requiredAllowanceSegment, "; actual allowance: ", actualAllowanceSegment));
+
         require(
-            lumerin.allowance(msg.sender, address(this)) >= _price+_marketplaceFee,
-            "not authorized to spend required funds"
+            actualAllowance >= requiredAllowance,
+            message
         );
         bool tokensTransfered = lumerin.transferFrom(
             msg.sender,
@@ -94,14 +106,16 @@ contract CloneFactory {
             _price
         );
 
+        require(tokensTransfered, "lumerin transfer failed");
+
         bool feeTransfer = lumerin.transferFrom(
             msg.sender,
             marketPlaceFeeRecipient,
             _marketplaceFee
         );
-        require(tokensTransfered, "lumerin transfer failed");
+
         require(feeTransfer, "marketplace fee not paid");
-        targetContract.setPurchaseContract(_cipherText, msg.sender, marketPlaceFeeRecipient, _marketplaceFee);
+        targetContract.setPurchaseContract(_cipherText, msg.sender, marketPlaceFeeRecipient, sellerFeeFactor);
 
         emit clonefactoryContractPurchased(contractAddress);
     }
@@ -128,8 +142,17 @@ contract CloneFactory {
         return whitelist[_address];
     }
 
+
     function setDisableWhitelist() external onlyOwner {
         noMoreWhitelist = true;
+    }
+
+    function setChangeSellerFeeRate(uint256 _newFee) external onlyOwner {
+        sellerFeeFactor = _newFee;
+    }
+    
+    function setChangeBuyerFeeRate(uint256 _newFee) external onlyOwner {
+        buyerFeeFactor = _newFee;
     }
 
     function setChangeMarketplaceRecipient(address _newRecipient) external onlyOwner {

@@ -13,7 +13,7 @@ contract Escrow is ReentrancyGuard {
     address public escrow_seller; // Entity to receive funds...
     uint256 public contractTotal; // How much should be escrowed...
     uint256 public receivedTotal; // Optional; Keep a balance for how much has been received...
-    uint256 marketplaceFee; // amount of fee to be sent to the fee recipient (marketPlaceFeeRecipient)
+    uint256 marketplaceFeeRate; // amount of fee to be sent to the fee recipient (marketPlaceFeeRecipient)
     address marketPlaceFeeRecipient; //address where the marketplace fee's are sent
 
     Lumerin myToken;
@@ -30,13 +30,13 @@ contract Escrow is ReentrancyGuard {
         address _escrow_purchaser,
         uint256 _lumerinTotal,
         address _marketPlaceFeeRecipient, 
-        uint256 _marketplaceFee
+        uint256 _marketplaceFeeRate
     ) internal {
         escrow_seller = _escrow_seller;
         escrow_purchaser = _escrow_purchaser;
         contractTotal = _lumerinTotal;
         marketPlaceFeeRecipient = _marketPlaceFeeRecipient;
-        marketplaceFee = _marketplaceFee;
+        marketplaceFeeRate = _marketplaceFeeRate;
     }
 
     // @notice Find out how much is left to fullfill the Escrow to say it's funded.
@@ -62,8 +62,10 @@ contract Escrow is ReentrancyGuard {
         internal
         nonReentrant
     {
-        extractFee(_seller);
-        myToken.transfer(escrow_seller, _seller - calculateFee(_seller));
+        uint256 fee = calculateFee(_seller);
+        myToken.transfer(marketPlaceFeeRecipient, fee);
+
+        myToken.transfer(escrow_seller, _seller - fee);
         if (_buyer != 0) {
             myToken.transfer(escrow_purchaser, _buyer);
         }
@@ -76,7 +78,7 @@ contract Escrow is ReentrancyGuard {
         uint256 fee = calculateFee(balance);
         uint256 transferrableBalance = balance - fee;
 
-        extractFee(fee);
+        myToken.transfer(marketPlaceFeeRecipient, fee);
 
         myToken.transfer(
             escrow_seller,
@@ -84,15 +86,7 @@ contract Escrow is ReentrancyGuard {
         );
     }
 
-    function extractFee(uint256 revenue) internal {
-        transferFeeToFeeRecipient(calculateFee(revenue));
-    }
-
-    function transferFeeToFeeRecipient(uint256 fee) internal {
-        myToken.transfer(marketPlaceFeeRecipient, fee);
-    }
-
-    function calculateFee(uint256 revenue) internal returns (uint256) {
-        return revenue / 100;
+    function calculateFee(uint256 revenue) internal view returns (uint256) {
+        return revenue / marketplaceFeeRate;
     }
 }
