@@ -23,11 +23,40 @@ contract Implementation is Initializable, Escrow {
     address cloneFactory; //used to limit where the purchase can be made
     address validator; //validator to be used. Can be set to 0 address if validator not being used
     string public encryptedPoolData; //encrypted data for pool target info
+    string public pubKey; //encrypted data for pool target info
+
+    struct SellerHistory {
+        bool goodCloseout;
+        uint256 _purchaseTime;
+        uint256 endingTime;
+        uint256 _price;
+        uint256 _speed;
+        uint256 _length;
+        address _buyer;
+    }
+
+    SellerHistory[] public sellerHistory;
+    /*1. call the clonefactory get contract
+    2. for each contract, call sellerHistory
+    3. get the inf
+    */
+
+    struct PurchaseInfo {
+        bool goodCloseout;
+        uint256 _purchaseTime;
+        uint256 endingTime;
+        uint256 _price;
+        uint256 _speed;
+        uint256 _length;
+    }
+
 
     event contractPurchased(address indexed _buyer); //make indexed
-    event contractClosed();
+    event contractClosed(address indexed _buyer);
     event purchaseInfoUpdated();
     event cipherTextUpdated(string newCipherText);
+
+    mapping(address => PurchaseInfo[]) public buyerTracking;
 
     function initialize(
         uint256 _price,
@@ -37,7 +66,8 @@ contract Implementation is Initializable, Escrow {
         address _seller,
         address _lmn,
         address _cloneFactory, //used to restrict purchasing power to only the clonefactory
-        address _validator
+        address _validator,
+        string memory _pubKey
     ) public initializer {
         price = _price;
         limit = _limit;
@@ -47,6 +77,7 @@ contract Implementation is Initializable, Escrow {
         cloneFactory = _cloneFactory;
         validator = _validator;
         contractState = ContractState.Available;
+        pubKey = _pubKey;
         setParameters(_lmn);
     }
 
@@ -153,11 +184,8 @@ contract Implementation is Initializable, Escrow {
         buyer = seller;
         encryptedPoolData = "";
         contractState = ContractState.Available;
-        startingBlockTimestamp = 0;
     }
 
-    //purpose is to calculate how many tokens the buyer is owed incase the contract
-    //is canceled early
     function buyerPayoutCalc() internal view returns (uint256) {
         uint256 durationOfContract = block.timestamp - startingBlockTimestamp;
         if (durationOfContract <= length) {
@@ -165,7 +193,7 @@ contract Implementation is Initializable, Escrow {
                 uint256(price * uint256(length - durationOfContract)) /
                 uint256(length);
         }
-        return 0;
+        return price;
     }
 
     function setContractCloseOut(uint256 closeOutType) public {
@@ -177,11 +205,11 @@ contract Implementation is Initializable, Escrow {
                 "this account is not authorized to trigger an early closeout"
             );
             uint256 buyerPayout = buyerPayoutCalc();
-            if (buyerPayout > 0) {
-                withdrawFunds(myToken.balanceOf(address(this))-buyerPayout, buyerPayout);
-            }
+            withdrawFunds(price - buyerPayout, buyerPayout);
+            buyerTracking[buyer].push(PurchaseInfo(false,startingBlockTimestamp, block.timestamp, price, speed, length));
+            sellerHistory.push(SellerHistory(false,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
             setContractVariableUpdate();
-            emit contractClosed();
+            emit contractClosed(buyer);
         } else if (closeOutType == 1) {
             //this is a function call for the seller to withdraw their funds
             //at any time during the smart contracts lifecycle
@@ -189,7 +217,8 @@ contract Implementation is Initializable, Escrow {
                 msg.sender == seller,
                 "this account is not authorized to trigger a mid-contract closeout"
             );
-            getDepositContractHodlingsToSeller(buyerPayoutCalc());
+
+            getDepositContractHodlingsToSeller(price - buyerPayoutCalc());
         } else if (closeOutType == 2 || closeOutType == 3) {
             require(
                 block.timestamp - startingBlockTimestamp >= length,
@@ -198,8 +227,29 @@ contract Implementation is Initializable, Escrow {
             if (closeOutType == 3) {
                 withdrawFunds(myToken.balanceOf(address(this)), 0);
             }
+
+            buyerTracking[buyer].push(PurchaseInfo(true,startingBlockTimestamp, block.timestamp, price, speed, length));
+            sellerHistory.push(SellerHistory(true,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
             setContractVariableUpdate();
-            emit contractClosed();
+            emit contractClosed(buyer);
+        } else if (closeOutType == 4) {
+            require(
+                block.timestamp - startingBlockTimestamp >= length,
+                "the contract has yet to be carried to term"
+            );
+            require(
+                msg.sender == cloneFactory,
+                "only the clonefactory can call this method"
+            );
+            buyerTracking[buyer].push(PurchaseInfo(true,startingBlockTimestamp, block.timestamp, price, speed, length));
+            sellerHistory.push(SellerHistory(true,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
+            withdrawFunds(myToken.balanceOf(address(this)), 0);
+
+        } else {
+            require(
+                closeOutType < 5,
+                "you must make a selection between 0 and 3"
+            );
         }
     }
 }
