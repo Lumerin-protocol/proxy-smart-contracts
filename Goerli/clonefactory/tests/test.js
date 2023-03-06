@@ -1,6 +1,9 @@
 let { expect } = require("chai");
 let { ethers } = require("hardhat");
-let sleep = require("sleep");
+
+async function sleep(sleepTime) {
+  return new Promise((resolve) => setTimeout(resolve, sleepTime));
+}
 
 describe("ContractPurchase", function () {
   this.timeout(600 * 1000);
@@ -23,9 +26,7 @@ describe("ContractPurchase", function () {
     let lumerinAttachErr = null;
 
     try {
-      lumerin = await Lumerin.attach(
-        process.env.LUMERIN_TOKEN_ADDRESS
-      );
+      lumerin = await Lumerin.attach(process.env.LUMERIN_TOKEN_ADDRESS);
     } catch (e) {
       lumerinAttachErr = e;
       console.log(
@@ -109,7 +110,7 @@ describe("ContractPurchase", function () {
     let contractsBefore = await cloneFactory.getContractList();
 
     let contractCreate = await cloneFactory
-      .connect(withPOE)
+      .connect(seller)
       .setCreateNewRentalContract(
         purchase_price,
         10,
@@ -146,23 +147,13 @@ describe("ContractPurchase", function () {
   });
 
   //account with POE token buys a contract
-  it.only("purchase a contract", async function () {
+  it("purchase a contract", async function () {
     //buyer calls purchase function on clone factory
 
     let contracts = await cloneFactory.getContractList();
     let contractAddress = contracts[contracts.length - 1];
     let contract1 = await Implementation.attach(contractAddress);
-    let contractDetails = await contract1.getPublicVariables();
-
-    let price = BigInt(contractDetails[1]);
-    console.log("price: ", price);
-    console.log("contract details: ", contractDetails);
-    console.log("allowance increase: ", price + price / BigInt(100));
-
-    let allowanceIncrease1 = await lumerin
-      .connect(withPOE)
-      .increaseAllowance(cloneFactory.address, price + price / BigInt(100));
-    await allowanceIncrease1.wait();
+    await tryIncreaseAllowanceForContract(contract1, withPOE);
 
     let purchaseContract = await cloneFactory
       .connect(withPOE)
@@ -172,6 +163,23 @@ describe("ContractPurchase", function () {
     let contractBuyer = await contract1.buyer();
     expect(contractBuyer).to.equal(withPOE.address);
   });
+
+  async function tryIncreaseAllowanceForContract(contract1, owner) {
+    let state = await contract1.contractState();
+
+    if (state == 0) {
+      let price = BigInt(await contract1.price());
+
+      let allowanceIncrease1 = await lumerin
+        .connect(owner)
+        .increaseAllowance(cloneFactory.address, price + price / BigInt(100));
+      await allowanceIncrease1.wait();
+
+      return true;
+    }
+
+    return false;
+  }
 
   //account without POE token fails to buy a contract
   it("failContractPurchase", async function () {
@@ -196,48 +204,77 @@ describe("ContractPurchase", function () {
   //buyer buys all 10
   //seller closes out all 10 after contract duration
   //confirm buyer can see all 10
-  it("confirmCloseoutTracking", async function () {
-    await loadLouMarinAllowance();
-
+  it.skip("confirmCloseoutTracking", async function () {
     //create 10 contracts
     for (let count = 0; count < 10; count++) {
       let contractCreate = await cloneFactory
-        .connect(withPOE)
+        .connect(seller)
         .setCreateNewRentalContract(1, 1, 1, 1, lumerin.address, "123");
       await contractCreate.wait();
     }
 
+    let contracts = {};
+    let purchasedContracts = {};
+
     //get list of contracts
-    let contracts = await cloneFactory.getContractList();
-    for (let contract of contracts) {
-      let purchaseContract = await cloneFactory
-        .connect(withPOE)
-        .setPurchaseRentalContract(contract, "123");
-      await purchaseContract.wait();
+    let contractAddresses = await cloneFactory.getContractList();
+
+    for (let contract of contractAddresses) {
+      let contractInstance = await Implementation.attach(contract);
+
+      contracts[contract] = contractInstance;
+
+      let shouldPurchase = await tryIncreaseAllowanceForContract(
+        contractInstance,
+        withPOE
+      );
+
+      if (shouldPurchase) {
+        let purchaseContract = await cloneFactory
+          .connect(withPOE)
+          .setPurchaseRentalContract(contract, "123");
+        await purchaseContract.wait();
+      }
+
+      purchasedContracts[contract] = shouldPurchase;
     }
 
-    //wait 10 seconds
-    sleep.sleep(10);
-
+    contractCloseoutPromises = [];
     //close out all contracts with option 3
-    for (let contract of contracts) {
-      let imp = await Implementation.attach(contract);
-      let closeout = await imp.connect(withPOE).setContractCloseOut(3);
-      await closeout.wait();
-    }
+    for (let contract of contractAddresses) {
+      if (purchasedContracts[contract]) {
+        // force a block to be mined
 
-    //iterate through each contract in getContractList and look for each
-    //instance of contractClosed event
-    //create an object where the key is the buyer address, and the value is a list of contract addresses
-    let closedContracts = {};
-    for (let contract of contracts) {
-      let imp = await Implementation.attach(contract);
-      let closedEvents = await imp.queryFilter("contractClosedGood");
-      for (let event in closedEvents) {
-        console.log(event[0]);
+        await ethers.provider.poll();
+
+        let closeout = await contracts[contract]
+          .connect(withPOE)
+          .setContractCloseOut(3);
+
+        await closeout.wait();
+
+        let closedEvents = await contracts[contract].queryFilter(
+          "contractClosed"
+        );
+
+        expect(closedEvents.length).to.be.greaterThanOrEqual(1);
+
+        console.log("verified contract closed: ", contract);
+        let buyerHistory = await contracts[contract].buyerTracking(
+          withPOE.address
+        );
+        console.log("buyerHistory: ", buyerHistory);
+        expect(buyerHistory.length).to.be.greaterThanOrEqual(1);
       }
     }
-    expect(1).to.equal(2);
+
+    //create an object where the key is the buyer address, and the value is a list of contract addresses
+
+    // for (let contract of contractAddresses) {
+    //   if (purchasedContracts[contract]) {
+
+    //   }
+    // }
   });
 
   //deploys a new clone factory

@@ -22,14 +22,14 @@ contract CloneFactory {
     address owner;
     address marketPlaceFeeRecipient; //address where the marketplace fee's are sent
     address[] public rentalContracts; //dynamically allocated list of rental contracts
-    uint256 public buyerFeeFactor; //fee to be paid to the marketplace
-    uint256 public sellerFeeFactor; //fee to be paid to the marketplace
+    uint256 public buyerFeeRate; //fee to be paid to the marketplace
+    uint256 public sellerFeeRate; //fee to be paid to the marketplace
     bool public noMoreWhitelist;
     mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
     mapping(address => bool) public isContractDead; // keeps track of contracts that are no longer valid
     Lumerin lumerin;
 
-    constructor(address _lmn, address _validator, uint256 _buyerFeeFactor, uint256 _sellerFeeFactor) {
+    constructor(address _lmn, address _validator) {
         Implementation _imp = new Implementation();
         baseImplementation = address(_imp);
         lmnDeploy = _lmn; //deployed address of lumeirn token
@@ -37,8 +37,9 @@ contract CloneFactory {
         lumerin = Lumerin(_lmn);
         owner = msg.sender;
         marketPlaceFeeRecipient = msg.sender;
-        buyerFeeFactor = _buyerFeeFactor;
-        sellerFeeFactor = _sellerFeeFactor;
+        
+        buyerFeeRate = 100;
+        sellerFeeRate = 100;
     }
 
     event contractCreated(address indexed _address, string _pubkey); //emitted whenever a contract is created
@@ -85,10 +86,10 @@ contract CloneFactory {
     function setPurchaseRentalContract (
         address contractAddress,
         string memory _cipherText
-    ) onlyInWhitelist external {
+    ) external {
         Implementation targetContract = Implementation(contractAddress);
         uint256 _price = targetContract.price();
-        uint256 _marketplaceFee = _price/buyerFeeFactor;
+        uint256 _marketplaceFee = _price/buyerFeeRate;
 
         uint256 requiredAllowance = _price + _marketplaceFee;
         uint256 actualAllowance = lumerin.allowance(msg.sender, address(this));
@@ -115,7 +116,7 @@ contract CloneFactory {
         );
 
         require(feeTransfer, "marketplace fee not paid");
-        targetContract.setPurchaseContract(_cipherText, msg.sender, marketPlaceFeeRecipient, sellerFeeFactor);
+        targetContract.setPurchaseContract(_cipherText, msg.sender, marketPlaceFeeRecipient, sellerFeeRate);
 
         emit clonefactoryContractPurchased(contractAddress);
     }
@@ -148,11 +149,11 @@ contract CloneFactory {
     }
 
     function setChangeSellerFeeRate(uint256 _newFee) external onlyOwner {
-        sellerFeeFactor = _newFee;
+        sellerFeeRate = _newFee;
     }
     
     function setChangeBuyerFeeRate(uint256 _newFee) external onlyOwner {
-        buyerFeeFactor = _newFee;
+        buyerFeeRate = _newFee;
     }
 
     function setChangeMarketplaceRecipient(address _newRecipient) external onlyOwner {

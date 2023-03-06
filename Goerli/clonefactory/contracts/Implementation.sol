@@ -36,7 +36,8 @@ contract Implementation is Initializable, Escrow {
     }
 
     SellerHistory[] public sellerHistory;
-    /*1. call the clonefactory get contract
+    /*
+    1. call the clonefactory get contract
     2. for each contract, call sellerHistory
     3. get the inf
     */
@@ -49,7 +50,6 @@ contract Implementation is Initializable, Escrow {
         uint256 _speed;
         uint256 _length;
     }
-
 
     event contractPurchased(address indexed _buyer); //make indexed
     event contractClosed(address indexed _buyer);
@@ -209,6 +209,7 @@ contract Implementation is Initializable, Escrow {
             uint256 buyerPayout = buyerPayoutCalc();
             withdrawFunds(price - buyerPayout, buyerPayout);
             buyerTracking[buyer].push(PurchaseInfo(false,startingBlockTimestamp, block.timestamp, price, speed, length));
+
             sellerHistory.push(SellerHistory(false,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
             setContractVariableUpdate();
             emit contractClosed(buyer);
