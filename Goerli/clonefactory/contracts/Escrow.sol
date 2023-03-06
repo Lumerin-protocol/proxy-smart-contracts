@@ -13,6 +13,9 @@ contract Escrow is ReentrancyGuard {
     address public escrow_seller; // Entity to receive funds...
     uint256 public contractTotal; // How much should be escrowed...
     uint256 public receivedTotal; // Optional; Keep a balance for how much has been received...
+    uint256 marketplaceFeeRate; // amount of fee to be sent to the fee recipient (marketPlaceFeeRecipient)
+    address marketPlaceFeeRecipient; //address where the marketplace fee's are sent
+
     Lumerin myToken;
 
     //internal function which will be called by the hashrate contract
@@ -20,24 +23,20 @@ contract Escrow is ReentrancyGuard {
         myToken = Lumerin(_titanToken);
     }
 
-    //internal function which transfers current hodled tokens into sellers account
-    function getDepositContractHodlingsToSeller(uint256 remaining) internal {
-        myToken.transfer(
-            escrow_seller,
-            myToken.balanceOf(address(this)) - remaining
-        );
-    }
-
     // @notice This will create a new escrow based on the seller, buyer, and total.
     // @dev Call this in order to make a new contract.
     function createEscrow(
         address _escrow_seller,
         address _escrow_purchaser,
-        uint256 _lumerinTotal
+        uint256 _lumerinTotal,
+        address _marketPlaceFeeRecipient, 
+        uint256 _marketplaceFeeRate
     ) internal {
         escrow_seller = _escrow_seller;
         escrow_purchaser = _escrow_purchaser;
         contractTotal = _lumerinTotal;
+        marketPlaceFeeRecipient = _marketPlaceFeeRecipient;
+        marketplaceFeeRate = _marketplaceFeeRate;
     }
 
     // @notice Find out how much is left to fullfill the Escrow to say it's funded.
@@ -63,9 +62,31 @@ contract Escrow is ReentrancyGuard {
         internal
         nonReentrant
     {
-        myToken.transfer(escrow_seller, _seller);
+        uint256 fee = calculateFee(_seller);
+        myToken.transfer(marketPlaceFeeRecipient, fee);
+
+        myToken.transfer(escrow_seller, _seller - fee);
         if (_buyer != 0) {
             myToken.transfer(escrow_purchaser, _buyer);
         }
+    }
+
+    //internal function which transfers current hodled tokens into sellers account
+    function getDepositContractHodlingsToSeller(uint256 remaining) internal {
+
+        uint256 balance = myToken.balanceOf(address(this)) - remaining;
+        uint256 fee = calculateFee(balance);
+        uint256 transferrableBalance = balance - fee;
+
+        myToken.transfer(marketPlaceFeeRecipient, fee);
+
+        myToken.transfer(
+            escrow_seller,
+            transferrableBalance
+        );
+    }
+
+    function calculateFee(uint256 revenue) internal view returns (uint256) {
+        return revenue / marketplaceFeeRate;
     }
 }
