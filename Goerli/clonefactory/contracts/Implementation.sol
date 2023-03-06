@@ -251,7 +251,7 @@ contract Implementation is Initializable, Escrow {
         } else {
             require(
                 closeOutType < 5,
-                "you must make a selection between 0 and 3"
+                "you must make a selection from 0 to 4"
             );
         }
     }
