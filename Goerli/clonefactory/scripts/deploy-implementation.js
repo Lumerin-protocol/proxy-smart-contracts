@@ -7,14 +7,6 @@ async function main() {
 
   console.log("Deploying IMPLEMENTATION with the account:", deployer.address);
   console.log("Account balance:", (await deployer.getBalance()).toString());
-
-  const Implementation = await ethers.getContractFactory("Implementation");
-  const implementation = await Implementation.deploy();
-  await implementation.deployed();
-
-  console.log("IMPLEMENTATION address:", implementation.address);
-
-  console.log("\nDeploying CLONEFACTORY with the account:", deployer.address);
   console.log("LUMERIN address:", process.env.LUMERIN_TOKEN_ADDRESS);
   console.log("VALIDATOR address:", process.env.VALIDATOR_ADDRESS);
 
@@ -26,12 +18,9 @@ async function main() {
   await cloneFactory.deployed();
 
   console.log("CLONEFACTORY address:", cloneFactory.address);
-
-  const setBaseImplementation = await cloneFactory.setBaseImplementation(
-    implementation.address
-  );
-  await setBaseImplementation.wait();
+  fs.writeFileSync("clonefactory-addr.tmp", String(cloneFactory.address));
 }
+
 main()
   .then(() => process.exit(0))
   .catch((error) => {

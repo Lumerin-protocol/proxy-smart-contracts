@@ -37,7 +37,7 @@ contract CloneFactory {
         lumerin = Lumerin(_lmn);
         owner = msg.sender;
         marketPlaceFeeRecipient = msg.sender;
-        
+
         buyerFeeRate = 100;
         sellerFeeRate = 100;
     }
@@ -51,12 +51,15 @@ contract CloneFactory {
     }
 
     modifier onlyInWhitelist() {
-        require(whitelist[msg.sender] == true || noMoreWhitelist == true, "you are not an approved seller on this marketplace");
+        require(
+            whitelist[msg.sender] == true || noMoreWhitelist == true,
+            "you are not an approved seller on this marketplace"
+        );
         _;
     }
 
     //function to create a new Implementation contract
-    function setCreateNewRentalContract (
+    function setCreateNewRentalContract(
         uint256 _price,
         uint256 _limit,
         uint256 _speed,
@@ -143,7 +146,6 @@ contract CloneFactory {
         return whitelist[_address];
     }
 
-
     function setDisableWhitelist() external onlyOwner {
         noMoreWhitelist = true;
     }
@@ -151,7 +153,7 @@ contract CloneFactory {
     function setChangeSellerFeeRate(uint256 _newFee) external onlyOwner {
         sellerFeeRate = _newFee;
     }
-    
+
     function setChangeBuyerFeeRate(uint256 _newFee) external onlyOwner {
         buyerFeeRate = _newFee;
     }
@@ -167,5 +169,12 @@ contract CloneFactory {
         if (closeout) {
             _tempContract.setContractCloseOut(4);
         }
+    }
+
+    // for test purposes, this allows us to configure our test environment so the ABI's can be matched with the Implementation contract source.
+    function setBaseImplementation(
+        address _newImplementation
+    ) external onlyOwner {
+        baseImplementation = _newImplementation;
     }
 }
