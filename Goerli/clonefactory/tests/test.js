@@ -82,8 +82,6 @@ describe("marketplace", function () {
       await cloneFactory.deployed();
     }
 
-    // console.log("clone factory: ", cloneFactory.address);
-
     //transfer POE to required addresses
     for (addr of [withPOE, withPOE1, withPOE2]) {
       let tx = await poe.transfer(addr.address, 1);
