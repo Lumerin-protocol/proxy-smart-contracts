@@ -337,43 +337,7 @@ describe("marketplace", function () {
     //seller closes out all 10 after contract duration
     //confirm buyer can see all 10
     it("should track closeout with buyer and seller information", async function () {
-      //create 10 contracts
-      // for (let count = 0; count < 10; count++) {
-      //   let contractCreate = await cloneFactory
-      //     .connect(seller)
-      //     .setCreateNewRentalContract(1, 1, 1, 1, lumerin.address, "123");
-      //   await contractCreate.wait();
-      // }
-
-      // let contracts = {};
-      // let purchasedContracts = {};
-
-      // //get list of contracts
-      // let contractAddresses = await cloneFactory.getContractList();
-
-      // for (let contract of contractAddresses) {
-      //   let contractInstance = await Implementation.attach(contract);
-
-      //   contracts[contract] = contractInstance;
-
-      //   let shouldPurchase = await tryIncreaseAllowanceForContract(
-      //     contractInstance,
-      //     withPOE
-      //   );
-
-      //   if (shouldPurchase) {
-      //     let purchaseContract = await cloneFactory
-      //       .connect(withPOE)
-      //       .setPurchaseRentalContract(contract, "123");
-      //     await purchaseContract.wait();
-
-      //     // wait for contract to expire
-      //     await time.increase((await contractInstance.length()) * 60 * 60);
-      //   }
-
-      //   purchasedContracts[contract] = shouldPurchase;
-      // }
-
+     
       const contracts = await purchaseContracts(10, withPOE);
 
       let contractCloseoutPromises = [];
@@ -457,7 +421,7 @@ describe("marketplace", function () {
         sellerBalanceAfterCloseout,
         sellerBalance
       );
-      
+
       expect(sellerPayoutPercentError).to.be.lessThan(1);
     }
     function assertBuyerPayout(
