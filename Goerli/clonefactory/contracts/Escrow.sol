@@ -7,6 +7,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./LumerinToken.sol";
+import "hardhat/console.sol";
 
 contract Escrow is ReentrancyGuard {
     address public escrow_purchaser; // Entity making a payment...
@@ -29,7 +30,7 @@ contract Escrow is ReentrancyGuard {
         address _escrow_seller,
         address _escrow_purchaser,
         uint256 _lumerinTotal,
-        address _marketPlaceFeeRecipient, 
+        address _marketPlaceFeeRecipient,
         uint256 _marketplaceFeeRate
     ) internal {
         escrow_seller = _escrow_seller;
@@ -58,10 +59,11 @@ contract Escrow is ReentrancyGuard {
     // by checking the State and if so, release the funds to the seller.
     // sends lumerin tokens to the appropriate entities.
     // _buyer will obtain a 0 value unless theres a penalty involved
-    function withdrawFunds(uint256 _seller, uint256 _buyer)
-        internal
-        nonReentrant
-    {
+    function withdrawFunds(
+        uint256 _seller,
+        uint256 _buyer
+    ) internal nonReentrant {
+        
         uint256 fee = calculateFee(_seller);
         myToken.transfer(marketPlaceFeeRecipient, fee);
 
@@ -69,21 +71,18 @@ contract Escrow is ReentrancyGuard {
         if (_buyer != 0) {
             myToken.transfer(escrow_purchaser, _buyer);
         }
+
     }
 
     //internal function which transfers current hodled tokens into sellers account
     function getDepositContractHodlingsToSeller(uint256 remaining) internal {
-
         uint256 balance = myToken.balanceOf(address(this)) - remaining;
         uint256 fee = calculateFee(balance);
         uint256 transferrableBalance = balance - fee;
 
         myToken.transfer(marketPlaceFeeRecipient, fee);
 
-        myToken.transfer(
-            escrow_seller,
-            transferrableBalance
-        );
+        myToken.transfer(escrow_seller, transferrableBalance);
     }
 
     function calculateFee(uint256 revenue) internal view returns (uint256) {

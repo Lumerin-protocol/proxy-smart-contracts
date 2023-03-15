@@ -4,7 +4,7 @@ pragma solidity >0.8.0;
 
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "./Escrow.sol";
-
+import "hardhat/console.sol";
 //MyToken is place holder for actual lumerin token, purely for testing purposes
 contract Implementation is Initializable, Escrow {
     enum ContractState {
@@ -189,16 +189,12 @@ contract Implementation is Initializable, Escrow {
     }
 
     function buyerPayoutCalc() internal view returns (uint256) {        
-        uint256 durationOfContract = block.timestamp - startingBlockTimestamp;
+        uint256 durationOfContract = (block.timestamp - startingBlockTimestamp) * 1000;
 
-        console.log("starting block timestamp: %s", startingBlockTimestamp);
-        console.log("current block timestamp: %s", block.timestamp);
-        console.log("duration of contract: %s", durationOfContract);
-        console.log("length: %s", length);
-
-        uint256 lengthMS = length * 1 hours;
-
+        uint256 lengthMS = length * 1 hours * 1000;
+        
         if (durationOfContract < lengthMS) {
+
             return
                 uint256(price * uint256(lengthMS - durationOfContract)) /
                 uint256(lengthMS);
@@ -214,7 +210,9 @@ contract Implementation is Initializable, Escrow {
                 msg.sender == buyer || msg.sender == validator,
                 "this account is not authorized to trigger an early closeout"
             );
+            
             uint256 buyerPayout = buyerPayoutCalc();
+
             withdrawFunds(price - buyerPayout, buyerPayout);
             buyerHistory[buyer].push(PurchaseInfo(false,startingBlockTimestamp, block.timestamp, price, speed, length));
 

@@ -86,24 +86,18 @@ contract CloneFactory {
 
     //function to purchase a hashrate contract
     //requires the clonefactory to be able to spend tokens on behalf of the purchaser
-    function setPurchaseRentalContract (
+    function setPurchaseRentalContract(
         address contractAddress,
         string memory _cipherText
     ) external {
         Implementation targetContract = Implementation(contractAddress);
         uint256 _price = targetContract.price();
-        uint256 _marketplaceFee = _price/buyerFeeRate;
+        uint256 _marketplaceFee = _price / buyerFeeRate;
 
         uint256 requiredAllowance = _price + _marketplaceFee;
         uint256 actualAllowance = lumerin.allowance(msg.sender, address(this));
-        string memory requiredAllowanceSegment = Strings.toString(requiredAllowance);
-        string memory actualAllowanceSegment = Strings.toString(actualAllowance);
-        string memory message = string(abi.encodePacked("not authorized to spend required funds: ", requiredAllowanceSegment, "; actual allowance: ", actualAllowanceSegment));
 
-        require(
-            actualAllowance >= requiredAllowance,
-            message
-        );
+        require(actualAllowance >= requiredAllowance, "not authorized to spend required funds");
         bool tokensTransfered = lumerin.transferFrom(
             msg.sender,
             contractAddress,
@@ -119,7 +113,12 @@ contract CloneFactory {
         );
 
         require(feeTransfer, "marketplace fee not paid");
-        targetContract.setPurchaseContract(_cipherText, msg.sender, marketPlaceFeeRecipient, sellerFeeRate);
+        targetContract.setPurchaseContract(
+            _cipherText,
+            msg.sender,
+            marketPlaceFeeRecipient,
+            sellerFeeRate
+        );
 
         emit clonefactoryContractPurchased(contractAddress);
     }
@@ -130,12 +129,12 @@ contract CloneFactory {
     }
 
     //adds an address to the whitelist
-    function setAddToWhitelist(address _address) onlyOwner external {
+    function setAddToWhitelist(address _address) external onlyOwner {
         whitelist[_address] = true;
     }
 
     //remove an address from the whitelist
-    function setRemoveFromWhitelist(address _address) onlyOwner external {
+    function setRemoveFromWhitelist(address _address) external onlyOwner {
         whitelist[_address] = false;
     }
 
@@ -158,13 +157,18 @@ contract CloneFactory {
         buyerFeeRate = _newFee;
     }
 
-    function setChangeMarketplaceRecipient(address _newRecipient) external onlyOwner {
+    function setChangeMarketplaceRecipient(
+        address _newRecipient
+    ) external onlyOwner {
         marketPlaceFeeRecipient = _newRecipient;
     }
 
     function setContractAsDead(address _contract, bool closeout) public {
         Implementation _tempContract = Implementation(_contract);
-        require (msg.sender == owner || msg.sender == _tempContract.seller(), "you arent approved to mark this contract as dead");
+        require(
+            msg.sender == owner || msg.sender == _tempContract.seller(),
+            "you arent approved to mark this contract as dead"
+        );
         isContractDead[_contract] = true;
         if (closeout) {
             _tempContract.setContractCloseOut(4);

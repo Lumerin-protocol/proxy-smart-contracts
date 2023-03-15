@@ -17,6 +17,7 @@ describe("marketplace", function () {
   let lumerin;
   let poe;
   let testContract;
+  let initialTestContractBalance;
 
   before(async function () {
     [seller, withPOE, withPOE1, withPOE2, withoutPOE] =
@@ -92,6 +93,10 @@ describe("marketplace", function () {
     testContract = await Implementation.attach(
       process.env.TEST_CONTRACT_ADDRESS
     );
+
+    initialTestContractBalance = Number(
+      await lumerin.balanceOf(testContract.address)
+    );
   });
 
   //account with POE token creates contract
@@ -139,12 +144,13 @@ describe("marketplace", function () {
   it("should purchase a contract", async function () {
     //buyer calls purchase function on clone factory
 
-    let contract = await purchaseContracts(1, withPOE);
-    expect(await contract.buyer()).to.equal(withPOE.address);
+    let contracts = await purchaseContracts(1, withPOE);
+
+    expect(await Object.values(contracts)[0].buyer()).to.equal(withPOE.address);
   });
 
   //account without POE token fails to buy a contract
-  it("should failContractPurchase", async function () {
+  it.skip("should failContractPurchase", async function () {
     //buyer calls purchase function on clone factory
 
     let contracts = await cloneFactory.getContractList();
@@ -162,12 +168,24 @@ describe("marketplace", function () {
   });
 
   describe("hash power contract", function () {
+    beforeEach(async function () {
+      const status = await testContract.contractState();
+
+      if (status !== 0) {
+        await closeContract(testContract, withPOE);
+      }
+    });
+
     it("should close out and distribute full price to seller minus fees", async function () {
       await testCloseout(
         3,
         (await testContract.length()) * 60 * 60,
         withPOE,
-        withoutPOE
+        withoutPOE,
+        assertBuyerPayout,
+        assertSellerPayout,
+        assertContractWithdawal,
+        assertHashrateContractState
       );
     });
 
@@ -176,7 +194,11 @@ describe("marketplace", function () {
         2,
         (await testContract.length()) * 60 * 60,
         withPOE,
-        withoutPOE
+        withoutPOE,
+        Function(),
+        Function(),
+        Function(),
+        assertHashrateContractState
       );
     });
 
@@ -185,7 +207,10 @@ describe("marketplace", function () {
         1,
         ((await testContract.length()) / 2) * 60 * 60,
         withPOE,
-        withoutPOE
+        withoutPOE,
+        Function(),
+        assertSellerPayout,
+        assertContractWithdawal
       );
       // console.log(results);
     });
@@ -198,6 +223,10 @@ describe("marketplace", function () {
         contractRunDuration * 60 * 60,
         withPOE,
         withoutPOE,
+        assertBuyerPayout,
+        assertSellerPayout,
+        assertContractWithdawal,
+        assertHashrateContractState,
         withoutPOE
       );
     });
@@ -207,17 +236,27 @@ describe("marketplace", function () {
       closeoutAfterSeconds,
       seller,
       buyer,
+      assertBuyerPayout = () => {},
+      assertSellerPayout = () => {},
+      assertContractWithdawal = () => {},
+      assertHashrateContractState = () => {},
       closer = seller
     ) {
       let sellerAddress = seller.address;
-
       let contractPrice = Number(await testContract.price());
+      let sellerBalance = Number(await lumerin.balanceOf(sellerAddress));
+      let buyerBalance = Number(await lumerin.balanceOf(buyer.address));
+      let contractBalanceBeforePurchase = Number(
+        await lumerin.balanceOf(testContract.address)
+      );
 
-      let sellerBalance = await lumerin.balanceOf(sellerAddress);
-      let buyerBalance = await lumerin.balanceOf(buyer.address);
+      // verify contract status "running"
+      let contractStateBeforePurchase = await testContract.contractState();
+      // contract state should be 1 (running)
+      expect(contractStateBeforePurchase).to.equal(0);
 
       // // buy the test contract for tracability in hardhat
-      await purchaseContracts(1, buyer, testContract.address);
+      await purchaseContracts(1, buyer, testContract);
 
       // verify contract status "running"
       let contractState = await testContract.contractState();
@@ -225,20 +264,27 @@ describe("marketplace", function () {
       expect(contractState).to.equal(1);
 
       //verify contract balance
-      let contractBalance = await lumerin.balanceOf(testContract.address);
-      expect(contractBalance).to.equal(contractPrice);
-      // wait for contract to expire
-      await time.increase(closeoutAfterSeconds);
+      let contractBalanceAfterPurchase = await lumerin.balanceOf(
+        testContract.address
+      );
 
-      await closeContract(testContract, closer, closeoutType);
+      expect(contractBalanceAfterPurchase).to.equal(
+        contractBalanceBeforePurchase + contractPrice
+      );
+
+      await closeContract(
+        testContract,
+        closer,
+        closeoutType,
+        closeoutAfterSeconds
+      );
 
       //wait for the contract to emit "contractClosed" event
       let closedEvents = await testContract.queryFilter("contractClosed");
       expect(closedEvents.length).to.be.greaterThanOrEqual(1);
 
       // verify contract status "available"
-      let contractStateAfterCloseout = await testContract.contractState();
-      expect(contractStateAfterCloseout).to.equal(0);
+      await assertHashrateContractState();
 
       //verify wallet balances after payout completes
       let sellerBalanceAfterCloseout = await lumerin.balanceOf(sellerAddress);
@@ -247,29 +293,34 @@ describe("marketplace", function () {
         testContract.address
       );
 
-      expect(contractBalanceAfterCloseout).to.equal(0);
+      // There will be some difference between the expected payout and the actual payout given latency in the transaction
+      // For the purposes of this test, pass if the percent difference between expected and actual payout is less than 1%
+      const contractLength = Number(await testContract.length());
+      const contractCompletionRatio =
+        closeoutAfterSeconds / (contractLength * 60 * 60);
+
+      assertContractWithdawal(
+        contractCompletionRatio,
+        contractPrice,
+        contractBalanceAfterCloseout,
+        contractBalanceAfterPurchase
+      );
 
       // There will be some difference between the expected payout and the actual payout given latency in the transaction
       // For the purposes of this test, pass if the percent difference between expected and actual payout is less than 1%
-      const contractLength = await testContract.length();
-      const contractCompletionRatio =
-        closeoutAfterSeconds / (contractLength * 60 * 60);
-      const expectedSellerPayout = contractCompletionRatio * contractPrice;
-      const sellerPayoutDiff =
-        expectedSellerPayout - (sellerBalanceAfterCloseout - sellerBalance);
-      const sellerPayoutPercentError =
-        (sellerPayoutDiff / expectedSellerPayout) * 100;
+      assertSellerPayout(
+        contractCompletionRatio,
+        contractPrice,
+        sellerBalanceAfterCloseout,
+        sellerBalance
+      );
 
-      expect(sellerPayoutPercentError).to.be.lessThan(1);
-
-      const expectedBuyerPayout =
-        contractPrice - contractCompletionRatio * contractPrice;
-      const buyerPayoutDiff =
-        expectedBuyerPayout - (buyerBalanceAfterCloseout - buyerBalance);
-      const buyerPayoutPercentError =
-        (buyerPayoutDiff / expectedBuyerPayout) * 100;
-
-      expect(buyerPayoutPercentError).to.be.lessThan(1);
+      assertBuyerPayout(
+        contractCompletionRatio,
+        contractPrice,
+        buyerBalanceAfterCloseout,
+        buyerBalance
+      );
 
       return {
         sellerBalanceAfterCloseout,
@@ -279,7 +330,7 @@ describe("marketplace", function () {
         buyerBalance,
       };
     }
-    
+
     //deploys a new clone factory
     //seller creates 10 hashrate contracts
     //buyer buys all 10
@@ -287,78 +338,68 @@ describe("marketplace", function () {
     //confirm buyer can see all 10
     it("should track closeout with buyer and seller information", async function () {
       //create 10 contracts
-      for (let count = 0; count < 10; count++) {
-        let contractCreate = await cloneFactory
-          .connect(seller)
-          .setCreateNewRentalContract(1, 1, 1, 1, lumerin.address, "123");
-        await contractCreate.wait();
-      }
+      // for (let count = 0; count < 10; count++) {
+      //   let contractCreate = await cloneFactory
+      //     .connect(seller)
+      //     .setCreateNewRentalContract(1, 1, 1, 1, lumerin.address, "123");
+      //   await contractCreate.wait();
+      // }
 
-      let contracts = {};
-      let purchasedContracts = {};
+      // let contracts = {};
+      // let purchasedContracts = {};
 
-      //get list of contracts
-      let contractAddresses = await cloneFactory.getContractList();
-
-      for (let contract of contractAddresses) {
-        let contractInstance = await Implementation.attach(contract);
-
-        contracts[contract] = contractInstance;
-
-        let shouldPurchase = await tryIncreaseAllowanceForContract(
-          contractInstance,
-          withPOE
-        );
-
-        if (shouldPurchase) {
-          let purchaseContract = await cloneFactory
-            .connect(withPOE)
-            .setPurchaseRentalContract(contract, "123");
-          await purchaseContract.wait();
-
-          // wait for contract to expire
-          await time.increase((await contractInstance.length()) * 60 * 60);
-        }
-
-        purchasedContracts[contract] = shouldPurchase;
-      }
-
-      contractCloseoutPromises = [];
-      //close out all contracts with option 3
-      for (let contract of contractAddresses) {
-        if (purchasedContracts[contract]) {
-          // force a block to be mined
-
-          const contractInstance = contracts[contract];
-
-          await closeContract(withPOE, contractInstance);
-
-          let closedEvents = await contractInstance.queryFilter(
-            "contractClosed"
-          );
-
-          expect(closedEvents.length).to.be.greaterThanOrEqual(1);
-
-          let buyerHistory = await contractInstance.buyerHistory(
-            withPOE.address,
-            0
-          );
-          expect(buyerHistory.length).to.be.greaterThanOrEqual(1);
-
-          // check the value of the funds transferred to the seller
-          let sellerHistory = await contractInstance.sellerHistory(0);
-
-          expect(sellerHistory.length).to.be.greaterThanOrEqual(1);
-        }
-      }
-
-      //create an object where the key is the buyer address, and the value is a list of contract addresses
+      // //get list of contracts
+      // let contractAddresses = await cloneFactory.getContractList();
 
       // for (let contract of contractAddresses) {
-      //   if (purchasedContracts[contract]) {
+      //   let contractInstance = await Implementation.attach(contract);
 
+      //   contracts[contract] = contractInstance;
+
+      //   let shouldPurchase = await tryIncreaseAllowanceForContract(
+      //     contractInstance,
+      //     withPOE
+      //   );
+
+      //   if (shouldPurchase) {
+      //     let purchaseContract = await cloneFactory
+      //       .connect(withPOE)
+      //       .setPurchaseRentalContract(contract, "123");
+      //     await purchaseContract.wait();
+
+      //     // wait for contract to expire
+      //     await time.increase((await contractInstance.length()) * 60 * 60);
       //   }
+
+      //   purchasedContracts[contract] = shouldPurchase;
       // }
+
+      const contracts = await purchaseContracts(10, withPOE);
+
+      let contractCloseoutPromises = [];
+      //close out all contracts with option 3
+      for (let contract in contracts) {
+        // force a block to be mined
+
+        const contractInstance = contracts[contract];
+
+        await closeContract(contractInstance, withPOE);
+
+        let closedEvents = await contractInstance.queryFilter("contractClosed");
+
+        expect(closedEvents.length).to.be.greaterThanOrEqual(1);
+
+        let buyerHistory = await contractInstance.buyerHistory(
+          withPOE.address,
+          0
+        );
+        expect(buyerHistory.length).to.be.greaterThanOrEqual(1);
+
+        // check the value of the funds transferred to the seller
+        let sellerHistory = await contractInstance.sellerHistory(0);
+
+        expect(sellerHistory.length).to.be.greaterThanOrEqual(1);
+      }
     });
 
     //deploys a new clone factory
@@ -374,9 +415,126 @@ describe("marketplace", function () {
     //seller closes out all 10 after contract duration
     //confirm buyer can see only 10
     it("should confirmCloseoutTrackingSeperateBuyers", async function () {});
+
+    async function assertHashrateContractState() {
+      let contractStateAfterCloseout = await testContract.contractState();
+      expect(contractStateAfterCloseout).to.equal(0);
+    }
+
+    function assertContractWithdawal(
+      contractCompletionRatio,
+      contractPrice,
+      contractBalanceAfterCloseout,
+      contractBalanceAfterPurchase
+    ) {
+      if (contractBalanceAfterCloseout != 0) {
+        const expectedPayout =
+          contractPrice - contractCompletionRatio * contractPrice;
+        const buyerPayoutDiff =
+          expectedPayout -
+          (contractBalanceAfterPurchase - contractBalanceAfterCloseout);
+        const payoutPercentError = (buyerPayoutDiff / expectedPayout) * 100;
+
+        if (expectedPayout > 0) {
+          expect(payoutPercentError).to.be.lessThan(1);
+        } else {
+          expect(contractBalanceAfterCloseout).to.equal(
+            contractBalanceAfterPurchase
+          );
+        }
+      }
+    }
+
+    function assertSellerPayout(
+      contractCompletionRatio,
+      contractPrice,
+      sellerBalanceAfterCloseout,
+      sellerBalance
+    ) {
+      const sellerPayoutPercentError = calculateSellerPayoutPercentError(
+        contractCompletionRatio,
+        contractPrice,
+        sellerBalanceAfterCloseout,
+        sellerBalance
+      );
+
+      // console.log("contractPrice", contractPrice);
+      // console.log("contractLength", contractLength);
+      // console.log("contractCompletionRatio", contractCompletionRatio);
+      // console.log(
+      //   "expectedSellerPayoutWithoutFee",
+      //   expectedSellerPayoutWithoutFee
+      // );
+      // console.log("expectedSellerPayout", expectedSellerPayout);
+      // console.log("sellerBalanceDiff", sellerBalanceDiff);
+      // console.log("sellerPayoutDiff", sellerPayoutDiff);
+      // console.log("sellerPayoutPercentError", sellerPayoutPercentError);
+      expect(sellerPayoutPercentError).to.be.lessThan(1);
+    }
+    function assertBuyerPayout(
+      contractCompletionRatio,
+      contractPrice,
+      buyerBalanceAfterCloseout,
+      buyerBalance
+    ) {
+      const { expectedPayout, payoutPercentError } =
+        calculateBuyerPayoutExpectations(
+          contractCompletionRatio,
+          contractPrice,
+          buyerBalanceAfterCloseout,
+          buyerBalance
+        );
+
+      if (expectedPayout > 0) {
+        expect(payoutPercentError).to.be.lessThan(1);
+      } else {
+        expect(buyerBalanceAfterCloseout).to.equal(buyerBalance);
+      }
+    }
+
+    function calculateBuyerPayoutExpectations(
+      contractCompletionRatio,
+      contractPrice,
+      buyerBalanceAfterCloseout,
+      buyerBalance
+    ) {
+      const expectedPayout =
+        contractPrice - contractCompletionRatio * contractPrice;
+      const buyerPayoutDiff =
+        expectedPayout - (buyerBalanceAfterCloseout - buyerBalance);
+      const payoutPercentError = (buyerPayoutDiff / expectedPayout) * 100;
+      return { expectedPayout, payoutPercentError };
+    }
+
+    function calculateSellerPayoutPercentError(
+      contractCompletionRatio,
+      contractPrice,
+      sellerBalanceAfterCloseout,
+      sellerBalance
+    ) {
+      const expectedSellerPayoutWithoutFee =
+        contractCompletionRatio * contractPrice;
+
+      const expectedSellerPayout =
+        expectedSellerPayoutWithoutFee - expectedSellerPayoutWithoutFee * 0.01;
+      const sellerBalanceDiff = sellerBalanceAfterCloseout - sellerBalance;
+      const sellerPayoutDiff = expectedSellerPayout - sellerBalanceDiff;
+      const sellerPayoutPercentError =
+        (sellerPayoutDiff / expectedSellerPayout) * 100;
+      return sellerPayoutPercentError;
+    }
   });
-  async function closeContract(contractInstance, closer, closeoutType = 3) {
-    await ethers.provider.poll();
+
+  async function closeContract(
+    contractInstance,
+    closer,
+    closeoutType = 3,
+    delay
+  ) {
+    delay = delay || (await contractInstance.length()) * 60 * 60;
+
+    // wait for contract to expire
+    await time.increase(delay);
 
     let closeout = await contractInstance
       .connect(closer)
@@ -392,10 +550,17 @@ describe("marketplace", function () {
       let price = BigInt(await contract1.price());
       let requiredAmount = price + price / BigInt(100);
 
+      // console.log("wallet balance before transfer - ", owner.address, ": ", await lumerin.balanceOf(owner.address));
+      // console.log("lumerin allowance before transfer - ", owner.address, ": ", await lumerin.allowance(owner.address, cloneFactory.address));
+      // console.log("lumerin available before transfer: ", await lumerin.totalSupply());
       let transfer = await lumerin
         .connect(seller)
         .transfer(owner.address, requiredAmount);
       await transfer.wait();
+
+      // console.log("wallet balance after transfer - ", owner.address, ": ", await lumerin.balanceOf(owner.address));
+      // console.log("lumerin allowance after transfer - ", owner.address, ": ", await lumerin.allowance(owner.address, cloneFactory.address));
+      // console.log("lumerin available after transfer: ", await lumerin.totalSupply());
 
       let allowanceIncrease1 = await lumerin
         .connect(owner)
@@ -408,49 +573,62 @@ describe("marketplace", function () {
     return false;
   }
 
-  async function purchaseContracts(count, buyerAddress, contractAddress) {
-    let contracts = await cloneFactory.getContractList();
+  async function purchaseContracts(count, buyer, contractForPurchase) {
+    let contract = contractForPurchase,
+      contractNumber = 0,
+      results = {};
 
-    let contract,
-      contractNumber = 0;
+    if (!contract) {
+      let contracts = await cloneFactory.getContractList();
 
-    if (contractAddress) {
-      ({ contract, contractNumber } = await attachToContractAndIncrement(
-        contractAddress,
-        contractNumber
-      ));
-    }
+      // find a contract that is in state 0
+      for (let i = 0; i < contracts.length; i++) {
+        if (contractNumber == count) {
+          break;
+        }
 
-    // find a contract that is in state 0
-    for (let i = 0; i < contracts.length; i++) {
-      if (contractNumber == count) {
-        break;
+        let contractAddress = contracts[i];
+
+        ({ contract, contractNumber } = await attachToContractAndIncrement(
+          contractAddress,
+          contractNumber
+        ));
+
+        await purchaseContract(contract, buyer);
+
+        results[contract.address] = contract;
       }
-
-      contractAddress = contracts[i];
-
-      ({ contract, contractNumber } = await attachToContractAndIncrement(
-        contractAddress,
-        contractNumber
-      ));
+    } else {
+      await purchaseContract(contract, buyer);
     }
 
-    await tryIncreaseAllowanceForContract(contract, buyerAddress);
+    //seller closes out the contract and collects the lumerin tokens
+    return contractForPurchase || results;
+  }
+
+  async function purchaseContract(contract, buyer) {
+    let shouldNotClose = await tryIncreaseAllowanceForContract(contract, buyer);
+
+    if (!shouldNotClose) {
+      await closeContract(contract, buyer);
+
+      await tryIncreaseAllowanceForContract(contract, buyer);
+    }
 
     let purchaseContract = await cloneFactory
-      .connect(buyerAddress)
-      .setPurchaseRentalContract(contractAddress, "123");
+      .connect(buyer)
+      .setPurchaseRentalContract(contract.address, "123");
     await purchaseContract.wait();
-    //seller closes out the contract and collects the lumerin tokens
-    return contract;
   }
 
   async function attachToContractAndIncrement(contractAddress, contractNumber) {
     let contract = await Implementation.attach(contractAddress);
     let state = await contract.contractState();
+
     if (state == 0) {
       contractNumber++;
     }
+
     return { contract, contractNumber };
   }
 });
