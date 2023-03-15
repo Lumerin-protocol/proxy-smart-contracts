@@ -7,7 +7,6 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./LumerinToken.sol";
-import "hardhat/console.sol";
 
 contract Escrow is ReentrancyGuard {
     address public escrow_purchaser; // Entity making a payment...
