@@ -4,6 +4,7 @@ pragma solidity >0.8.0;
 
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "./Escrow.sol";
+
 //MyToken is place holder for actual lumerin token, purely for testing purposes
 contract Implementation is Initializable, Escrow {
     enum ContractState {
@@ -188,16 +189,14 @@ contract Implementation is Initializable, Escrow {
     }
 
     function buyerPayoutCalc() internal view returns (uint256) {        
-        uint256 durationOfContract = (block.timestamp - startingBlockTimestamp) * 1000;
+        uint256 durationOfContract = (block.timestamp - startingBlockTimestamp);
 
-        uint256 lengthMS = length * 1 hours * 1000;
-        
-        if (durationOfContract < lengthMS) {
-
+        if (durationOfContract < length) {
             return
-                uint256(price * uint256(lengthMS - durationOfContract)) /
-                uint256(lengthMS);
+                uint256(price * uint256(length - durationOfContract)) /
+                uint256(length);
         }
+
         return price;
     }
 

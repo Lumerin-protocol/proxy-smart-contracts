@@ -177,7 +177,7 @@ describe("marketplace", function () {
     it("should close out and distribute full price to seller minus fees", async function () {
       await testCloseout(
         3,
-        (await testContract.length()) * 60 * 60,
+        await testContract.length(),
         withPOE,
         withoutPOE,
         assertBuyerPayout,
@@ -190,7 +190,7 @@ describe("marketplace", function () {
     it("should close out and not distribute funds", async function () {
       await testCloseout(
         2,
-        (await testContract.length()) * 60 * 60,
+        (await testContract.length()),
         withPOE,
         withoutPOE,
         Function(),
@@ -203,7 +203,7 @@ describe("marketplace", function () {
     it("should not close out and distribute funds approx. 50% to seller", async function () {
       const results = await testCloseout(
         1,
-        ((await testContract.length()) / 2) * 60 * 60,
+        ((await testContract.length()) / 2),
         withPOE,
         withoutPOE,
         Function(),
@@ -218,7 +218,7 @@ describe("marketplace", function () {
 
       const results = await testCloseout(
         0,
-        contractRunDuration * 60 * 60,
+        contractRunDuration,
         withPOE,
         withoutPOE,
         assertBuyerPayout,
@@ -294,8 +294,7 @@ describe("marketplace", function () {
       // There will be some difference between the expected payout and the actual payout given latency in the transaction
       // For the purposes of this test, pass if the percent difference between expected and actual payout is less than 1%
       const contractLength = Number(await testContract.length());
-      const contractCompletionRatio =
-        closeoutAfterSeconds / (contractLength * 60 * 60);
+      const contractCompletionRatio = closeoutAfterSeconds / contractLength;
 
       assertContractWithdawal(
         contractCompletionRatio,
@@ -335,7 +334,6 @@ describe("marketplace", function () {
     //seller closes out all 10 after contract duration
     //confirm buyer can see all 10
     it("should track closeout with buyer and seller information", async function () {
-     
       const contracts = await purchaseContracts(10, withPOE);
 
       let contractCloseoutPromises = [];
@@ -482,7 +480,7 @@ describe("marketplace", function () {
     closeoutType = 3,
     delay
   ) {
-    delay = delay || (await contractInstance.length()) * 60 * 60;
+    delay = delay || (await contractInstance.length());
 
     // wait for contract to expire
     await time.increase(delay);

@@ -36,7 +36,7 @@ async function main() {
     10**8,
     1,
     1,
-    1,
+    1 * 60 * 60,
     process.env.TEST_SELLER_ADDRESS,
     process.env.LUMERIN_TOKEN_ADDRESS,
     cloneFactory.address,
