@@ -457,18 +457,7 @@ describe("marketplace", function () {
         sellerBalanceAfterCloseout,
         sellerBalance
       );
-
-      // console.log("contractPrice", contractPrice);
-      // console.log("contractLength", contractLength);
-      // console.log("contractCompletionRatio", contractCompletionRatio);
-      // console.log(
-      //   "expectedSellerPayoutWithoutFee",
-      //   expectedSellerPayoutWithoutFee
-      // );
-      // console.log("expectedSellerPayout", expectedSellerPayout);
-      // console.log("sellerBalanceDiff", sellerBalanceDiff);
-      // console.log("sellerPayoutDiff", sellerPayoutDiff);
-      // console.log("sellerPayoutPercentError", sellerPayoutPercentError);
+      
       expect(sellerPayoutPercentError).to.be.lessThan(1);
     }
     function assertBuyerPayout(
