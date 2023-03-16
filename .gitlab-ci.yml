@@ -76,6 +76,7 @@ variables:
     - make whitelist-clonefactory
 
 test:
+  environment: test
   stage: test
   image: node:14-buster
   allow_failure: true

@@ -20,7 +20,7 @@ export VALIDATOR_ADDRESS="$(cat lumerin-addr.tmp)" # currently unused
 yarn hardhat run --network localhost --config hardhat-base.config.js ./scripts/deploy-faucet.js 
 
 # deploy clonefactory
-yarn hardhat run --network localhost --config hardhat-base.config.js ./scripts/deploy-clonefactory.js
+yarn hardhat run --network localhost --config hardhat-base.config.js ./scripts/deploy-clonefactory-local.js
 export CLONE_FACTORY_ADDRESS="$(cat clonefactory-addr.tmp)"
 
 # whitelist clonefactory addresses

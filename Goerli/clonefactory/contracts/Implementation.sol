@@ -56,7 +56,7 @@ contract Implementation is Initializable, Escrow {
     event purchaseInfoUpdated();
     event cipherTextUpdated(string newCipherText);
 
-    mapping(address => PurchaseInfo[]) public buyerTracking;
+    mapping(address => PurchaseInfo[]) public buyerHistory;
 
     function initialize(
         uint256 _price,
@@ -188,13 +188,15 @@ contract Implementation is Initializable, Escrow {
         contractState = ContractState.Available;
     }
 
-    function buyerPayoutCalc() internal view returns (uint256) {
-        uint256 durationOfContract = block.timestamp - startingBlockTimestamp;
-        if (durationOfContract <= length) {
+    function buyerPayoutCalc() internal view returns (uint256) {        
+        uint256 durationOfContract = (block.timestamp - startingBlockTimestamp);
+
+        if (durationOfContract < length) {
             return
                 uint256(price * uint256(length - durationOfContract)) /
                 uint256(length);
         }
+
         return price;
     }
 
@@ -206,9 +208,11 @@ contract Implementation is Initializable, Escrow {
                 msg.sender == buyer || msg.sender == validator,
                 "this account is not authorized to trigger an early closeout"
             );
+            
             uint256 buyerPayout = buyerPayoutCalc();
+
             withdrawFunds(price - buyerPayout, buyerPayout);
-            buyerTracking[buyer].push(PurchaseInfo(false,startingBlockTimestamp, block.timestamp, price, speed, length));
+            buyerHistory[buyer].push(PurchaseInfo(false,startingBlockTimestamp, block.timestamp, price, speed, length));
 
             sellerHistory.push(SellerHistory(false,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
             setContractVariableUpdate();
@@ -231,7 +235,7 @@ contract Implementation is Initializable, Escrow {
                 withdrawFunds(myToken.balanceOf(address(this)), 0);
             }
 
-            buyerTracking[buyer].push(PurchaseInfo(true,startingBlockTimestamp, block.timestamp, price, speed, length));
+            buyerHistory[buyer].push(PurchaseInfo(true,startingBlockTimestamp, block.timestamp, price, speed, length));
             sellerHistory.push(SellerHistory(true,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
             setContractVariableUpdate();
             emit contractClosed(buyer);
@@ -244,7 +248,7 @@ contract Implementation is Initializable, Escrow {
                 msg.sender == cloneFactory,
                 "only the clonefactory can call this method"
             );
-            buyerTracking[buyer].push(PurchaseInfo(true,startingBlockTimestamp, block.timestamp, price, speed, length));
+            buyerHistory[buyer].push(PurchaseInfo(true,startingBlockTimestamp, block.timestamp, price, speed, length));
             sellerHistory.push(SellerHistory(true,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
             withdrawFunds(myToken.balanceOf(address(this)), 0);
 
