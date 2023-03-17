@@ -27,7 +27,7 @@ const main = async function () {
         c.speed,
         c.length,
         process.env.VALIDATOR_ADDRESS,
-        "",
+        seller.address,
         {
           gasLimit: 10000000,
         }

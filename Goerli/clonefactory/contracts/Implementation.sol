@@ -193,7 +193,7 @@ contract Implementation is Initializable, Escrow {
 
         if (durationOfContract < length) {
             return
-                uint256(price * uint256(length - durationOfContract)) /
+                uint256(price * uint256(length - (length - durationOfContract))) /
                 uint256(length);
         }
 

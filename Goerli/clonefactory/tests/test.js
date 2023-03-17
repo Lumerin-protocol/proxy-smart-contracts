@@ -171,7 +171,10 @@ describe("marketplace", function () {
 
       if (status !== 0) {
         await closeContract(testContract, withPOE);
+      } else {
+        await closeContract(testContract, withPOE, 1)
       }
+
     });
 
     it("should close out and distribute full price to seller minus fees", async function () {
@@ -190,7 +193,7 @@ describe("marketplace", function () {
     it("should close out and not distribute funds", async function () {
       await testCloseout(
         2,
-        (await testContract.length()),
+        await testContract.length(),
         withPOE,
         withoutPOE,
         Function(),
@@ -201,16 +204,28 @@ describe("marketplace", function () {
     });
 
     it("should not close out and distribute funds approx. 50% to seller", async function () {
+
       const results = await testCloseout(
         1,
-        ((await testContract.length()) / 2),
+        (await testContract.length()) / 2,
         withPOE,
         withoutPOE,
         Function(),
         assertSellerPayout,
         assertContractWithdawal
       );
-      // console.log(results);
+    });
+
+    it("should not close out and distribute funds approx. 25% to seller", async function () {
+      const results = await testCloseout(
+        1,
+        (await testContract.length()) / 4,
+        withPOE,
+        withoutPOE,
+        Function(),
+        assertSellerPayout,
+        assertContractWithdawal
+      );
     });
 
     it("should close out and distribute funds approx. 50/50", async function () {
@@ -277,10 +292,6 @@ describe("marketplace", function () {
         closeoutAfterSeconds
       );
 
-      //wait for the contract to emit "contractClosed" event
-      let closedEvents = await testContract.queryFilter("contractClosed");
-      expect(closedEvents.length).to.be.greaterThanOrEqual(1);
-
       // verify contract status "available"
       await assertHashrateContractState();
 
@@ -325,6 +336,10 @@ describe("marketplace", function () {
         contractBalanceAfterCloseout,
         sellerBalance,
         buyerBalance,
+        contractPrice,
+        contractLength,
+        closeoutAfterSeconds,
+        contractCompletionRatio,
       };
     }
 
@@ -377,6 +392,9 @@ describe("marketplace", function () {
     it("should confirmCloseoutTrackingSeperateBuyers", async function () {});
 
     async function assertHashrateContractState() {
+      //wait for the contract to emit "contractClosed" event
+      let closedEvents = await testContract.queryFilter("contractClosed");
+      expect(closedEvents.length).to.be.greaterThanOrEqual(1);
       let contractStateAfterCloseout = await testContract.contractState();
       expect(contractStateAfterCloseout).to.equal(0);
     }
@@ -389,11 +407,13 @@ describe("marketplace", function () {
     ) {
       if (contractBalanceAfterCloseout != 0) {
         const expectedPayout =
-          contractPrice - contractCompletionRatio * contractPrice;
-        const buyerPayoutDiff =
+          contractCompletionRatio * contractPrice;
+        const contractWithdrawalDiff =
           expectedPayout -
           (contractBalanceAfterPurchase - contractBalanceAfterCloseout);
-        const payoutPercentError = (buyerPayoutDiff / expectedPayout) * 100;
+        const payoutPercentError = Math.abs(
+          (contractWithdrawalDiff / expectedPayout) * 100
+        );
 
         if (expectedPayout > 0) {
           expect(payoutPercentError).to.be.lessThan(1);
@@ -451,7 +471,9 @@ describe("marketplace", function () {
         contractPrice - contractCompletionRatio * contractPrice;
       const buyerPayoutDiff =
         expectedPayout - (buyerBalanceAfterCloseout - buyerBalance);
-      const payoutPercentError = (buyerPayoutDiff / expectedPayout) * 100;
+      const payoutPercentError = Math.abs(
+        (buyerPayoutDiff / expectedPayout) * 100
+      );
       return { expectedPayout, payoutPercentError };
     }
 
@@ -468,8 +490,10 @@ describe("marketplace", function () {
         expectedSellerPayoutWithoutFee - expectedSellerPayoutWithoutFee * 0.01;
       const sellerBalanceDiff = sellerBalanceAfterCloseout - sellerBalance;
       const sellerPayoutDiff = expectedSellerPayout - sellerBalanceDiff;
-      const sellerPayoutPercentError =
-        (sellerPayoutDiff / expectedSellerPayout) * 100;
+      const sellerPayoutPercentError = Math.abs(
+        (sellerPayoutDiff / expectedSellerPayout) * 100
+      );
+
       return sellerPayoutPercentError;
     }
   });
@@ -499,17 +523,10 @@ describe("marketplace", function () {
       let price = BigInt(await contract1.price());
       let requiredAmount = price + price / BigInt(100);
 
-      // console.log("wallet balance before transfer - ", owner.address, ": ", await lumerin.balanceOf(owner.address));
-      // console.log("lumerin allowance before transfer - ", owner.address, ": ", await lumerin.allowance(owner.address, cloneFactory.address));
-      // console.log("lumerin available before transfer: ", await lumerin.totalSupply());
       let transfer = await lumerin
         .connect(seller)
         .transfer(owner.address, requiredAmount);
       await transfer.wait();
-
-      // console.log("wallet balance after transfer - ", owner.address, ": ", await lumerin.balanceOf(owner.address));
-      // console.log("lumerin allowance after transfer - ", owner.address, ": ", await lumerin.allowance(owner.address, cloneFactory.address));
-      // console.log("lumerin available after transfer: ", await lumerin.totalSupply());
 
       let allowanceIncrease1 = await lumerin
         .connect(owner)
