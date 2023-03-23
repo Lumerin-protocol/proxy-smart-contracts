@@ -88,7 +88,7 @@ contract Faucet {
           payable(owner).transfer(address(this).balance); //sends amount in wei to recipient
       }
 
-      function canClaimTokens(address _address, string _ipAddress) external view returns (bool) {
+      function canClaimTokens(address _address, string _ipAddress) public view returns (bool) {
           return lastClaimed[msg.sender] + cooldownPeriod <= block.timestamp
             && lastClaimedIP[_ipAddress] + cooldownPeriod <= block.timestamp;
       }
