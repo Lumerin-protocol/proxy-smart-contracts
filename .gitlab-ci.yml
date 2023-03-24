@@ -47,12 +47,13 @@ variables:
     url: $DYNAMIC_ENVIRONMENT_URL
   script:
     - cd ./Goerli/clonefactory/
-    - make deploy-clonefactory
-    - export ENV_NAME="CLONE_FACTORY_ADDRESS" ENV_VALUE=$(cat clonefactory-addr.tmp) ENV_ENV=$CI_ENVIRONMENT_SLUG
-    - *set-env
-    - export DYNAMIC_ENVIRONMENT_URL="https://goerli.etherscan.io/address/$(cat clonefactory-addr.tmp)"
-    - cd ../..
-    - echo "DYNAMIC_ENVIRONMENT_URL=$DYNAMIC_ENVIRONMENT_URL" >> deploy.env
+    - echo "deploy contracts"
+    # - make deploy-clonefactory
+    # - export ENV_NAME="CLONE_FACTORY_ADDRESS" ENV_VALUE=$(cat clonefactory-addr.tmp) ENV_ENV=$CI_ENVIRONMENT_SLUG
+    # - *set-env
+    # - export DYNAMIC_ENVIRONMENT_URL="https://goerli.etherscan.io/address/$(cat clonefactory-addr.tmp)"
+    # - cd ../..
+    # - echo "DYNAMIC_ENVIRONMENT_URL=$DYNAMIC_ENVIRONMENT_URL" >> deploy.env
 
 .deploy_hr_contracts_template: &deploy_hr_contracts_template
   stage: populate-hr-contracts
@@ -62,7 +63,8 @@ variables:
     name: dev
   script:
     - cd ./Goerli/clonefactory/
-    - make populate-contracts
+    - echo "populate contracts"
+    # - make populate-contracts
 
 .whitelist_clonefactory_template: &whitelist_clonefactory_template
   stage: whitelist-clonefactory
@@ -73,7 +75,8 @@ variables:
     action: prepare
   script:
     - cd ./Goerli/clonefactory/
-    - make whitelist-clonefactory
+    - echo "whitelist_clonefactory"
+    # - make whitelist-clonefactory
 
 test:
   environment: test
@@ -133,9 +136,10 @@ deploy-lumerintoken-dev-stg:
   #   - main
   script:
     - cd ./Goerli/clonefactory/
-    - make deploy-lumerin
-    - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp)
-    - *set-env
+    - echo "deploy lumerin dev stg"
+    # - make deploy-lumerin
+    # - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp)
+    # - *set-env
 
 # Will be used only when we will have a separate lumerin token for LMN environment
 #
@@ -154,6 +158,11 @@ deploy-lumerintoken-dev-stg:
 
 deploy-clonefactory-dev:
   <<: *deploy_clonefactory_template
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE != "trigger"
+      when: manual
   environment:
     name: dev
   # only:
@@ -176,6 +185,11 @@ deploy-clonefactory-lmn:
 whitelist-clonefactory-dev:
   <<: *whitelist_clonefactory_template
   needs: ["compile-contracts"]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE != "trigger"
+      when: manual
   environment:
     name: dev
   # only:
@@ -200,6 +214,11 @@ whitelist-clonefactory-lmn:
 populate-hr-contracts-dev:
   <<: *deploy_hr_contracts_template
   needs: ["compile-contracts"]
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "trigger"
+    when: on_success
+  - if: $CI_PIPELINE_SOURCE != "trigger"
+    when: manual
   environment:
     name: dev
   # only:
@@ -225,7 +244,12 @@ release-contracts-go:
   stage: release-bindings
   needs: ["build-contracts-go"]
   image: node:14-buster
-  when: manual
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE != "trigger"
+      when: manual
+  # when: manual
   # only:
   #   - main
   before_script:
@@ -233,15 +257,21 @@ release-contracts-go:
     - mkdir ~/.ssh
     - ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
   script:
-    - cp $SSH_KEY_CONTRACTS_GO ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - cd ./Goerli/clonefactory/ && make release-go
+    - echo "release contracts go"
+    # - cp $SSH_KEY_CONTRACTS_GO ~/.ssh/id_rsa
+    # - chmod 600 ~/.ssh/id_rsa
+    # - cd ./Goerli/clonefactory/ && make release-go
 
 release-contracts-js:
   stage: release-bindings
   needs: ["build-contracts-js"]
   image: node:14-buster
-  when: manual
+  # when: manual
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE != "trigger"
+      when: manual
   # only:
   #   - main
   before_script:
@@ -249,6 +279,7 @@ release-contracts-js:
     - mkdir ~/.ssh
     - ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
   script:
-    - cp $SSH_KEY_CONTRACTS_JS ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - cd ./Goerli/clonefactory/ && make release-js
+    - echo "release contracts js"
+    # - cp $SSH_KEY_CONTRACTS_JS ~/.ssh/id_rsa
+    # - chmod 600 ~/.ssh/id_rsa
+    # - cd ./Goerli/clonefactory/ && make release-js
