@@ -75,6 +75,17 @@ variables:
     - cd ./Goerli/clonefactory/
     - make whitelist-clonefactory
 
+.deploy_lumerintoken_dev_stg: &deploy_lumerintoken_dev_stg
+  stage: deploy-contracts
+  needs: ["compile-contracts"]
+  image: node:14-buster
+  when: manual
+  script:
+    - cd ./Goerli/clonefactory/
+    - make deploy-lumerin
+    - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp)
+    - *set-env
+
 test:
   environment: test
   stage: test
@@ -144,21 +155,25 @@ build-contracts-js:
     paths:
       - Goerli/clonefactory/build-js
 
-deploy-lumerintoken-dev-stg:
-  stage: deploy-contracts
-  needs: ["compile-contracts"]
-  image: node:14-buster
-  when: manual
+deploy-lumerintoken-dev:
+  <<: *whitelist_clonefactory_template
+  environment:
+    name: dev
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-dev
+
+deploy-lumerintoken-stg:
+  <<: *whitelist_clonefactory_template
+  environment:
+    name: stg
   tags:
     - devops
     - bedrock
     - docker
     - titanio-stg
-  script:
-    - cd ./Goerli/clonefactory/
-    - make deploy-lumerin
-    - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp)
-    - *set-env
 
 # Will be used only when we will have a separate lumerin token for LMN environment
 #
