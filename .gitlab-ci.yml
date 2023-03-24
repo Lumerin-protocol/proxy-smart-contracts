@@ -160,7 +160,7 @@ deploy-lumerintoken-dev:
   environment:
     name: dev
   tags:
-    - devops
+    - glrblue
     - bedrock
     - docker
     - titanio-dev
