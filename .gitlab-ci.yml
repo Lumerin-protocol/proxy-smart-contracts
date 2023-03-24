@@ -82,7 +82,7 @@ test:
   tags:
     - devops
     - bedrock
-    - shell
+    - docker
     - titanio-dev
   allow_failure: true
   only:
@@ -99,7 +99,7 @@ compile-contracts:
   tags:
     - devops
     - bedrock
-    - shell
+    - docker
     - titanio-dev
   needs: ["test"]
   environment:
@@ -121,7 +121,7 @@ build-contracts-go:
   tags:
     - devops
     - bedrock
-    - shell
+    - docker
     - titanio-lmn
   script: cd ./Goerli/clonefactory && ./build-go.sh
   artifacts:
@@ -136,7 +136,7 @@ build-contracts-js:
   tags:
     - devops
     - bedrock
-    - shell
+    - docker
     - titanio-dev
   script: cd ./Goerli/clonefactory && make build-js
   artifacts:
@@ -152,7 +152,7 @@ deploy-lumerintoken-dev-stg:
   tags:
     - devops
     - bedrock
-    - shell
+    - docker
     - titanio-stg
   script:
     - cd ./Goerli/clonefactory/
@@ -182,7 +182,7 @@ deploy-clonefactory-dev:
   tags:
     - devops
     - bedrock
-    - shell
+    - docker
     - titanio-dev
   # only:
   #   - dev
@@ -194,7 +194,7 @@ deploy-clonefactory-stg:
   tags:
     - devops
     - bedrock
-    - shell
+    - docker
     - titanio-stg
   # only:
   #   - stg
@@ -206,7 +206,7 @@ deploy-clonefactory-lmn:
   tags:
     - devops
     - bedrock
-    - shell
+    - docker
     - titanio-lmn
   # only:
   #   - main
@@ -219,7 +219,7 @@ whitelist-clonefactory-dev:
   tags:
     - devops
     - bedrock
-    - shell
+    - docker
     - titanio-dev
   # only:
   #   - dev
@@ -232,7 +232,7 @@ whitelist-clonefactory-stg:
   tags:
     - devops
     - bedrock
-    - shell
+    - docker
     - titanio-stg
   # only:
   #   - stg
@@ -245,7 +245,7 @@ whitelist-clonefactory-lmn:
   tags:
     - devops
     - bedrock
-    - shell
+    - docker
     - titanio-lmn
   # only:
   #   - lmn
@@ -258,7 +258,7 @@ populate-hr-contracts-dev:
   tags:
     - devops
     - bedrock
-    - shell
+    - docker
     - titanio-dev
   # only:
   #   - dev
@@ -271,7 +271,7 @@ populate-hr-contracts-stg:
   tags:
     - devops
     - bedrock
-    - shell
+    - docker
     - titanio-stg
   # only:
   #   - stg
@@ -284,7 +284,7 @@ populate-hr-contracts-lmn:
   tags:
     - devops
     - bedrock
-    - shell
+    - docker
     - titanio-lmn
   # only:
   #   - main
@@ -297,7 +297,7 @@ release-contracts-go:
   tags:
     - devops
     - bedrock
-    - shell
+    - docker
     - titanio-lmn
   # only:
   #   - main
@@ -318,7 +318,7 @@ release-contracts-js:
   tags:
     - devops
     - bedrock
-    - shell
+    - docker
     - titanio-lmn
   # only:
   #   - main
