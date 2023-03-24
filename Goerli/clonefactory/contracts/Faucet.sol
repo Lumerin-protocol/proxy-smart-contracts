@@ -40,7 +40,7 @@ contract Faucet {
       receive() external payable {}
 
       //allows the owner of this contract to send tokens to the claiment
-      function supervisedClaim(address _claiment, string _ipAddress) public onlyOwner dailyLimit {
+      function supervisedClaim(address _claiment, string calldata _ipAddress) public onlyOwner dailyLimit {
           require(canClaimTokens(msg.sender, _ipAddress), "you need to wait before claiming");
 
           lumerin.transfer(_claiment, txAmount);
@@ -54,7 +54,7 @@ contract Faucet {
       }
 
       function refreshDailyLimit() internal {
-        if (startOfDay + 24*60*60 < block.timestamp) {
+        if (startOfDay + cooldownPeriod < block.timestamp) {
           startOfDay = block.timestamp;
           dailyLimitCount = 0;
         }
@@ -88,8 +88,8 @@ contract Faucet {
           payable(owner).transfer(address(this).balance); //sends amount in wei to recipient
       }
 
-      function canClaimTokens(address _address, string _ipAddress) public view returns (bool) {
-          return lastClaimed[msg.sender] + cooldownPeriod <= block.timestamp
+      function canClaimTokens(address _address, string calldata _ipAddress) public view returns (bool) {
+          return lastClaimed[_address] + cooldownPeriod <= block.timestamp
             && lastClaimedIP[_ipAddress] + cooldownPeriod <= block.timestamp;
       }
 }
