@@ -156,7 +156,7 @@ build-contracts-js:
       - Goerli/clonefactory/build-js
 
 deploy-lumerintoken-dev:
-  <<: *whitelist_clonefactory_template
+  <<: *deploy_lumerintoken_dev_stg
   environment:
     name: dev
   tags:
@@ -166,7 +166,7 @@ deploy-lumerintoken-dev:
     - titanio-dev
 
 deploy-lumerintoken-stg:
-  <<: *whitelist_clonefactory_template
+  <<: *deploy_lumerintoken_dev_stg
   environment:
     name: stg
   tags:
