@@ -41,7 +41,7 @@ contract Faucet {
 
       //allows the owner of this contract to send tokens to the claiment
       function supervisedClaim(address _claiment, string calldata _ipAddress) public onlyOwner dailyLimit {
-          require(canClaimTokens(msg.sender, _ipAddress), "you need to wait before claiming");
+          require(canClaimTokens(_claiment, _ipAddress), "you need to wait before claiming");
 
           lumerin.transfer(_claiment, txAmount);
           payable(_claiment).transfer(gethAmount); //sends amount in wei to recipient

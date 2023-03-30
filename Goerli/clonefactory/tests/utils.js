@@ -26,3 +26,9 @@ function RandomIPAddress(){
   const randomPart = () => Math.floor(Math.random()*256)
   return `${randomPart()}.${randomPart()}.${randomPart()}.${randomPart()}`
 }
+
+module.exports = {
+  ToString,
+  RandomEthAddress,
+  RandomIPAddress
+}
