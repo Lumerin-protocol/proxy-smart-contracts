@@ -91,7 +91,7 @@ test:
   stage: test
   image: node:14-buster
   tags:
-    - devops
+    - glrblue
     - bedrock
     - docker
     - titanio-dev
@@ -108,7 +108,7 @@ compile-contracts:
   stage: build
   image: node:14-buster
   tags:
-    - devops
+    - glrblue
     - bedrock
     - docker
     - titanio-dev
@@ -195,7 +195,7 @@ deploy-clonefactory-dev:
   environment:
     name: dev
   tags:
-    - devops
+    - glrblue
     - bedrock
     - docker
     - titanio-dev
