@@ -4,7 +4,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "generate": "rm -rf ./src/generated-types && mkdir -p ./src/generated-types && abi-types-generator './src/abi/CloneFactory.json' --output='./src/generated-types' && abi-types-generator './src/abi/Lumerin.json' --output='./src/generated-types' && abi-types-generator './src/abi/Implementation.json' --output='./src/generated-types'",
+    "generate": "rm -rf ./src/generated-types && mkdir -p ./src/generated-types && abi-types-generator './src/abi/CloneFactory.json' --output='./src/generated-types' && abi-types-generator './src/abi/Lumerin.json' --output='./src/generated-types' && abi-types-generator './src/abi/Implementation.json' --output='./src/generated-types' && abi-types-generator './src/abi/Faucet.json' --output='./src/generated-types'",
     "build": "rm -rf ./dist && tsc"
   },
   "dependencies": {

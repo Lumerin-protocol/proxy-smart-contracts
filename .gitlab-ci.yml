@@ -75,10 +75,26 @@ variables:
     - cd ./Goerli/clonefactory/
     - make whitelist-clonefactory
 
+.deploy_lumerintoken_dev_stg: &deploy_lumerintoken_dev_stg
+  stage: deploy-contracts
+  needs: ["compile-contracts"]
+  image: node:14-buster
+  when: manual
+  script:
+    - cd ./Goerli/clonefactory/
+    - make deploy-lumerin
+    - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp)
+    - *set-env
+
 test:
   environment: test
   stage: test
   image: node:14-buster
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-dev
   allow_failure: true
   only:
     - branches
@@ -91,6 +107,11 @@ test:
 compile-contracts:
   stage: build
   image: node:14-buster
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-dev
   needs: ["test"]
   environment:
     name: dev
@@ -108,6 +129,11 @@ build-contracts-go:
   stage: build
   needs: ["compile-contracts"]
   image: ethereum/client-go:alltools-stable
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-lmn
   script: cd ./Goerli/clonefactory && ./build-go.sh
   artifacts:
     untracked: true
@@ -118,24 +144,36 @@ build-contracts-js:
   stage: build
   needs: ["compile-contracts"]
   image: node:14-buster
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-dev
   script: cd ./Goerli/clonefactory && make build-js
   artifacts:
     untracked: true
     paths:
       - Goerli/clonefactory/build-js
 
-deploy-lumerintoken-dev-stg:
-  stage: deploy-contracts
-  needs: ["compile-contracts"]
-  image: node:14-buster
-  when: manual
-  # only:
-  #   - main
-  script:
-    - cd ./Goerli/clonefactory/
-    - make deploy-lumerin
-    - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp)
-    - *set-env
+deploy-lumerintoken-dev:
+  <<: *deploy_lumerintoken_dev_stg
+  environment:
+    name: dev
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-dev
+
+deploy-lumerintoken-stg:
+  <<: *deploy_lumerintoken_dev_stg
+  environment:
+    name: stg
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-stg
 
 # Will be used only when we will have a separate lumerin token for LMN environment
 #
@@ -156,6 +194,11 @@ deploy-clonefactory-dev:
   <<: *deploy_clonefactory_template
   environment:
     name: dev
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-dev
   # only:
   #   - dev
 
@@ -163,6 +206,11 @@ deploy-clonefactory-stg:
   <<: *deploy_clonefactory_template
   environment:
     name: stg
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-stg
   # only:
   #   - stg
 
@@ -170,6 +218,11 @@ deploy-clonefactory-lmn:
   <<: *deploy_clonefactory_template
   environment:
     name: lmn
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-lmn
   # only:
   #   - main
 
@@ -178,6 +231,11 @@ whitelist-clonefactory-dev:
   needs: ["compile-contracts"]
   environment:
     name: dev
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-dev
   # only:
   #   - dev
 
@@ -186,6 +244,11 @@ whitelist-clonefactory-stg:
   needs: ["compile-contracts"]
   environment:
     name: stg
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-stg
   # only:
   #   - stg
 
@@ -194,6 +257,11 @@ whitelist-clonefactory-lmn:
   needs: ["compile-contracts"]
   environment:
     name: lmn
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-lmn
   # only:
   #   - lmn
 
@@ -202,6 +270,11 @@ populate-hr-contracts-dev:
   needs: ["compile-contracts"]
   environment:
     name: dev
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-dev
   # only:
   #   - dev
 
@@ -210,6 +283,11 @@ populate-hr-contracts-stg:
   needs: ["compile-contracts"]
   environment:
     name: stg
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-stg
   # only:
   #   - stg
 
@@ -218,6 +296,11 @@ populate-hr-contracts-lmn:
   needs: ["compile-contracts"]
   environment:
     name: lmn
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-lmn
   # only:
   #   - main
 
@@ -226,6 +309,11 @@ release-contracts-go:
   needs: ["build-contracts-go"]
   image: node:14-buster
   when: manual
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-lmn
   # only:
   #   - main
   before_script:
@@ -242,6 +330,11 @@ release-contracts-js:
   needs: ["build-contracts-js"]
   image: node:14-buster
   when: manual
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-lmn
   # only:
   #   - main
   before_script:

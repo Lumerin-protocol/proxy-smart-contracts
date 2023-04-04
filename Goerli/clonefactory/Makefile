@@ -10,19 +10,19 @@ compile:
 	yarn hardhat compile --config hardhat-base.config.js
 
 deploy-lumerin:
-	yarn hardhat run --network goerli ./scripts/deploy-lumerin.js
+	yarn hardhat run --network sepolia ./scripts/deploy-lumerin.js
 
 deploy-clonefactory:
-	yarn hardhat run --network goerli ./scripts/deploy-clonefactory.js
+	yarn hardhat run --network sepolia ./scripts/deploy-clonefactory.js
 
 deploy-faucet:
-	yarn hardhat run --network goerli ./scripts/deploy-faucet.js
+	yarn hardhat run --network sepolia ./scripts/deploy-faucet.js
 
 populate-contracts:
-	yarn hardhat run --network goerli ./scripts/populate-contracts.js
+	yarn hardhat run --network sepolia ./scripts/populate-contracts.js
 
 whitelist-clonefactory:
-	yarn hardhat run --network goerli ./scripts/whitelist-clonefactory.js
+	yarn hardhat run --network sepolia ./scripts/whitelist-clonefactory.js
 
 build-go:
 	./build-go.sh
