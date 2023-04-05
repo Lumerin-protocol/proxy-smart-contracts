@@ -30,6 +30,12 @@ module.exports = {
       gasPrice: "auto",
       gas: "auto",
     },
+    sepolia: {
+      url: process.env.ETH_NODE_ADDRESS,
+      accounts: [process.env.CONTRACTS_OWNER_PRIVATE_KEY],
+      gasPrice: "auto",
+      gas: "auto",
+    },
   },
   etherscan: {
     apiKey: {

@@ -12,6 +12,7 @@ mkdir -p "$PTH/src/abi"
 cp ./abi/CloneFactory.json $PTH/src/abi
 cp ./abi/Implementation.json $PTH/src/abi
 cp ./abi/Lumerin.json $PTH/src/abi
+cp ./abi/Faucet.json $PTH/src/abi
 
 cd $PTH
 
