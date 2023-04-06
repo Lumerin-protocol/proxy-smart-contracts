@@ -349,10 +349,10 @@ release-contracts-js:
 
 
 release-contracts-audit:
-  stage: test
-  # needs: ["release-contracts-js", "release-contracts-go"]
+  stage: release-bindings
+  needs: ["release-contracts-js", "release-contracts-go"]
   image: node:14-buster
-  when: manual
+  # when: manual
   tags:
     - devops
     - bedrock
