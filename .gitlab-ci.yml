@@ -350,7 +350,7 @@ release-contracts-js:
 
 release-contracts-audit:
   stage: release-bindings
-  needs: ["release-contracts-js", "release-contracts-go"]
+  # needs: ["release-contracts-js", "release-contracts-go"]
   image: node:14-buster
   when: manual
   tags:
