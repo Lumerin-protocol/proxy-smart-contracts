@@ -349,7 +349,7 @@ release-contracts-js:
 
 
 release-contracts-audit:
-  stage: release-bindings
+  stage: test
   # needs: ["release-contracts-js", "release-contracts-go"]
   image: node:14-buster
   when: manual
