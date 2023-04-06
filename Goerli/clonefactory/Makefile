@@ -40,7 +40,7 @@ release-js:
 	echo "contracts-js released"
 
 update-public-contracts:
-	make release-git path="Goerli/clonefactory/contracts" remote="git@github.com:Lumerin-protocol/smart-contracts.git"
+	make release-git path="contracts" remote="git@github.com:Lumerin-protocol/smart-contracts.git"
 	echo "smart-contracts released"
 
 # release-js-npm:
