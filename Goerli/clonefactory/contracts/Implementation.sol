@@ -188,16 +188,13 @@ contract Implementation is Initializable, Escrow {
         contractState = ContractState.Available;
     }
 
-    function buyerPayoutCalc() internal view returns (uint256) {        
-        uint256 durationOfContract = (block.timestamp - startingBlockTimestamp);
-
-        if (durationOfContract < length) {
-            return
-                uint256(price * uint256(length - durationOfContract)) /
-                uint256(length);
+    function buyerPayoutCalc() internal view returns (uint256) {
+        uint256 elapsedTimeSeconds = block.timestamp - startingBlockTimestamp;
+        uint256 remainingTimeSeconds = length - elapsedTimeSeconds;
+        if (remainingTimeSeconds > 0) {
+            return (price * remainingTimeSeconds) / length;
         }
-
-        return price;
+        return 0;
     }
 
     function setContractCloseOut(uint256 closeOutType) public {
