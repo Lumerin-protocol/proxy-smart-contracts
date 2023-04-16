@@ -3,7 +3,7 @@ const { expect } = require("chai");
 const ethers  = require("hardhat");
 const Web3 = require("web3");
 const { Faucet, Lumerin } = require("../build-js/dist")
-const { RandomEthAddress, RandomIPAddress, ToString } = require('./utils')
+const { RandomEthAddress, RandomIPAddress, ToString, WaitBlockchain, ToLMNDecimals, ToETHDecimals } = require('./utils')
 
 describe("Faucet", function () {
   const lumerinAddress = "0x5fbdb2315678afecb367f032d93f642f64180aa3"
@@ -18,17 +18,17 @@ describe("Faucet", function () {
   const lumerinInstance = Lumerin(web3, lumerinAddress)
   const faucetInstance = Faucet(web3, faucetAddress)
 
-  before(async ()=>{
+  before(async () => {
     // load balance to faucet
     await lumerinInstance.methods.transfer(
       faucetAddress, 
-      ToString(1000*10**8),
+      ToString(ToLMNDecimals(1000)),
     ).send({from})
 
     await web3.eth.sendTransaction({
       from: ethWallet,
       to: faucetAddress,
-      value: ToString(1000*10**18),
+      value: ToString(ToETHDecimals(1000)),
     })
   })
 
@@ -65,19 +65,7 @@ describe("Faucet", function () {
   })
 
   it('should allow when 24 hours elapse', async function(){
-    /** @type {import("web3-core").HttpProvider}*/
-    const provider = web3.currentProvider
-    const { timestamp } = await web3.eth.getBlock(await web3.eth.getBlockNumber());
-
-    await new Promise((resolve,reject)=>{
-      provider.send({
-        method: "evm_mine",
-        params: [Number(timestamp) + 32*3600],
-        jsonrpc: '2.0',
-        id: new Date().getTime(),
-      }, (err, data) => err ? reject(err) : resolve(data))
-    })
-
+    await WaitBlockchain(web3, 24*3600)
     await faucetInstance.methods.supervisedClaim(claiment, ipAddress).send({ from })
   })
 
