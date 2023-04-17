@@ -38,7 +38,7 @@ describe("Implementation tests", function () {
     expect(implementationContractAddress).to.be.not.null
   })
 
-  it('should close at end and pay correct funds/fees', async function(){
+  it('should close after 100% time and pay correct funds/fees', async function(){
     await TestChargesPayoutsFees(1)
   })
 
@@ -46,8 +46,16 @@ describe("Implementation tests", function () {
     await TestChargesPayoutsFees(0.9)
   })
 
+  it('should close after 75% time and pay correct funds/fees', async function(){
+    await TestChargesPayoutsFees(0.75)
+  })
+
   it('should close after 50% time and pay correct funds/fees', async function(){
     await TestChargesPayoutsFees(0.5)
+  })
+
+  it('should close after 25% time and pay correct funds/fees', async function(){
+    await TestChargesPayoutsFees(0.25)
   })
 
   it('should close after 1% time and pay correct funds/fees', async function(){
