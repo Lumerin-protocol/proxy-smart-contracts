@@ -15,7 +15,12 @@ async function main() {
   console.log("LUMERIN address:", process.env.LUMERIN_TOKEN_ADDRESS);
 
   const Faucet = await ethers.getContractFactory("Faucet");
-  const faucet = await Faucet.deploy(process.env.LUMERIN_TOKEN_ADDRESS);
+  const faucet = await Faucet.deploy(
+    process.env.LUMERIN_TOKEN_ADDRESS,
+    process.env.FAUCET_DAILY_LIMIT_LMR,
+    process.env.FAUCET_LMR_AMOUNT,
+    process.env.FAUCET_ETH_AMOUNT,
+  );
   await faucet.deployed();
 
   console.log("Faucet address:", faucet.address);
