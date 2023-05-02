@@ -11,6 +11,7 @@ contract Faucet {
       uint public cooldownPeriod;
       uint public startOfDay;
       uint public dailyLimitCount;
+      uint public dailyLimit;
       uint public txAmount;
       uint public gethAmount;
       mapping(address => uint) lastClaimed;
@@ -21,6 +22,7 @@ contract Faucet {
           owner = payable(msg.sender);
           startOfDay = block.timestamp;
           dailyLimitCount = 0;
+          dailyLimit = 800;
           cooldownPeriod = 24*60*60;
           lumerin = Lumerin(_lmr); //lumerin token address
           txAmount = 10*10**lumerin.decimals();
@@ -33,7 +35,7 @@ contract Faucet {
       }
 
       modifier dailyLimit {
-        require(dailyLimitCount < 800, "the daily limit of test lumerin has been distributed");
+        require(dailyLimitCount < dailyLimit, "the daily limit of test lumerin has been distributed");
         _;
       }
 
@@ -70,6 +72,15 @@ contract Faucet {
 
       function setUpdateTxAmount(uint _txAmount) public onlyOwner {
           txAmount = _txAmount*10**lumerin.decimals();
+      }
+
+      function setUpdateDailyLimit(uint _dailyLimit) public onlyOwner {
+          dailyLimit = _dailyLimit;
+      }
+
+      function resetTodaysLimit() public onlyOwner {
+          startOfDay = block.timestamp;
+          dailyLimitCount = 0;
       }
 
       function setUpdateLumerin(address _lmr) public onlyOwner {
