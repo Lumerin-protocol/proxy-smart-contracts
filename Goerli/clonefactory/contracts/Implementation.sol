@@ -225,7 +225,7 @@ contract Implementation is Initializable, Escrow {
                 "this account is not authorized to trigger a mid-contract closeout"
             );
 
-            getDepositContractHodlingsToSeller(price - buyerPayoutCalc());
+            getDepositContractHodlingsToSeller(buyerPayoutCalc());
         } else if (closeOutType == 2 || closeOutType == 3) {
             require(
                 block.timestamp - startingBlockTimestamp >= length,
