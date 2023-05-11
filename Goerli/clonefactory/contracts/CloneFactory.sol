@@ -27,6 +27,7 @@ contract CloneFactory {
     bool public noMoreWhitelist;
     mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
     mapping(address => bool) public isContractDead; // keeps track of contracts that are no longer valid
+    mapping(address => bool) mappedContracts;
     Lumerin lumerin;
 
     constructor(address _lmn, address _validator) {
@@ -80,6 +81,7 @@ contract CloneFactory {
             _pubKey
         );
         rentalContracts.push(_newContract); //add clone to list of contracts
+        mappedContracts[_newContract] = true;
         emit contractCreated(_newContract, _pubKey); //broadcasts a new contract and the pubkey to use for encryption
         return _newContract;
     }
@@ -90,6 +92,7 @@ contract CloneFactory {
         address contractAddress,
         string memory _cipherText
     ) external {
+        require(mappedContracts[contractAddress], "unknown contract address");
         Implementation targetContract = Implementation(contractAddress);
         uint256 _price = targetContract.price();
         uint256 _marketplaceFee = _price / buyerFeeRate;
@@ -164,6 +167,7 @@ contract CloneFactory {
     }
 
     function setContractAsDead(address _contract, bool closeout) public {
+        require(mappedContracts[_contract], "unknown contract address");
         Implementation _tempContract = Implementation(_contract);
         require(
             msg.sender == owner || msg.sender == _tempContract.seller(),
