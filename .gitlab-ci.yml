@@ -100,7 +100,6 @@ test:
     - branches
   script:
     - cd ./Goerli/clonefactory/ && yarn install
-    - ./node-local-deploy.sh
     - export ENV_NAME="CLONE_FACTORY_ADDRESS" ENV_VALUE=$(cat clonefactory-addr.tmp) ENV_ENV=$CI_ENVIRONMENT_SLUG
     - *set-env
     - make test
