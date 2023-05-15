@@ -22,6 +22,7 @@ async function main() {
   const cloneFactory = CloneFactory.attach(process.env.CLONE_FACTORY_ADDRESS);
   console.log("Using account:", account.address);
   console.log("Account balance:", (await account.getBalance()).toString());
+  console.log("Account owner", await cloneFactory.owner())
   console.log("\n");
 
   for (const address of whitelistedAddresses) {

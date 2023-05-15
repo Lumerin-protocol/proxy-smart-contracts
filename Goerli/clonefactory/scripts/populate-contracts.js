@@ -5,7 +5,7 @@ const { ethers } = require("hardhat");
 const main = async function () {
   const CloneFactory = await ethers.getContractFactory("CloneFactory");
   const [seller] = await ethers.getSigners();
-  const cloneFactory =  CloneFactory.attach(
+  const cloneFactory = CloneFactory.attach(
     process.env.CLONE_FACTORY_ADDRESS
   );
 
@@ -14,12 +14,12 @@ const main = async function () {
   console.log("CLONEFACTORY address:", process.env.CLONE_FACTORY_ADDRESS);
   console.log("VALIDATOR address:", process.env.VALIDATOR_ADDRESS)
 
-  const variableList = buildContractsList(
+  const contractList = buildContractsList(
     process.env.BUILD_FULL_MARKETPLACE === "true"
   );
 
-  for (let c of variableList) {
-    let contractCreate = await cloneFactory
+  for (const c of contractList) {
+    const contractCreate = await cloneFactory
       .connect(seller)
       .setCreateNewRentalContract(
         c.price,
@@ -27,14 +27,16 @@ const main = async function () {
         c.speed,
         c.length,
         process.env.VALIDATOR_ADDRESS,
-        "",
+        "0x",
         {
           gasLimit: 10000000,
         }
       );
 
-    await contractCreate.wait();
+    const tx = await contractCreate.wait();
+    console.log(tx);
     console.log(`contract created, tx hash:`, contractCreate.hash);
+    break
   }
 };
 

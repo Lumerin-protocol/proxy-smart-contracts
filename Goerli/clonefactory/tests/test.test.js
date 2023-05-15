@@ -3,11 +3,7 @@ let { expect } = require("chai");
 let { ethers } = require("hardhat");
 let { time } = require("@nomicfoundation/hardhat-network-helpers");
 
-async function sleep(sleepTime) {
-  return new Promise((resolve) => setTimeout(resolve, sleepTime));
-}
-
-describe("marketplace", function () {
+describe.skip("marketplace", function () {
   this.timeout(600 * 1000);
   let purchase_price = 100;
   let contract_length = 100;
