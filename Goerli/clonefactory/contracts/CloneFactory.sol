@@ -1,46 +1,28 @@
 //SPDX-License-Identifier: MIT
+pragma solidity >0.8.10;
 
-pragma solidity >0.8.0;
-
-import "@openzeppelin/contracts/proxy/Clones.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "./Implementation.sol";
-import "./LumerinToken.sol";
-import "./Common.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import {Implementation} from "./Implementation.sol";
+import {Lumerin} from "./LumerinToken.sol";
 
 /// @title CloneFactory
 /// @author Josh Kean (Lumerin)
 /// @notice Variables passed into contract initializer are subject to change based on the design of the hashrate contract
 
 //CloneFactory now responsible for minting, purchasing, and tracking contracts
-contract CloneFactory {
-    address baseImplementation;
-    address validator;
-    address lmnDeploy;
-    address webfacingAddress;
-    address owner;
-    address marketPlaceFeeRecipient; //address where the marketplace fee's are sent
-    address[] public rentalContracts; //dynamically allocated list of rental contracts
+contract CloneFactory is Initializable {
+    Lumerin lumerin;
+    address feeRecipient; //address where the marketplace fee's are sent
+    address public baseImplementation;
+    address public owner;
     uint256 public buyerFeeRate; //fee to be paid to the marketplace
     uint256 public sellerFeeRate; //fee to be paid to the marketplace
     bool public noMoreWhitelist;
+    address[] public rentalContracts; //dynamically allocated list of rental contracts
+
     mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
     mapping(address => bool) public isContractDead; // keeps track of contracts that are no longer valid
-    Lumerin lumerin;
-
-    constructor(address _lmn, address _validator) {
-        Implementation _imp = new Implementation();
-        baseImplementation = address(_imp);
-        lmnDeploy = _lmn; //deployed address of lumeirn token
-        validator = _validator;
-        lumerin = Lumerin(_lmn);
-        owner = msg.sender;
-        marketPlaceFeeRecipient = msg.sender;
-
-        buyerFeeRate = 100;
-        sellerFeeRate = 100;
-    }
 
     event contractCreated(address indexed _address, string _pubkey); //emitted whenever a contract is created
     event clonefactoryContractPurchased(address indexed _address); //emitted whenever a contract is purchased
@@ -58,30 +40,44 @@ contract CloneFactory {
         _;
     }
 
+    function initialize(address _baseImplementation, address _lumerin, address _feeRecipient) public initializer {
+        lumerin = Lumerin(_lumerin);
+        baseImplementation = _baseImplementation;
+        
+        owner = msg.sender;
+        feeRecipient = _feeRecipient;
+
+        buyerFeeRate = 100;
+        sellerFeeRate = 100;
+    }
+
     //function to create a new Implementation contract
     function setCreateNewRentalContract(
         uint256 _price,
         uint256 _limit,
         uint256 _speed,
         uint256 _length,
-        address _validator,
+        address, //removed _validator
         string memory _pubKey
-    ) external onlyInWhitelist returns (address) {
-        address _newContract = Clones.clone(baseImplementation);
-        Implementation(_newContract).initialize(
+    ) external onlyInWhitelist returns (address) {        
+        bytes memory data = abi.encodeWithSelector(
+            Implementation(address(0)).initialize.selector,
             _price,
             _limit,
             _speed,
             _length,
             msg.sender,
-            lmnDeploy,
+            address(lumerin),
             address(this),
-            _validator,
+            address(0),
             _pubKey
         );
-        rentalContracts.push(_newContract); //add clone to list of contracts
-        emit contractCreated(_newContract, _pubKey); //broadcasts a new contract and the pubkey to use for encryption
-        return _newContract;
+
+        BeaconProxy beaconProxy = new BeaconProxy(baseImplementation, data);
+        address newContractAddr = address(beaconProxy);
+        rentalContracts.push(newContractAddr); //add clone to list of contracts
+        emit contractCreated(newContractAddr, _pubKey); //broadcasts a new contract and the pubkey to use for encryption
+        return newContractAddr;
     }
 
     //function to purchase a hashrate contract
@@ -97,7 +93,10 @@ contract CloneFactory {
         uint256 requiredAllowance = _price + _marketplaceFee;
         uint256 actualAllowance = lumerin.allowance(msg.sender, address(this));
 
-        require(actualAllowance >= requiredAllowance, "not authorized to spend required funds");
+        require(
+            actualAllowance >= requiredAllowance,
+            "not authorized to spend required funds"
+        );
         bool tokensTransfered = lumerin.transferFrom(
             msg.sender,
             contractAddress,
@@ -108,7 +107,7 @@ contract CloneFactory {
 
         bool feeTransfer = lumerin.transferFrom(
             msg.sender,
-            marketPlaceFeeRecipient,
+            feeRecipient,
             _marketplaceFee
         );
 
@@ -116,7 +115,7 @@ contract CloneFactory {
         targetContract.setPurchaseContract(
             _cipherText,
             msg.sender,
-            marketPlaceFeeRecipient,
+            feeRecipient,
             sellerFeeRate
         );
 
@@ -149,6 +148,7 @@ contract CloneFactory {
         noMoreWhitelist = true;
     }
 
+    // TODO: set in constructor instead of mutating existing contract
     function setChangeSellerFeeRate(uint256 _newFee) external onlyOwner {
         sellerFeeRate = _newFee;
     }
@@ -160,25 +160,20 @@ contract CloneFactory {
     function setChangeMarketplaceRecipient(
         address _newRecipient
     ) external onlyOwner {
-        marketPlaceFeeRecipient = _newRecipient;
+        feeRecipient = _newRecipient;
     }
 
+    // TODO: use double linked list to remove from array
+    // https://ethereum.stackexchange.com/a/15341 
     function setContractAsDead(address _contract, bool closeout) public {
-        Implementation _tempContract = Implementation(_contract);
+        Implementation implementation = Implementation(_contract);
         require(
-            msg.sender == owner || msg.sender == _tempContract.seller(),
+            msg.sender == owner || msg.sender == implementation.seller(),
             "you arent approved to mark this contract as dead"
         );
         isContractDead[_contract] = true;
         if (closeout) {
-            _tempContract.setContractCloseOut(4);
+            implementation.setContractCloseOut(4);
         }
-    }
-
-    // for test purposes, this allows us to configure our test environment so the ABI's can be matched with the Implementation contract source.
-    function setBaseImplementation(
-        address _newImplementation
-    ) external onlyOwner {
-        baseImplementation = _newImplementation;
     }
 }

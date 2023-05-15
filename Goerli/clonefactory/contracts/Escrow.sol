@@ -5,10 +5,10 @@ pragma solidity ^0.8.0;
 /// @author Lance Seidman (Lumerin)
 /// @notice This first version will be used to hold lumerin temporarily for the Marketplace Hash Rental.
 
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "./LumerinToken.sol";
 
-contract Escrow is ReentrancyGuard {
+contract Escrow is Initializable, ReentrancyGuardUpgradeable {
     address public escrow_purchaser; // Entity making a payment...
     address public escrow_seller; // Entity to receive funds...
     uint256 public contractTotal; // How much should be escrowed...
@@ -16,11 +16,12 @@ contract Escrow is ReentrancyGuard {
     uint256 marketplaceFeeRate; // amount of fee to be sent to the fee recipient (marketPlaceFeeRecipient)
     address marketPlaceFeeRecipient; //address where the marketplace fee's are sent
 
-    Lumerin myToken;
+    Lumerin lumerin;
 
     //internal function which will be called by the hashrate contract
-    function setParameters(address _titanToken) internal {
-        myToken = Lumerin(_titanToken);
+    function initialize(address _lmrAddress) internal onlyInitializing {
+        lumerin = Lumerin(_lmrAddress);
+        __ReentrancyGuard_init();
     }
 
     // @notice This will create a new escrow based on the seller, buyer, and total.
@@ -43,14 +44,14 @@ contract Escrow is ReentrancyGuard {
     // @dev This is used to determine if the contract amount has been
     // fullfilled and return how much is left to be fullfilled.
     function dueAmount() internal returns (uint256) {
-        if (myToken.balanceOf(address(this)) > contractTotal) {
-            myToken.transfer(
+        if (lumerin.balanceOf(address(this)) > contractTotal) {
+            lumerin.transfer(
                 escrow_purchaser,
-                myToken.balanceOf(address(this)) - contractTotal
+                lumerin.balanceOf(address(this)) - contractTotal
             );
             return 0;
         }
-        return contractTotal - myToken.balanceOf(address(this));
+        return contractTotal - lumerin.balanceOf(address(this));
     }
 
     // @notice Validator can request the funds to be released once determined it's safe to do.
@@ -58,30 +59,26 @@ contract Escrow is ReentrancyGuard {
     // by checking the State and if so, release the funds to the seller.
     // sends lumerin tokens to the appropriate entities.
     // _buyer will obtain a 0 value unless theres a penalty involved
-    function withdrawFunds(
-        uint256 _seller,
-        uint256 _buyer
-    ) internal nonReentrant {
-        
+    function withdrawFunds(uint256 _seller, uint256 _buyer) internal nonReentrant {
         uint256 fee = calculateFee(_seller);
-        myToken.transfer(marketPlaceFeeRecipient, fee);
+        lumerin.transfer(marketPlaceFeeRecipient, fee);
 
-        myToken.transfer(escrow_seller, _seller - fee);
+        lumerin.transfer(escrow_seller, _seller - fee);
         if (_buyer != 0) {
-            myToken.transfer(escrow_purchaser, _buyer);
+            lumerin.transfer(escrow_purchaser, _buyer);
         }
 
     }
 
     //internal function which transfers current hodled tokens into sellers account
     function getDepositContractHodlingsToSeller(uint256 remaining) internal {
-        uint256 balance = myToken.balanceOf(address(this)) - remaining;
+        uint256 balance = lumerin.balanceOf(address(this)) - remaining;
         uint256 fee = calculateFee(balance);
         uint256 transferrableBalance = balance - fee;
 
-        myToken.transfer(marketPlaceFeeRecipient, fee);
+        lumerin.transfer(marketPlaceFeeRecipient, fee);
 
-        myToken.transfer(escrow_seller, transferrableBalance);
+        lumerin.transfer(escrow_seller, transferrableBalance);
     }
 
     function calculateFee(uint256 revenue) internal view returns (uint256) {
