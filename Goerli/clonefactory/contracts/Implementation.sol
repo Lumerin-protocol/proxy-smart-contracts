@@ -235,8 +235,10 @@ contract Implementation is Initializable, Escrow {
                 withdrawFunds(myToken.balanceOf(address(this)), 0);
             }
 
-            buyerHistory[buyer].push(PurchaseInfo(true,startingBlockTimestamp, block.timestamp, price, speed, length));
-            sellerHistory.push(SellerHistory(true,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
+            if (contractState == ContractState.Running) {
+                buyerHistory[buyer].push(PurchaseInfo(true,startingBlockTimestamp, block.timestamp, price, speed, length));
+                sellerHistory.push(SellerHistory(true,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
+            }
             setContractVariableUpdate();
             emit contractClosed(buyer);
         } else if (closeOutType == 4) {
