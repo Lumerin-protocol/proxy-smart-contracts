@@ -95,7 +95,7 @@ test:
     - bedrock
     - docker
     - titanio-dev
-  allow_failure: true
+  allow_failure: false
   only:
     - branches
   script:
