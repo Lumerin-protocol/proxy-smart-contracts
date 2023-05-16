@@ -100,7 +100,7 @@ test:
     - branches
   script:
     - cd ./Goerli/clonefactory/ && yarn install
-    - export ENV_NAME="CLONE_FACTORY_ADDRESS" ENV_VALUE=$(cat clonefactory-addr.tmp) ENV_ENV=$CI_ENVIRONMENT_SLUG
+    # - export ENV_NAME="CLONE_FACTORY_ADDRESS" ENV_VALUE=$(cat clonefactory-addr.tmp) ENV_ENV=$CI_ENVIRONMENT_SLUG
     - *set-env
     - make test
   artifacts:
