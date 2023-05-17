@@ -4,7 +4,7 @@ clean:
 	rm -rf abi artifacts cache build-go build-js
 
 test:
-	yarn hardhat node & ./node-local-deploy.sh & build-js && yarn hardhat test --network localhost tests/*.js
+	yarn hardhat node & ./node-local-deploy.sh & make build-js && yarn hardhat test --network localhost tests/*.js
 
 compile:
 	yarn hardhat compile --config hardhat-base.config.js
