@@ -1,11 +1,15 @@
 import Web3 from "web3";
+import { AbiItem } from "ethereum-abi-types-generator";
+
 import CloneFactoryAbi from "./abi/CloneFactory.json";
 import ImplementationAbi from "./abi/Implementation.json";
 import LumerinAbi from "./abi/Lumerin.json";
-import { AbiItem } from "ethereum-abi-types-generator";
+import FaucetAbi from "./abi/Faucet.json";
+
 import { ContractContext as CloneFactoryContext } from "./generated-types/CloneFactory";
 import { ContractContext as ImplementationContext } from "./generated-types/Implementation";
 import { ContractContext as LumerinContext } from "./generated-types/Lumerin";
+import { ContractContext as FaucetContext } from "./generated-types/Faucet";
 
 const factory = <T>(web3: Web3, address: string, abi: any): T => {
   if (!web3 || !web3.eth) {
@@ -30,4 +34,7 @@ export const Implementation = (web3: Web3, address: string): ImplementationConte
 export const Lumerin = (web3: Web3, address: string): LumerinContext =>
   factory(web3, address, LumerinAbi);
 
-export { CloneFactoryContext, ImplementationContext, LumerinContext }
+export const Faucet = (web3: Web3, address: string): FaucetContext =>
+  factory(web3, address, FaucetAbi);
+
+export { CloneFactoryContext, ImplementationContext, LumerinContext, FaucetContext }

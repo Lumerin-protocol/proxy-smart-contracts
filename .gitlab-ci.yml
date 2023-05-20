@@ -95,11 +95,12 @@ test:
     - bedrock
     - docker
     - titanio-dev
-  allow_failure: true
+  allow_failure: false
   only:
     - branches
   script:
-    - cd ./Goerli/clonefactory/ && yarn install && make test
+    - cd ./Goerli/clonefactory/ && yarn install
+    - make test
   artifacts:
     paths:
       - Goerli/clonefactory/node_modules
@@ -345,3 +346,26 @@ release-contracts-js:
     - cp $SSH_KEY_CONTRACTS_JS ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - cd ./Goerli/clonefactory/ && make release-js
+
+
+
+release-contracts-audit:
+  stage: release-bindings
+  needs: ["release-contracts-js", "release-contracts-go"]
+  image: node:14-buster
+  # when: manual
+  tags:
+    - devops
+    - bedrock
+    - docker
+    - titanio-lmn
+  # only:
+  #   - main
+  before_script:
+    - apt-get -yq update && apt-get -yqq install openssh-client
+    - mkdir ~/.ssh
+    - ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
+  script:
+    - cp $SSH_KEY_SMART_CONTRACTS ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - cd ./Goerli/clonefactory/ && make update-public-contracts

@@ -5,7 +5,7 @@ clean:
 
 test:
 	yarn hardhat node & ./node-local-deploy.sh && yarn hardhat test --network localhost tests/*.js
-
+	
 compile:
 	yarn hardhat compile --config hardhat-base.config.js
 
@@ -38,6 +38,10 @@ release-js:
 	cd build-js && yarn version --new-version $(version) --no-git-tag-version
 	make release-git path="build-js" remote="git@github.com:Lumerin-protocol/contracts-js.git"
 	echo "contracts-js released"
+
+update-public-contracts:
+	make release-git path="contracts" remote="git@github.com:Lumerin-protocol/smart-contracts.git"
+	echo "smart-contracts released"
 
 # release-js-npm:
 # 	./templates/js/release.sh $(version) $(token)
