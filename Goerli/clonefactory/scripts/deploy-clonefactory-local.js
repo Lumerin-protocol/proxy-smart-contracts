@@ -17,6 +17,7 @@ async function main() {
   await cloneFactory.deployed();
 
   console.log("CLONEFACTORY address:", cloneFactory.address);
+  fs.writeFileSync("clonefactory-addr.tmp", String(cloneFactory.address));
 
   console.log("Deploying IMPLEMENTATION with the account:", deployer.address);
   console.log("Account balance:", (await deployer.getBalance()).toString());

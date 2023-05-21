@@ -28,6 +28,14 @@ describe("marketplace", function () {
     // console.log("withPOE1 address:", withPOE1.address);
     // console.log("withPOE2 address:", withPOE2.address);
     // console.log("withoutPOE address:", withoutPOE.address);
+    console.log({
+      CLONE_FACTORY_ADDRESS: process.env.CLONE_FACTORY_ADDRESS,
+      LUMERIN_TOKEN_ADDRESS: process.env.LUMERIN_TOKEN_ADDRESS,
+      VALIDATOR_ADDRESS: process.env.VALIDATOR_ADDRESS,
+      TEST_CONTRACT_ADDRESS: process.env.TEST_CONTRACT_ADDRESS,
+      TEST_SELLER_ADDRESS: process.env.TEST_SELLER_ADDRESS,
+      TEST_BUYER_ADDRESS: process.env.TEST_BUYER_ADDRESS
+    });
 
     Implementation = await ethers.getContractFactory("Implementation");
 
