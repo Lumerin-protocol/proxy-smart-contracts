@@ -91,7 +91,7 @@ test:
   stage: test
   image: node:14-buster
   tags:
-    - devops
+    - glrred
     - bedrock
     - docker
     - titanio-dev
@@ -109,7 +109,7 @@ compile-contracts:
   stage: build
   image: node:14-buster
   tags:
-    - devops
+    - glrred
     - bedrock
     - docker
     - titanio-dev
@@ -161,7 +161,7 @@ deploy-lumerintoken-dev:
   environment:
     name: dev
   tags:
-    - devops
+    - glrred
     - bedrock
     - docker
     - titanio-dev
@@ -196,7 +196,7 @@ deploy-clonefactory-dev:
   environment:
     name: dev
   tags:
-    - devops
+    - glrred
     - bedrock
     - docker
     - titanio-dev
@@ -233,7 +233,7 @@ whitelist-clonefactory-dev:
   environment:
     name: dev
   tags:
-    - devops
+    - glrred
     - bedrock
     - docker
     - titanio-dev
