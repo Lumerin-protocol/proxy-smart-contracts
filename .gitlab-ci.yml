@@ -91,15 +91,16 @@ test:
   stage: test
   image: node:14-buster
   tags:
-    - devops
+    - glrred
     - bedrock
     - docker
     - titanio-dev
-  allow_failure: true
+  allow_failure: false
   only:
     - branches
   script:
-    - cd ./Goerli/clonefactory/ && yarn install && make test
+    - cd ./Goerli/clonefactory/ && yarn install
+    - make test
   artifacts:
     paths:
       - Goerli/clonefactory/node_modules
@@ -108,7 +109,7 @@ compile-contracts:
   stage: build
   image: node:14-buster
   tags:
-    - devops
+    - glrred
     - bedrock
     - docker
     - titanio-dev
@@ -160,7 +161,7 @@ deploy-lumerintoken-dev:
   environment:
     name: dev
   tags:
-    - devops
+    - glrred
     - bedrock
     - docker
     - titanio-dev
@@ -195,7 +196,7 @@ deploy-clonefactory-dev:
   environment:
     name: dev
   tags:
-    - devops
+    - glrred
     - bedrock
     - docker
     - titanio-dev
@@ -232,7 +233,7 @@ whitelist-clonefactory-dev:
   environment:
     name: dev
   tags:
-    - devops
+    - glrred
     - bedrock
     - docker
     - titanio-dev
