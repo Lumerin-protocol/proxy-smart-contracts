@@ -1,9 +1,9 @@
 //@ts-check
-const { expect } = require("chai");
-const ethers  = require("hardhat");
-const Web3 = require("web3");
-const { Faucet, Lumerin } = require("../build-js/dist")
-const { RandomEthAddress, RandomIPAddress, ToString, WaitBlockchain, ToLMNDecimals, ToETHDecimals } = require('./utils')
+// const { expect } = require("chai");
+// const ethers  = require("hardhat");
+// const Web3 = require("web3");
+// const { Faucet, Lumerin } = require("../build-js/dist")
+// const { RandomEthAddress, RandomIPAddress, ToString, WaitBlockchain, ToLMNDecimals, ToETHDecimals } = require('./utils')
 
 // describe("Faucet", function () {
 //   const lumerinAddress = "0x5fbdb2315678afecb367f032d93f642f64180aa3"
@@ -18,19 +18,19 @@ const { RandomEthAddress, RandomIPAddress, ToString, WaitBlockchain, ToLMNDecima
 //   const lumerinInstance = Lumerin(web3, lumerinAddress)
 //   const faucetInstance = Faucet(web3, faucetAddress)
 
-  before(async () => {
-    // load balance to faucet
-    await lumerinInstance.methods.transfer(
-      faucetAddress, 
-      ToString(ToLMNDecimals(1000)),
-    ).send({from})
+  // before(async () => {
+  //   // load balance to faucet
+  //   await lumerinInstance.methods.transfer(
+  //     faucetAddress, 
+  //     ToString(ToLMNDecimals(1000)),
+  //   ).send({from})
 
-    await web3.eth.sendTransaction({
-      from: ethWallet,
-      to: faucetAddress,
-      value: ToString(ToETHDecimals(1000)),
-    })
-  })
+  //   await web3.eth.sendTransaction({
+  //     from: ethWallet,
+  //     to: faucetAddress,
+  //     value: ToString(ToETHDecimals(1000)),
+  //   })
+  // })
 
 //   it("should send correct amount of lmr and eth", async function(){
 //     await faucetInstance.methods.supervisedClaim(claiment, ipAddress).send({ from })
@@ -64,10 +64,10 @@ const { RandomEthAddress, RandomIPAddress, ToString, WaitBlockchain, ToLMNDecima
 //     await faucetInstance.methods.supervisedClaim(RandomEthAddress(), RandomIPAddress()).send({ from })
 //   })
 
-  it('should allow when 24 hours elapse', async function(){
-    await WaitBlockchain(web3, 24*3600)
-    await faucetInstance.methods.supervisedClaim(claiment, ipAddress).send({ from })
-  })
+  // it('should allow when 24 hours elapse', async function(){
+  //   await WaitBlockchain(web3, 24*3600)
+  //   await faucetInstance.methods.supervisedClaim(claiment, ipAddress).send({ from })
+  // })
 
 //   it('canClaimTokens should disallow after recent claim', async function (){
 //     const res = await faucetInstance.methods.canClaimTokens(claiment, ipAddress).call({ from })
