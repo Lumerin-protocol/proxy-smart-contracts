@@ -93,6 +93,7 @@ contract CloneFactory {
         string memory _cipherText
     ) external {
         require(mappedContracts[contractAddress], "unknown contract address");
+        require(!isContractDead[contractAddress], "cannot purchase a contract marked as dead");
         Implementation targetContract = Implementation(contractAddress);
         uint256 _price = targetContract.price();
         uint256 _marketplaceFee = _price / buyerFeeRate;
