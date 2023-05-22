@@ -212,9 +212,11 @@ contract Implementation is Initializable, Escrow {
             uint256 buyerPayout = buyerPayoutCalc();
 
             withdrawFunds(price - buyerPayout, buyerPayout);
-            buyerHistory[buyer].push(PurchaseInfo(false,startingBlockTimestamp, block.timestamp, price, speed, length));
 
-            sellerHistory.push(SellerHistory(false,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
+            bool comp = block.timestamp - startingBlockTimestamp >= length;
+            buyerHistory[buyer].push(PurchaseInfo(comp,startingBlockTimestamp, block.timestamp, price, speed, length));
+
+            sellerHistory.push(SellerHistory(comp,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
             setContractVariableUpdate();
             emit contractClosed(buyer);
         } else if (closeOutType == 1) {
