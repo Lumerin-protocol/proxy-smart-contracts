@@ -5,7 +5,7 @@ clean:
 
 test:
 	yarn hardhat node & ./node-local-deploy.sh && yarn hardhat test --network localhost tests/*.js
-
+	
 compile:
 	yarn hardhat compile --config hardhat-base.config.js
 
