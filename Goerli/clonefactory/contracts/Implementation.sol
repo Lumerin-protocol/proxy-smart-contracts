@@ -197,7 +197,7 @@ contract Implementation is Initializable, Escrow {
                 uint256(length);
         }
 
-        return price;
+        return 0;
     }
 
     function setContractCloseOut(uint256 closeOutType) public {
