@@ -197,7 +197,7 @@ contract Implementation is Initializable, Escrow {
                 uint256(length);
         }
 
-        return price;
+        return 0;
     }
 
     function setContractCloseOut(uint256 closeOutType) public {
@@ -212,9 +212,11 @@ contract Implementation is Initializable, Escrow {
             uint256 buyerPayout = buyerPayoutCalc();
 
             withdrawFunds(price - buyerPayout, buyerPayout);
-            buyerHistory[buyer].push(PurchaseInfo(false,startingBlockTimestamp, block.timestamp, price, speed, length));
 
-            sellerHistory.push(SellerHistory(false,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
+            bool comp = block.timestamp - startingBlockTimestamp >= length;
+            buyerHistory[buyer].push(PurchaseInfo(comp,startingBlockTimestamp, block.timestamp, price, speed, length));
+
+            sellerHistory.push(SellerHistory(comp,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
             setContractVariableUpdate();
             emit contractClosed(buyer);
         } else if (closeOutType == 1) {
@@ -225,7 +227,7 @@ contract Implementation is Initializable, Escrow {
                 "this account is not authorized to trigger a mid-contract closeout"
             );
 
-            getDepositContractHodlingsToSeller(price - buyerPayoutCalc());
+            getDepositContractHodlingsToSeller(buyerPayoutCalc());
         } else if (closeOutType == 2 || closeOutType == 3) {
             require(
                 block.timestamp - startingBlockTimestamp >= length,
