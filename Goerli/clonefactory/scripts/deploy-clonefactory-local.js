@@ -28,11 +28,6 @@ async function main() {
 
   console.log("IMPLEMENTATION address:", implementation.address);
 
-  const setBaseImplementation = await cloneFactory.setBaseImplementation(
-    implementation.address
-  );
-  await setBaseImplementation.wait();
-
   let initialize = await implementation.initialize(
     10**8,
     1,
@@ -48,6 +43,11 @@ async function main() {
   await initialize.wait();
 
   console.log("IMPLEMENTATION price:", await implementation.price());
+
+  const setBaseImplementation = await cloneFactory.setBaseImplementation(
+    implementation.address
+  );
+  await setBaseImplementation.wait();
 }
 main()
   .then(() => process.exit(0))
