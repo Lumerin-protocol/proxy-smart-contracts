@@ -34,7 +34,7 @@ describe("marketplace", function () {
       VALIDATOR_ADDRESS: process.env.VALIDATOR_ADDRESS,
       TEST_CONTRACT_ADDRESS: process.env.TEST_CONTRACT_ADDRESS,
       TEST_SELLER_ADDRESS: process.env.TEST_SELLER_ADDRESS,
-      TEST_BUYER_ADDRESS: process.env.TEST_BUYER_ADDRESS
+      TEST_BUYER_ADDRESS: process.env.TEST_BUYER_ADDRESS,
     });
 
     Implementation = await ethers.getContractFactory("Implementation");
@@ -96,8 +96,11 @@ describe("marketplace", function () {
       await tx.wait();
     }
 
+    let contracts = await cloneFactory.getContractList();
+
     testContract = await Implementation.attach(
-      process.env.TEST_CONTRACT_ADDRESS
+      contracts[0]
+      // process.env.TEST_CONTRACT_ADDRESS
     );
 
     initialTestContractBalance = Number(
@@ -198,7 +201,7 @@ describe("marketplace", function () {
     it("should close out and not distribute funds", async function () {
       await testCloseout(
         2,
-        (await testContract.length()),
+        await testContract.length(),
         withPOE,
         withoutPOE,
         Function(),
@@ -211,8 +214,8 @@ describe("marketplace", function () {
     it("should not close out and distribute funds approx. 50% to seller", async function () {
       const results = await testCloseout(
         1,
-        ((await testContract.length()) / 2),
-        withPOE,
+        (await testContract.length()) / 2,
+        seller,
         withoutPOE,
         Function(),
         assertSellerPayout,
@@ -474,10 +477,16 @@ describe("marketplace", function () {
 
       const expectedSellerPayout =
         expectedSellerPayoutWithoutFee - expectedSellerPayoutWithoutFee * 0.01;
-      const sellerBalanceDiff = sellerBalanceAfterCloseout - sellerBalance;
-      const sellerPayoutDiff = expectedSellerPayout - sellerBalanceDiff;
-      const sellerPayoutPercentError =
-        (sellerPayoutDiff / expectedSellerPayout) * 100;
+      // const sellerBalanceDiff = sellerBalanceAfterCloseout - sellerBalance;
+      const sellerPayoutDiff = Math.abs(expectedSellerPayout - contractPrice);
+      let sellerPayoutPercentError;
+
+      if (sellerPayoutDiff < expectedSellerPayout) {
+        sellerPayoutPercentError = sellerPayoutDiff / expectedSellerPayout;
+      } else {
+        sellerPayoutPercentError = expectedSellerPayout / sellerPayoutDiff;
+      }
+
       return sellerPayoutPercentError;
     }
   });

@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./Implementation.sol";
 import "./LumerinToken.sol";
 import "./Common.sol";
+import "hardhat/console.sol";
 
 /// @title CloneFactory
 /// @author Josh Kean (Lumerin)
@@ -92,6 +93,8 @@ contract CloneFactory {
         address contractAddress,
         string memory _cipherText
     ) external {
+        console.log("setPurchaseRentalContract - address: ", contractAddress);
+        console.log("setPurchaseRentalContract - is mapped: ", mappedContracts[contractAddress]);
         require(mappedContracts[contractAddress], "unknown contract address");
         require(!isContractDead[contractAddress], "cannot purchase a contract marked as dead");
         Implementation targetContract = Implementation(contractAddress);
