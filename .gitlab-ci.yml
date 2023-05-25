@@ -120,7 +120,7 @@ build-test:
     - branches
   script:
     - cd ./Goerli/clonefactory/ && yarn install
-    - make test
+    - make test-build
   artifacts:
     paths:
       - Goerli/clonefactory/node_modules
