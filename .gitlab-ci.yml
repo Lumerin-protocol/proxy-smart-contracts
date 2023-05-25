@@ -105,6 +105,26 @@ test:
     paths:
       - Goerli/clonefactory/node_modules
 
+build-test:
+  environment: test
+  stage: build-test
+  image: node:14-buster
+  tags:
+    - glrred
+    - bedrock
+    - docker
+    - titanio-dev
+  allow_failure: false
+  needs: ["build-contracts-js"]
+  only:
+    - branches
+  script:
+    - cd ./Goerli/clonefactory/ && yarn install
+    - make test
+  artifacts:
+    paths:
+      - Goerli/clonefactory/node_modules
+
 compile-contracts:
   stage: build
   image: node:14-buster
