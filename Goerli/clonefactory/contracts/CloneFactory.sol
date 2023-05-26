@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./Implementation.sol";
 import "./LumerinToken.sol";
-import "./Common.sol";
 
 /// @title CloneFactory
 /// @author Josh Kean (Lumerin)
@@ -26,7 +25,6 @@ contract CloneFactory {
     uint256 public sellerFeeRate; //fee to be paid to the marketplace
     bool public noMoreWhitelist;
     mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
-    mapping(address => bool) public isContractDead; // keeps track of contracts that are no longer valid
     Lumerin lumerin;
 
     constructor(address _lmn, address _validator) {
@@ -44,6 +42,7 @@ contract CloneFactory {
 
     event contractCreated(address indexed _address, string _pubkey); //emitted whenever a contract is created
     event clonefactoryContractPurchased(address indexed _address); //emitted whenever a contract is purchased
+    event contractDeleteUpdated(address _address, bool _isDeleted); //emitted whenever a contract is deleted/restored
 
     modifier onlyOwner() {
         require(msg.sender == owner, "you are not authorized");
@@ -90,8 +89,12 @@ contract CloneFactory {
         address contractAddress,
         string memory _cipherText
     ) external {
-        require(!isContractDead[contractAddress], "cannot purchase a contract marked as dead");
         Implementation targetContract = Implementation(contractAddress);
+        require(targetContract.isDeleted() == false, "cannot purchase deleted contract");
+        require(
+            targetContract.seller() != msg.sender,
+            "cannot purchase your own contract"
+        );
         uint256 _price = targetContract.price();
         uint256 _marketplaceFee = _price / buyerFeeRate;
 
@@ -164,16 +167,9 @@ contract CloneFactory {
         marketPlaceFeeRecipient = _newRecipient;
     }
 
-    function setContractAsDead(address _contract, bool closeout) public {
-        Implementation _tempContract = Implementation(_contract);
-        require(
-            msg.sender == owner || msg.sender == _tempContract.seller(),
-            "you arent approved to mark this contract as dead"
-        );
-        isContractDead[_contract] = true;
-        if (closeout) {
-            _tempContract.setContractCloseOut(4);
-        }
+    function setDeleteContract(address _contract, bool _isDeleted) public {
+        Implementation(_contract).setContractDeleted(_isDeleted);
+        emit contractDeleteUpdated(_contract, _isDeleted);
     }
 
     // for test purposes, this allows us to configure our test environment so the ABI's can be matched with the Implementation contract source.
