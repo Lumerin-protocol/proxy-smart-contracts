@@ -2,6 +2,7 @@
 let { expect } = require("chai");
 let { ethers } = require("hardhat");
 let { time } = require("@nomicfoundation/hardhat-network-helpers");
+const { Lumerin, Implementation } = require("../build-js/dist")
 
 async function sleep(sleepTime) {
   return new Promise((resolve) => setTimeout(resolve, sleepTime));
@@ -37,10 +38,10 @@ describe("marketplace", function () {
       TEST_BUYER_ADDRESS: process.env.TEST_BUYER_ADDRESS,
     });
 
-    Implementation = await ethers.getContractFactory("Implementation");
+    // Implementation = await ethers.getContractFactory("Implementation");
 
     //deploy lumeirn token
-    let Lumerin = await ethers.getContractFactory("Lumerin");
+    // let Lumerin = await ethers.getContractFactory("Lumerin");
 
     let lumerinAttachErr = null;
 
@@ -60,9 +61,9 @@ describe("marketplace", function () {
     }
 
     //deploy POE token
-    let POE = await ethers.getContractFactory("Lumerin");
-    poe = await POE.deploy();
-    await poe.deployed();
+    // let POE = await ethers.getContractFactory("Lumerin");
+    // poe = await POE.deploy();
+    // await poe.deployed();
 
     let CloneFactory = await ethers.getContractFactory("CloneFactory");
 
@@ -91,10 +92,10 @@ describe("marketplace", function () {
     }
 
     //transfer POE to required addresses
-    for (addr of [withPOE, withPOE1, withPOE2]) {
-      let tx = await poe.transfer(addr.address, 1);
-      await tx.wait();
-    }
+    // for (addr of [withPOE, withPOE1, withPOE2]) {
+    //   let tx = await poe.transfer(addr.address, 1);
+    //   await tx.wait();
+    // }
 
     let contracts = await cloneFactory.getContractList();
 
