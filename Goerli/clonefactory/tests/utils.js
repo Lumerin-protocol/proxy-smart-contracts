@@ -27,8 +27,26 @@ function RandomIPAddress(){
   return `${randomPart()}.${randomPart()}.${randomPart()}.${randomPart()}`
 }
 
+/**
+ * @param {import("web3").default} web3
+ * @param {number} seconds
+ * @returns {Promise<void>}
+ */
+async function AdvanceBlockTime(web3, seconds){
+  const { timestamp } = await web3.eth.getBlock(await web3.eth.getBlockNumber());
+  await new Promise((resolve,reject)=>{
+    web3.currentProvider.send({
+      method: "evm_mine",
+      params: [Number(timestamp) + seconds],
+      jsonrpc: '2.0',
+      id: new Date().getTime(),
+    }, (err, data) => err ? reject(err) : resolve(data))
+  })
+}
+
 module.exports = {
   ToString,
   RandomEthAddress,
-  RandomIPAddress
+  RandomIPAddress,
+  AdvanceBlockTime,
 }
