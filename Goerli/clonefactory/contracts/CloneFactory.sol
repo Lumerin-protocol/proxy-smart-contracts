@@ -167,9 +167,11 @@ contract CloneFactory {
         marketPlaceFeeRecipient = _newRecipient;
     }
 
-    function setContractDeleted(address _contract, bool _isDeleted) public {
-        Implementation(_contract).setContractDeleted(_isDeleted);
-        emit contractDeleteUpdated(_contract, _isDeleted);
+    function setContractDeleted(address _contractAddress, bool _isDeleted) public {
+        Implementation _contract = Implementation(_contractAddress);
+        require(msg.sender == _contract.seller() || msg.sender == owner, "you are not authorized");
+        Implementation(_contractAddress).setContractDeleted(_isDeleted);
+        emit contractDeleteUpdated(_contractAddress, _isDeleted);
     }
 
     // for test purposes, this allows us to configure our test environment so the ABI's can be matched with the Implementation contract source.
