@@ -28,12 +28,12 @@ describe("Contract delete", function () {
     hrContractAddr = receipt.events?.contractCreated.returnValues._address;
     const impl = Implementation(web3, hrContractAddr)
     const data = await impl.methods.getPublicVariables().call()
-    console.log(data)
+
     expect(data._isDeleted).equal(false)
   })
 
   it("should delete contract and emit event", async function(){
-    await cf.methods.setDeleteContract(hrContractAddr, true).send({from})
+    await cf.methods.setContractDeleted(hrContractAddr, true).send({from})
     const impl = Implementation(web3, hrContractAddr)
     const data = await impl.methods.getPublicVariables().call()
 
@@ -50,7 +50,7 @@ describe("Contract delete", function () {
 
   it("should error on second attempt to delete", async function(){
     try{
-      await cf.methods.setDeleteContract(hrContractAddr, true).send({from})
+      await cf.methods.setContractDeleted(hrContractAddr, true).send({from})
       expect.fail("should throw error")
     } catch(e){
       expect(e.message).includes("contract delete state is already set to this value")
@@ -67,7 +67,7 @@ describe("Contract delete", function () {
   })
 
   it("should undelete contract and emit event", async function(){
-    await cf.methods.setDeleteContract(hrContractAddr, false).send({from})
+    await cf.methods.setContractDeleted(hrContractAddr, false).send({from})
     const impl = Implementation(web3, hrContractAddr)
     const data = await impl.methods.getPublicVariables().call()
 
@@ -87,7 +87,7 @@ describe("Contract delete", function () {
   })
 
   it("should allow delete contract if contract is purchased", async function(){
-    await cf.methods.setDeleteContract(hrContractAddr, true).send({from})
+    await cf.methods.setContractDeleted(hrContractAddr, true).send({from})
     const impl = Implementation(web3, hrContractAddr)
     const data = await impl.methods.getPublicVariables().call()
 

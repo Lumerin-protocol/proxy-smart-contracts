@@ -167,7 +167,7 @@ contract CloneFactory {
         marketPlaceFeeRecipient = _newRecipient;
     }
 
-    function setDeleteContract(address _contract, bool _isDeleted) public {
+    function setContractDeleted(address _contract, bool _isDeleted) public {
         Implementation(_contract).setContractDeleted(_isDeleted);
         emit contractDeleteUpdated(_contract, _isDeleted);
     }
