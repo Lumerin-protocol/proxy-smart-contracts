@@ -134,7 +134,6 @@ compile-contracts:
     - bedrock
     - docker
     - titanio-dev
-  needs: ["test"]
   environment:
     name: dev
     action: prepare
