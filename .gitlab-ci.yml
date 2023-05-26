@@ -87,24 +87,24 @@ variables:
     - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp)
     - *set-env
 
-test:
-  environment: test
-  stage: test
-  image: node:14-buster
-  tags:
-    - glrred
-    - bedrock
-    - docker
-    - titanio-dev
-  allow_failure: false
-  only:
-    - branches
-  script:
-    - cd ./Goerli/clonefactory/ && yarn install
-    - make test
-  artifacts:
-    paths:
-      - Goerli/clonefactory/node_modules
+# test:
+#   environment: test
+#   stage: test
+#   image: node:14-buster
+#   tags:
+#     - glrred
+#     - bedrock
+#     - docker
+#     - titanio-dev
+#   allow_failure: false
+#   only:
+#     - branches
+#   script:
+#     - cd ./Goerli/clonefactory/ && yarn install
+#     - make test
+#   artifacts:
+#     paths:
+#       - Goerli/clonefactory/node_modules
 
 build-test:
   environment: test

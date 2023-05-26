@@ -21,7 +21,7 @@ describe("marketplace", function () {
   let initialTestContractBalance;
 
   before(async function () {
-    [seller, withPOE, withPOE1, withPOE2, withoutPOE] =
+    let [seller, withPOE, withPOE1, withPOE2, withoutPOE] =
       await ethers.getSigners();
     // UNCOMMENT TO HELP WITH TEST ENVIRONMENT SETUP
     // console.log("seller address:", seller.address);
