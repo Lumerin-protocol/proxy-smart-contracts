@@ -3,12 +3,7 @@ let { expect } = require("chai");
 let { ethers } = require("hardhat");
 let { time } = require("@nomicfoundation/hardhat-network-helpers");
 
-async function sleep(sleepTime) {
-  return new Promise((resolve) => setTimeout(resolve, sleepTime));
-}
-
 describe("marketplace", function () {
-  this.timeout(600 * 1000);
   let purchase_price = 100;
   let contract_length = 100;
   let seller, withPOE, withoutPOE;
@@ -17,24 +12,19 @@ describe("marketplace", function () {
   let lumerin;
   let poe;
   let testContract;
-  let initialTestContractBalance;
 
   before(async function () {
-    [seller, withPOE, withPOE1, withPOE2, withoutPOE] =
+    [seller, withPOE, withoutPOE] =
       await ethers.getSigners();
-    // UNCOMMENT TO HELP WITH TEST ENVIRONMENT SETUP
-    // console.log("seller address:", seller.address);
-    // console.log("withPOE address:", withPOE.address);
-    // console.log("withPOE1 address:", withPOE1.address);
-    // console.log("withPOE2 address:", withPOE2.address);
-    // console.log("withoutPOE address:", withoutPOE.address);
+
+    process.env.CLONE_FACTORY_ADDRESS = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+    process.env.LUMERIN_TOKEN_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+    process.env.VALIDATOR_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+
     console.log({
       CLONE_FACTORY_ADDRESS: process.env.CLONE_FACTORY_ADDRESS,
       LUMERIN_TOKEN_ADDRESS: process.env.LUMERIN_TOKEN_ADDRESS,
       VALIDATOR_ADDRESS: process.env.VALIDATOR_ADDRESS,
-      TEST_CONTRACT_ADDRESS: process.env.TEST_CONTRACT_ADDRESS,
-      TEST_SELLER_ADDRESS: process.env.TEST_SELLER_ADDRESS,
-      TEST_BUYER_ADDRESS: process.env.TEST_BUYER_ADDRESS,
     });
 
     Implementation = await ethers.getContractFactory("Implementation");
@@ -90,17 +80,17 @@ describe("marketplace", function () {
       await cloneFactory.deployed();
     }
 
-    //transfer POE to required addresses
-    for (addr of [withPOE, withPOE1, withPOE2]) {
-      let tx = await poe.transfer(addr.address, 1);
-      await tx.wait();
-    }
+    // //transfer POE to required addresses
+    // for (addr of [withPOE, withPOE1, withPOE2]) {
+    //   let tx = await poe.transfer(addr.address, 1);
+    //   await tx.wait();
+    // }
+
 
     let contracts = await cloneFactory.getContractList();
 
     testContract = await Implementation.attach(
       contracts[0]
-      // process.env.TEST_CONTRACT_ADDRESS
     );
 
     initialTestContractBalance = Number(
