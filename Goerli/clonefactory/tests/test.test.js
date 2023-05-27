@@ -2,7 +2,7 @@
 let { expect } = require("chai");
 let { config, ethers } = require("hardhat");
 let { time } = require("@nomicfoundation/hardhat-network-helpers");
-const { Lumerin, Implementation } = require("../build-js/dist");
+const { Lumerin, Implementation, CloneFactory } = require("../build-js/dist");
 const Web3 = require("web3");
 
 async function sleep(sleepTime) {
@@ -14,7 +14,6 @@ describe("marketplace", function () {
   let purchase_price = 100;
   let contract_length = 100;
   let seller, withPOE, withoutPOE;
-  let Implementation;
   let cloneFactory;
   let lumerin;
   let poe;
@@ -59,17 +58,17 @@ describe("marketplace", function () {
       );
     }
 
-    if (lumerinAttachErr) {
-      lumerin = await Lumerin.deploy();
-      await lumerin.deployed();
-    }
+    // if (lumerinAttachErr) {
+    //   lumerin = await Lumerin.deploy();
+    //   await lumerin.deployed();
+    // }
 
     //deploy POE token
     // let POE = await ethers.getContractFactory("Lumerin");
     // poe = await POE.deploy();
     // await poe.deployed();
 
-    let CloneFactory = await ethers.getContractFactory("CloneFactory");
+    // let CloneFactory = await ethers.getContractFactory("CloneFactory");
 
     let cloneFactoryAttachErr = null;
     try {
@@ -87,13 +86,13 @@ describe("marketplace", function () {
 
     if (cloneFactoryAttachErr) {
       //deploying with the lumerin as the address collecting titans lumerin
-      cloneFactory = await CloneFactory.deploy(
-        lumerin.address,
-        process.env.VALIDATOR_ADDRESS
-        //      poe.address
-      );
+      // cloneFactory = await CloneFactory.deploy(
+      //   lumerin.address,
+      //   process.env.VALIDATOR_ADDRESS
+      //   //      poe.address
+      // );
 
-      await cloneFactory.deployed();
+      // await cloneFactory.deployed();
     }
 
     //transfer POE to required addresses
