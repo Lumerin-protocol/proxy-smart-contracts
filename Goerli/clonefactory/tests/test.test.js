@@ -3,6 +3,7 @@ let { expect } = require("chai");
 let { ethers } = require("hardhat");
 let { time } = require("@nomicfoundation/hardhat-network-helpers");
 const { Lumerin, Implementation } = require("../build-js/dist")
+const Web3 = require("web3");
 
 async function sleep(sleepTime) {
   return new Promise((resolve) => setTimeout(resolve, sleepTime));
@@ -19,6 +20,7 @@ describe("marketplace", function () {
   let poe;
   let testContract;
   let initialTestContractBalance;
+  let web3 = new Web3(ethers.config.networks.localhost.url);
 
   before(async function () {
     let [seller, withPOE, withPOE1, withPOE2, withoutPOE] =
@@ -46,7 +48,7 @@ describe("marketplace", function () {
     let lumerinAttachErr = null;
 
     try {
-      lumerin = await Lumerin.attach(process.env.LUMERIN_TOKEN_ADDRESS);
+      lumerin = await Lumerin(web3, process.env.LUMERIN_TOKEN_ADDRESS);
     } catch (e) {
       lumerinAttachErr = e;
       console.log(
@@ -69,7 +71,8 @@ describe("marketplace", function () {
 
     let cloneFactoryAttachErr = null;
     try {
-      cloneFactory = await CloneFactory.attach(
+      cloneFactory = await CloneFactory(
+        web3,
         process.env.CLONE_FACTORY_ADDRESS
       );
     } catch (e) {
@@ -99,7 +102,8 @@ describe("marketplace", function () {
 
     let contracts = await cloneFactory.getContractList();
 
-    testContract = await Implementation.attach(
+    testContract = await Implementation(
+      web3,
       contracts[0]
       // process.env.TEST_CONTRACT_ADDRESS
     );
@@ -172,7 +176,7 @@ describe("marketplace", function () {
       await purchaseContract.wait();
     } catch {}
     //seller closes out the contract and collects the lumerin tokens
-    let contract1 = await Implementation.attach(contractAddress);
+    let contract1 = await Implementation(web3, contractAddress);
     let contractBuyer = await contract1.buyer();
     expect(contractBuyer).to.not.equal(withoutPOE.address);
   });
@@ -589,7 +593,7 @@ describe("marketplace", function () {
   }
 
   async function attachToContractAndIncrement(contractAddress, contractNumber) {
-    let contract = await Implementation.attach(contractAddress);
+    let contract = await Implementation(web3, contractAddress);
     let state = await contract.contractState();
 
     if (state == 0) {
