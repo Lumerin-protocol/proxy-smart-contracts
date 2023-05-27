@@ -1,8 +1,8 @@
 //@ts-check
 let { expect } = require("chai");
-let { ethers } = require("hardhat");
+let { config, ethers } = require("hardhat");
 let { time } = require("@nomicfoundation/hardhat-network-helpers");
-const { Lumerin, Implementation } = require("../build-js/dist")
+const { Lumerin, Implementation } = require("../build-js/dist");
 const Web3 = require("web3");
 
 async function sleep(sleepTime) {
@@ -20,7 +20,9 @@ describe("marketplace", function () {
   let poe;
   let testContract;
   let initialTestContractBalance;
-  let web3 = new Web3(ethers.config.networks.localhost.url);
+
+  /** @type {import("web3").default} */
+  let web3 = new Web3(config.networks.localhost.url);
 
   before(async function () {
     let [seller, withPOE, withPOE1, withPOE2, withoutPOE] =

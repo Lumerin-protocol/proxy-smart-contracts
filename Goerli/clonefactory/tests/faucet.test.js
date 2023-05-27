@@ -1,6 +1,6 @@
 //@ts-check
 const { expect } = require("chai");
-const ethers  = require("hardhat");
+const hardhat  = require("hardhat");
 const Web3 = require("web3");
 const { Faucet, Lumerin } = require("../build-js/dist")
 const { RandomEthAddress, RandomIPAddress, ToString } = require('./utils')
@@ -14,7 +14,7 @@ describe("Faucet", function () {
   const ethWallet = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 
   /** @type {import("web3").default} */
-  const web3 = new Web3(ethers.config.networks.localhost.url)
+  const web3 = new Web3(hardhat.config.networks.localhost.url)
   const lumerinInstance = Lumerin(web3, lumerinAddress)
   const faucetInstance = Faucet(web3, faucetAddress)
 
