@@ -67,6 +67,7 @@ describe("Faucet", function () {
 
   it('should allow when 24 hours elapse', async function(){
     /** @type {import("web3-core").HttpProvider}*/
+    //@ts-ignore
     const provider = web3.currentProvider
     const { timestamp } = await web3.eth.getBlock(await web3.eth.getBlockNumber());
 

@@ -1,6 +1,7 @@
 stages:
   - build
   - test
+  - build-test
   - release-bindings
   - deploy-contracts
   - whitelist-clonefactory
