@@ -24,13 +24,15 @@ contract CloneFactory {
     uint256 public buyerFeeRate; //fee to be paid to the marketplace
     uint256 public sellerFeeRate; //fee to be paid to the marketplace
     bool public noMoreWhitelist;
-    mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
+
+    mapping(address => bool) rentalContractsMap; //mapping of rental contracts to verify cheaply if implementation was created by this clonefactory
+    mapping(address => bool) whitelist; //whitelisting of seller addresses
     Lumerin lumerin;
 
     constructor(address _lmn, address _validator) {
         Implementation _imp = new Implementation();
         baseImplementation = address(_imp);
-        lmnDeploy = _lmn; //deployed address of lumeirn token
+        lmnDeploy = _lmn; //deployed address of lumerin token
         validator = _validator;
         lumerin = Lumerin(_lmn);
         owner = msg.sender;
@@ -79,6 +81,7 @@ contract CloneFactory {
             _pubKey
         );
         rentalContracts.push(_newContract); //add clone to list of contracts
+        rentalContractsMap[_newContract] = true; //add clone to mapping of contracts
         emit contractCreated(_newContract, _pubKey); //broadcasts a new contract and the pubkey to use for encryption
         return _newContract;
     }
@@ -89,6 +92,8 @@ contract CloneFactory {
         address contractAddress,
         string memory _cipherText
     ) external {
+        // TODO: add a test case so any third-party implementations will be discarded
+        require(rentalContractsMap[contractAddress], "unknown contract address");
         Implementation targetContract = Implementation(contractAddress);
         require(targetContract.isDeleted() == false, "cannot purchase deleted contract");
         require(
