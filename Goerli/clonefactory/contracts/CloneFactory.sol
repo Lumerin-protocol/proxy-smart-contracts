@@ -173,6 +173,7 @@ contract CloneFactory {
     }
 
     function setContractDeleted(address _contractAddress, bool _isDeleted) public {
+        require(rentalContractsMap[contractAddress], "unknown contract address");
         Implementation _contract = Implementation(_contractAddress);
         require(msg.sender == _contract.seller() || msg.sender == owner, "you are not authorized");
         Implementation(_contractAddress).setContractDeleted(_isDeleted);
