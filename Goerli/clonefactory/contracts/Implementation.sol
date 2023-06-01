@@ -7,11 +7,6 @@ import "./Escrow.sol";
 
 //MyToken is place holder for actual lumerin token, purely for testing purposes
 contract Implementation is Initializable, Escrow {
-    enum ContractState {
-        Available,
-        Running
-    }
-
     ContractState public contractState;
     uint256 public price; //cost to purchase contract
     uint256 public limit; //variable used to aid in the lumerin nodes decision making
@@ -25,39 +20,27 @@ contract Implementation is Initializable, Escrow {
     string public encryptedPoolData; //encrypted data for pool target info
     string public pubKey; //encrypted data for pool target info
     bool public isDeleted; //used to track if the contract is deleted, separate variable to account for the possibility of a contract being deleted when it is still running
+    HistoryEntry[] public history;
 
-    struct SellerHistory {
-        bool goodCloseout;
+    enum ContractState {
+        Available,
+        Running
+    }
+
+    struct HistoryEntry {
+        bool _goodCloseout; // consider dropping and use instead _purchaseTime + _length >= _endTime
         uint256 _purchaseTime;
-        uint256 endingTime;
+        uint256 _endTime;
         uint256 _price;
         uint256 _speed;
         uint256 _length;
         address _buyer;
     }
 
-    SellerHistory[] public sellerHistory;
-    /*
-    1. call the clonefactory get contract
-    2. for each contract, call sellerHistory
-    3. get the inf
-    */
-
-    struct PurchaseInfo {
-        bool goodCloseout;
-        uint256 _purchaseTime;
-        uint256 endingTime;
-        uint256 _price;
-        uint256 _speed;
-        uint256 _length;
-    }
-
     event contractPurchased(address indexed _buyer); //make indexed
     event contractClosed(address indexed _buyer);
     event purchaseInfoUpdated();
     event cipherTextUpdated(string newCipherText);
-
-    mapping(address => PurchaseInfo[]) public buyerHistory;
 
     function initialize(
         uint256 _price,
@@ -112,6 +95,36 @@ contract Implementation is Initializable, Escrow {
             isDeleted,
             myToken.balanceOf(address(this))
         );
+    }
+
+    function getHistory(uint256 _offset, uint256 _limit) public view returns (HistoryEntry[] memory) {
+        if (_offset > history.length) {
+            _offset = history.length;
+        }
+        if (_offset + _limit > history.length) {
+            _limit = history.length - _offset;
+        }
+         
+        HistoryEntry[] memory values = new HistoryEntry[](_limit);
+        for (uint256 i = 0; i < _limit; i++) {
+            // return values in reverse historical for displaying purposes
+            values[i] = history[history.length - 1 - _offset - i];
+        }
+
+        return values;
+    }
+
+    function getStats() public view returns (uint256 _successCount, uint256 _failCount){
+        uint256 successCount = 0;
+        uint256 failCount = 0;
+        for (uint256 i = 0; i < history.length; i++) {
+            if (history[i]._goodCloseout) {
+                successCount++;
+            } else {
+                failCount++;
+            }
+        }
+        return (successCount, failCount);
     }
 
     //function that the clone factory calls to purchase the contract
@@ -219,9 +232,9 @@ contract Implementation is Initializable, Escrow {
             withdrawFunds(price - buyerPayout, buyerPayout);
 
             bool comp = block.timestamp - startingBlockTimestamp >= length;
-            buyerHistory[buyer].push(PurchaseInfo(comp,startingBlockTimestamp, block.timestamp, price, speed, length));
-
-            sellerHistory.push(SellerHistory(comp,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
+            
+            history.push(HistoryEntry(comp, startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
+            
             setContractVariableUpdate();
             emit contractClosed(buyer);
         } else if (closeOutType == 1) {
@@ -243,8 +256,7 @@ contract Implementation is Initializable, Escrow {
             }
 
             if (contractState == ContractState.Running) {
-                buyerHistory[buyer].push(PurchaseInfo(true,startingBlockTimestamp, block.timestamp, price, speed, length));
-                sellerHistory.push(SellerHistory(true,startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
+                history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
             }
             setContractVariableUpdate();
             emit contractClosed(buyer);
