@@ -14,6 +14,7 @@ describe("Faucet", function () {
   const ethWallet = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 
   /** @type {import("web3").default} */
+  //@ts-ignore
   const web3 = new Web3(ethers.config.networks.localhost.url)
   const lumerinInstance = Lumerin(web3, lumerinAddress)
   const faucetInstance = Faucet(web3, faucetAddress)
@@ -66,6 +67,7 @@ describe("Faucet", function () {
 
   it('should allow when 24 hours elapse', async function(){
     /** @type {import("web3-core").HttpProvider}*/
+    //@ts-ignore
     const provider = web3.currentProvider
     const { timestamp } = await web3.eth.getBlock(await web3.eth.getBlockNumber());
 

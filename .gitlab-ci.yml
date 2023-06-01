@@ -1,6 +1,6 @@
 stages:
-  - test
   - build
+  - test
   - build-test
   - release-bindings
   - deploy-contracts
@@ -37,7 +37,7 @@ variables:
 # Updates the environment url to the etherscan url of the contract
 .deploy_clonefactory_template: &deploy_clonefactory_template
   stage: deploy-contracts
-  needs: ["compile-contracts"]
+  needs: ["test"]
   image: node:14-buster
   when: manual
   artifacts:
@@ -57,6 +57,7 @@ variables:
 
 .deploy_hr_contracts_template: &deploy_hr_contracts_template
   stage: populate-hr-contracts
+  needs: ["test"]
   image: node:14-buster
   when: manual
   environment:
@@ -67,6 +68,7 @@ variables:
 
 .whitelist_clonefactory_template: &whitelist_clonefactory_template
   stage: whitelist-clonefactory
+  needs: ["test"]
   image: node:14-buster
   when: manual
   environment:
@@ -78,7 +80,7 @@ variables:
 
 .deploy_lumerintoken_dev_stg: &deploy_lumerintoken_dev_stg
   stage: deploy-contracts
-  needs: ["compile-contracts"]
+  needs: ["test"]
   image: node:14-buster
   when: manual
   script:
@@ -86,45 +88,6 @@ variables:
     - make deploy-lumerin
     - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp)
     - *set-env
-
-test:
-  environment: test
-  stage: test
-  image: node:14-buster
-  tags:
-    - glrred
-    - bedrock
-    - docker
-    - titanio-dev
-  allow_failure: false
-  only:
-    - branches
-  script:
-    - cd ./Goerli/clonefactory/ && yarn install
-    - make test
-  artifacts:
-    paths:
-      - Goerli/clonefactory/node_modules
-
-build-test:
-  environment: test
-  stage: build-test
-  image: node:14-buster
-  tags:
-    - glrred
-    - bedrock
-    - docker
-    - titanio-dev
-  allow_failure: false
-  needs: ["build-contracts-js"]
-  only:
-    - branches
-  script:
-    - cd ./Goerli/clonefactory/ && yarn install
-    - make test-build
-  artifacts:
-    paths:
-      - Goerli/clonefactory/node_modules
 
 compile-contracts:
   stage: build
@@ -134,7 +97,6 @@ compile-contracts:
     - bedrock
     - docker
     - titanio-dev
-  needs: ["test"]
   environment:
     name: dev
     action: prepare
@@ -176,6 +138,22 @@ build-contracts-js:
     untracked: true
     paths:
       - Goerli/clonefactory/build-js
+
+test:
+  stage: test
+  image: node:14-buster
+  tags:
+    - glrred
+    - bedrock
+    - docker
+    - titanio-dev
+  allow_failure: false
+  needs: ["build-contracts-js", "compile-contracts"]
+  only:
+    - branches
+  script:
+    - cd ./Goerli/clonefactory/ && yarn install
+    - make test
 
 deploy-lumerintoken-dev:
   <<: *deploy_lumerintoken_dev_stg
@@ -367,8 +345,6 @@ release-contracts-js:
     - cp $SSH_KEY_CONTRACTS_JS ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - cd ./Goerli/clonefactory/ && make release-js
-
-
 
 release-contracts-audit:
   stage: release-bindings
