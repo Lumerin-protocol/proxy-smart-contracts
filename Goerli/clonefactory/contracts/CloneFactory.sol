@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./Implementation.sol";
 import "./LumerinToken.sol";
 import "./Common.sol";
-import "hardhat/console.sol";
 
 /// @title CloneFactory
 /// @author Josh Kean (Lumerin)
@@ -93,10 +92,11 @@ contract CloneFactory {
         address contractAddress,
         string memory _cipherText
     ) external {
-        console.log("setPurchaseRentalContract - address: ", contractAddress);
-        console.log("setPurchaseRentalContract - is mapped: ", mappedContracts[contractAddress]);
         require(mappedContracts[contractAddress], "unknown contract address");
-        require(!isContractDead[contractAddress], "cannot purchase a contract marked as dead");
+        require(
+            !isContractDead[contractAddress],
+            "cannot purchase a contract marked as dead"
+        );
         Implementation targetContract = Implementation(contractAddress);
         uint256 _price = targetContract.price();
         uint256 _marketplaceFee = _price / buyerFeeRate;
@@ -104,7 +104,10 @@ contract CloneFactory {
         uint256 requiredAllowance = _price + _marketplaceFee;
         uint256 actualAllowance = lumerin.allowance(msg.sender, address(this));
 
-        require(actualAllowance >= requiredAllowance, "not authorized to spend required funds");
+        require(
+            actualAllowance >= requiredAllowance,
+            "not authorized to spend required funds"
+        );
         bool tokensTransfered = lumerin.transferFrom(
             msg.sender,
             contractAddress,
