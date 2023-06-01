@@ -37,7 +37,7 @@ variables:
 # Updates the environment url to the etherscan url of the contract
 .deploy_clonefactory_template: &deploy_clonefactory_template
   stage: deploy-contracts
-  needs: ["test"]
+  needs: ["compile-contracts", "test"]
   image: node:14-buster
   when: manual
   artifacts:
@@ -57,7 +57,7 @@ variables:
 
 .deploy_hr_contracts_template: &deploy_hr_contracts_template
   stage: populate-hr-contracts
-  needs: ["test"]
+  needs: ["compile-contracts", "test"]
   image: node:14-buster
   when: manual
   environment:
@@ -68,7 +68,7 @@ variables:
 
 .whitelist_clonefactory_template: &whitelist_clonefactory_template
   stage: whitelist-clonefactory
-  needs: ["test"]
+  needs: ["compile-contracts", "test"]
   image: node:14-buster
   when: manual
   environment:
@@ -80,7 +80,7 @@ variables:
 
 .deploy_lumerintoken_dev_stg: &deploy_lumerintoken_dev_stg
   stage: deploy-contracts
-  needs: ["test"]
+  needs: ["compile-contracts", "test"]
   image: node:14-buster
   when: manual
   script:
