@@ -4,7 +4,6 @@ pragma solidity >0.8.0;
 
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "./Escrow.sol";
-import "hardhat/console.sol";
 
 //MyToken is place holder for actual lumerin token, purely for testing purposes
 contract Implementation is Initializable, Escrow {
@@ -20,6 +19,7 @@ contract Implementation is Initializable, Escrow {
     address validator; //validator to be used. Can be set to 0 address if validator not being used
     string public encryptedPoolData; //encrypted data for pool target info
     string public pubKey; //encrypted data for pool target info
+    bool public isDeleted; //used to track if the contract is deleted, separate variable to account for the possibility of a contract being deleted when it is still running
     HistoryEntry[] public history;
 
     enum ContractState {
@@ -69,15 +69,17 @@ contract Implementation is Initializable, Escrow {
         public
         view
         returns (
-            ContractState,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            address,
-            address,
-            string memory
+            ContractState _state,
+            uint256 _price,
+            uint256 _limit,
+            uint256 _speed,
+            uint256 _length,
+            uint256 _startingBlockTimestamp,
+            address _buyer,
+            address _seller,
+            string memory _encryptedPoolData,
+            bool _isDeleted,
+            uint256 _balance
         )
     {
         return (
@@ -89,7 +91,9 @@ contract Implementation is Initializable, Escrow {
             startingBlockTimestamp,
             buyer,
             seller,
-            encryptedPoolData
+            encryptedPoolData,
+            isDeleted,
+            myToken.balanceOf(address(this))
         );
     }
 
@@ -131,12 +135,12 @@ contract Implementation is Initializable, Escrow {
         uint256 marketplaceFeeRate
     ) public {
         require(
-            contractState == ContractState.Available,
-            "contract is not in an available state"
-        );
-        require(
             msg.sender == cloneFactory,
             "this address is not approved to call the purchase function"
+        );
+        require(
+            contractState == ContractState.Available,
+            "contract is not in an available state"
         );
         encryptedPoolData = _encryptedPoolData;
         buyer = _buyer;
@@ -256,25 +260,22 @@ contract Implementation is Initializable, Escrow {
             }
             setContractVariableUpdate();
             emit contractClosed(buyer);
-        } else if (closeOutType == 4) {
-            require(
-                block.timestamp - startingBlockTimestamp >= length,
-                "the contract has yet to be carried to term"
-            );
-            require(
-                msg.sender == cloneFactory,
-                "only the clonefactory can call this method"
-            );
-            history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
-            withdrawFunds(myToken.balanceOf(address(this)), 0);
-
         } else {
-            require(
-                closeOutType < 5,
-                "you must make a selection from 0 to 4"
-            );
+            revert("you must make a selection from 0 to 3");
         }
     }
 
+    function setContractDeleted(bool _isDeleted) public {
+        require(
+            msg.sender == cloneFactory,
+            "this address is not approved to call this function"
+        );
 
+        require(
+            isDeleted != _isDeleted,
+            "contract delete state is already set to this value"
+        );
+        
+        isDeleted = _isDeleted;
+    }
 }
