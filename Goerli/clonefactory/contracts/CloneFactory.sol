@@ -89,12 +89,12 @@ contract CloneFactory {
     //function to purchase a hashrate contract
     //requires the clonefactory to be able to spend tokens on behalf of the purchaser
     function setPurchaseRentalContract(
-        address contractAddress,
+        address _contractAddress,
         string memory _cipherText
     ) external {
         // TODO: add a test case so any third-party implementations will be discarded
-        require(rentalContractsMap[contractAddress], "unknown contract address");
-        Implementation targetContract = Implementation(contractAddress);
+        require(rentalContractsMap[_contractAddress], "unknown contract address");
+        Implementation targetContract = Implementation(_contractAddress);
         require(targetContract.isDeleted() == false, "cannot purchase deleted contract");
         require(
             targetContract.seller() != msg.sender,
@@ -109,7 +109,7 @@ contract CloneFactory {
         require(actualAllowance >= requiredAllowance, "not authorized to spend required funds");
         bool tokensTransfered = lumerin.transferFrom(
             msg.sender,
-            contractAddress,
+            _contractAddress,
             _price
         );
 
@@ -129,7 +129,7 @@ contract CloneFactory {
             sellerFeeRate
         );
 
-        emit clonefactoryContractPurchased(contractAddress);
+        emit clonefactoryContractPurchased(_contractAddress);
     }
 
     function getContractList() external view returns (address[] memory) {
@@ -173,7 +173,7 @@ contract CloneFactory {
     }
 
     function setContractDeleted(address _contractAddress, bool _isDeleted) public {
-        require(rentalContractsMap[contractAddress], "unknown contract address");
+        require(rentalContractsMap[_contractAddress], "unknown contract address");
         Implementation _contract = Implementation(_contractAddress);
         require(msg.sender == _contract.seller() || msg.sender == owner, "you are not authorized");
         Implementation(_contractAddress).setContractDeleted(_isDeleted);
