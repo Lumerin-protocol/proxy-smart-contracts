@@ -51,14 +51,18 @@ describe("Contract delete", function () {
   })
 
   it("should add history entry on good closeout", async function(){
-    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({from: buyer})
+    const receipt = await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({from: buyer})
+    const { timestamp: purchaseTime } = await web3.eth.getBlock(receipt.blockNumber);
+
     await AdvanceBlockTime(web3, 3600)
     const impl = Implementation(web3, hrContractAddr)
     await impl.methods.setContractCloseOut("3").send({from: buyer})
+    
     const data = await impl.methods.getHistory("0", "100").call()
+    const entry = data.find(entry => entry._purchaseTime == purchaseTime)
 
-    expect(data.length).equal(2)
-    expect(data[1]?._goodCloseout).equal(true)
+    expect(entry).not.undefined
+    expect(entry?._goodCloseout).equal(true)
   })
 
   it("should verify other fields", async function(){
@@ -69,16 +73,16 @@ describe("Contract delete", function () {
     const receipt2 = await impl.methods.setContractCloseOut("0").send({from: buyer})
     const { timestamp: endTime } = await web3.eth.getBlock(receipt2.blockNumber);
     const data = await impl.methods.getHistory("0", "100").call()
-
-    expect(data.length).equal(3)
-
-    const entry = data[2]
-    expect(entry._purchaseTime).equal(String(purchaseTime))
-    expect(entry._endTime).equal(String(endTime))
-    expect(entry._price).equal(price) 
-    expect(entry._speed).equal(speed)
-    expect(entry._length).equal(length)
-    expect(entry._buyer).equal(buyer)
+    
+    const entry = data.find(entry => entry._purchaseTime == purchaseTime)
+    
+    expect(entry).not.undefined
+    expect(entry?._purchaseTime).equal(String(purchaseTime))
+    expect(entry?._endTime).equal(String(endTime))
+    expect(entry?._price).equal(price) 
+    expect(entry?._speed).equal(speed)
+    expect(entry?._length).equal(length)
+    expect(entry?._buyer).equal(buyer)
   })
 
   it("should paginate history: limit less than total number of elements", async function(){

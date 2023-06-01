@@ -4,6 +4,7 @@ pragma solidity >0.8.0;
 
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "./Escrow.sol";
+import "hardhat/console.sol";
 
 //MyToken is place holder for actual lumerin token, purely for testing purposes
 contract Implementation is Initializable, Escrow {
@@ -96,13 +97,14 @@ contract Implementation is Initializable, Escrow {
         if (_offset > history.length) {
             _offset = history.length;
         }
-        if (_limit > history.length - _offset) {
+        if (_offset + _limit > history.length) {
             _limit = history.length - _offset;
-        } 
-
+        }
+         
         HistoryEntry[] memory values = new HistoryEntry[](_limit);
         for (uint256 i = 0; i < _limit; i++) {
-            values[i] = history[_offset + i];
+            // return values in reverse historical for displaying purposes
+            values[i] = history[history.length - 1 - _offset - i];
         }
 
         return values;
