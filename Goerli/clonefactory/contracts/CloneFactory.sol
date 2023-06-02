@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./Implementation.sol";
 import "./LumerinToken.sol";
-import "./Common.sol";
 
 /// @title CloneFactory
 /// @author Josh Kean (Lumerin)
@@ -25,15 +24,15 @@ contract CloneFactory {
     uint256 public buyerFeeRate; //fee to be paid to the marketplace
     uint256 public sellerFeeRate; //fee to be paid to the marketplace
     bool public noMoreWhitelist;
-    mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
-    mapping(address => bool) public isContractDead; // keeps track of contracts that are no longer valid
-    mapping(address => bool) mappedContracts;
+
+    mapping(address => bool) rentalContractsMap; //mapping of rental contracts to verify cheaply if implementation was created by this clonefactory
+    mapping(address => bool) whitelist; //whitelisting of seller addresses
     Lumerin lumerin;
 
     constructor(address _lmn, address _validator) {
         Implementation _imp = new Implementation();
         baseImplementation = address(_imp);
-        lmnDeploy = _lmn; //deployed address of lumeirn token
+        lmnDeploy = _lmn; //deployed address of lumerin token
         validator = _validator;
         lumerin = Lumerin(_lmn);
         owner = msg.sender;
@@ -45,6 +44,7 @@ contract CloneFactory {
 
     event contractCreated(address indexed _address, string _pubkey); //emitted whenever a contract is created
     event clonefactoryContractPurchased(address indexed _address); //emitted whenever a contract is purchased
+    event contractDeleteUpdated(address _address, bool _isDeleted); //emitted whenever a contract is deleted/restored
 
     modifier onlyOwner() {
         require(msg.sender == owner, "you are not authorized");
@@ -81,7 +81,7 @@ contract CloneFactory {
             _pubKey
         );
         rentalContracts.push(_newContract); //add clone to list of contracts
-        mappedContracts[_newContract] = true;
+        rentalContractsMap[_newContract] = true; //add clone to mapping of contracts
         emit contractCreated(_newContract, _pubKey); //broadcasts a new contract and the pubkey to use for encryption
         return _newContract;
     }
@@ -89,15 +89,17 @@ contract CloneFactory {
     //function to purchase a hashrate contract
     //requires the clonefactory to be able to spend tokens on behalf of the purchaser
     function setPurchaseRentalContract(
-        address contractAddress,
+        address _contractAddress,
         string memory _cipherText
     ) external {
-        require(mappedContracts[contractAddress], "unknown contract address");
+        // TODO: add a test case so any third-party implementations will be discarded
+        require(rentalContractsMap[_contractAddress], "unknown contract address");
+        Implementation targetContract = Implementation(_contractAddress);
+        require(targetContract.isDeleted() == false, "cannot purchase deleted contract");
         require(
-            !isContractDead[contractAddress],
-            "cannot purchase a contract marked as dead"
+            targetContract.seller() != msg.sender,
+            "cannot purchase your own contract"
         );
-        Implementation targetContract = Implementation(contractAddress);
         uint256 _price = targetContract.price();
         uint256 _marketplaceFee = _price / buyerFeeRate;
 
@@ -110,7 +112,7 @@ contract CloneFactory {
         );
         bool tokensTransfered = lumerin.transferFrom(
             msg.sender,
-            contractAddress,
+            _contractAddress,
             _price
         );
 
@@ -130,7 +132,7 @@ contract CloneFactory {
             sellerFeeRate
         );
 
-        emit clonefactoryContractPurchased(contractAddress);
+        emit clonefactoryContractPurchased(_contractAddress);
     }
 
     function getContractList() external view returns (address[] memory) {
@@ -173,17 +175,12 @@ contract CloneFactory {
         marketPlaceFeeRecipient = _newRecipient;
     }
 
-    function setContractAsDead(address _contract, bool closeout) public {
-        require(mappedContracts[_contract], "unknown contract address");
-        Implementation _tempContract = Implementation(_contract);
-        require(
-            msg.sender == owner || msg.sender == _tempContract.seller(),
-            "you arent approved to mark this contract as dead"
-        );
-        isContractDead[_contract] = true;
-        if (closeout) {
-            _tempContract.setContractCloseOut(4);
-        }
+    function setContractDeleted(address _contractAddress, bool _isDeleted) public {
+        require(rentalContractsMap[_contractAddress], "unknown contract address");
+        Implementation _contract = Implementation(_contractAddress);
+        require(msg.sender == _contract.seller() || msg.sender == owner, "you are not authorized");
+        Implementation(_contractAddress).setContractDeleted(_isDeleted);
+        emit contractDeleteUpdated(_contractAddress, _isDeleted);
     }
 
     // for test purposes, this allows us to configure our test environment so the ABI's can be matched with the Implementation contract source.

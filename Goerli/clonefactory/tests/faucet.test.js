@@ -2,8 +2,8 @@
 const { expect } = require("chai");
 const hardhat = require("hardhat");
 const Web3 = require("web3");
-const { Faucet, Lumerin } = require("../build-js/dist");
-const { RandomEthAddress, RandomIPAddress, ToString } = require("./utils");
+const { Faucet, Lumerin } = require("../build-js/dist")
+const { RandomEthAddress, RandomIPAddress, ToString, AdvanceBlockTime } = require('./utils')
 
 describe("Faucet", function () {
   const lumerinAddress = "0x5fbdb2315678afecb367f032d93f642f64180aa3";
@@ -73,24 +73,8 @@ describe("Faucet", function () {
       .send({ from });
   });
 
-  it("should allow when 24 hours elapse", async function () {
-    /** @type {import("web3-core").HttpProvider}*/
-    const provider = web3.currentProvider;
-    const { timestamp } = await web3.eth.getBlock(
-      await web3.eth.getBlockNumber()
-    );
-
-    await new Promise((resolve, reject) => {
-      provider.send(
-        {
-          method: "evm_mine",
-          params: [Number(timestamp) + 32 * 3600],
-          jsonrpc: "2.0",
-          id: new Date().getTime(),
-        },
-        (err, data) => (err ? reject(err) : resolve(data))
-      );
-    });
+  it('should allow when 24 hours elapse', async function(){
+    await AdvanceBlockTime(web3, 32*3600)
 
     await faucetInstance.methods
       .supervisedClaim(claiment, ipAddress)
