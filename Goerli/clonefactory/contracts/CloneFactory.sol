@@ -106,7 +106,10 @@ contract CloneFactory {
         uint256 requiredAllowance = _price + _marketplaceFee;
         uint256 actualAllowance = lumerin.allowance(msg.sender, address(this));
 
-        require(actualAllowance >= requiredAllowance, "not authorized to spend required funds");
+        require(
+            actualAllowance >= requiredAllowance,
+            "not authorized to spend required funds"
+        );
         bool tokensTransfered = lumerin.transferFrom(
             msg.sender,
             _contractAddress,

@@ -140,6 +140,7 @@ build-contracts-js:
       - Goerli/clonefactory/build-js
 
 test:
+  environment: test
   stage: test
   image: node:14-buster
   tags:
