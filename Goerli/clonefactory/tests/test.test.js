@@ -220,21 +220,15 @@ describe("marketplace", function () {
       let contractRunDuration =
         (await testContract.methods.length().call()) / 2;
 
-      const assertContractWithdawal = (
+      const assertContractWithdawalWithBalance = (
         contractCompletionRatio,
         contractPrice,
         contractBalanceAfterCloseout,
         contractBalanceAfterPurchase
       ) => {
-        const expectedBuyerPayout = contractPrice - (contractCompletionRatio * contractPrice);
+        expect(contractBalanceAfterCloseout).not.to.be.equal(0);
 
-        const buyerPayoutDiff =
-          expectedBuyerPayout -
-          (contractBalanceAfterPurchase - contractBalanceAfterCloseout);
-        const payoutPercentError =
-          (buyerPayoutDiff / expectedBuyerPayout) * 100;
-
-        expect(payoutPercentError).to.be.lessThan(1);
+        assertContractWithdawal(contractCompletionRatio, contractPrice, contractBalanceAfterCloseout, contractBalanceAfterPurchase);
       };
 
       const results = await testCloseout(
@@ -244,7 +238,7 @@ describe("marketplace", function () {
         withoutPOE,
         assertBuyerPayout,
         Function(),
-        assertContractWithdawal,
+        assertContractWithdawalWithBalance,
         assertHashrateContractState,
         withoutPOE
       );
