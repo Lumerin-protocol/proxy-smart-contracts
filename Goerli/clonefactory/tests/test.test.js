@@ -226,7 +226,7 @@ describe("marketplace", function () {
         contractBalanceAfterCloseout,
         contractBalanceAfterPurchase
       ) => {
-        const expectedBuyerPayout = contractCompletionRatio * contractPrice;
+        const expectedBuyerPayout = contractPrice - (contractCompletionRatio * contractPrice);
 
         const buyerPayoutDiff =
           expectedBuyerPayout -
