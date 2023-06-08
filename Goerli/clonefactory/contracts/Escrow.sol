@@ -48,11 +48,13 @@ contract Escrow is ReentrancyGuard {
         uint256 _seller,
         uint256 _buyer
     ) internal nonReentrant {
-        
-        uint256 fee = calculateFee(_seller);
-        myToken.transfer(marketPlaceFeeRecipient, fee);
+        if (_seller != 0) {
+            uint256 fee = calculateFee(_seller);
+            myToken.transfer(marketPlaceFeeRecipient, fee);
 
-        myToken.transfer(escrow_seller, _seller - fee);
+            myToken.transfer(escrow_seller, _seller - fee);
+        }
+
         if (_buyer != 0) {
             myToken.transfer(escrow_purchaser, _buyer);
         }
