@@ -226,7 +226,10 @@ describe("marketplace", function () {
         contractBalanceAfterCloseout,
         contractBalanceAfterPurchase
       ) => {
-        expect(contractBalanceAfterCloseout).to.be(contractBalanceAfterPurchase + (contractPrice * contractCompletionRatio));
+        const expectedPayout =
+          contractPrice - contractCompletionRatio * contractPrice;
+
+        expect(contractBalanceAfterCloseout).to.be.equal(contractBalanceAfterPurchase - expectedPayout);
       };
 
       const results = await testCloseout(
@@ -436,10 +439,10 @@ describe("marketplace", function () {
     ) {
       if (contractBalanceAfterCloseout != 0) {
         const expectedPayout =
-          contractPrice - contractCompletionRatio * contractPrice;
+          contractPrice - contractCompletionRatio * contractPrice; // 5 lmr
         const buyerPayoutDiff =
-          expectedPayout -
-          (contractBalanceAfterPurchase - contractBalanceAfterCloseout);
+          expectedPayout - 
+          (contractBalanceAfterPurchase - contractBalanceAfterCloseout); // 5 lmr - (10lmr - 5 lmr)
         const payoutPercentError = (buyerPayoutDiff / expectedPayout) * 100;
 
         if (expectedPayout > 0) {
