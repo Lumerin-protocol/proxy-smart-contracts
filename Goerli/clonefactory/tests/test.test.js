@@ -18,12 +18,14 @@ describe("marketplace", function () {
   let web3 = new Web3(config.networks.localhost.url);
 
   before(async function () {
-    [seller, withPOE, withoutPOE] =
-      await ethers.getSigners();
+    [seller, withPOE, withoutPOE] = await ethers.getSigners();
 
-    process.env.CLONE_FACTORY_ADDRESS = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
-    process.env.LUMERIN_TOKEN_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
-    process.env.VALIDATOR_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+    process.env.CLONE_FACTORY_ADDRESS =
+      "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
+    process.env.LUMERIN_TOKEN_ADDRESS =
+      "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+    process.env.VALIDATOR_ADDRESS =
+      "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
     console.log({
       CLONE_FACTORY_ADDRESS: process.env.CLONE_FACTORY_ADDRESS,
@@ -83,10 +85,7 @@ describe("marketplace", function () {
 
     let contracts = await cloneFactory.methods.getContractList().call();
 
-    testContract = Implementation(
-      web3,
-      contracts[0]
-    );
+    testContract = Implementation(web3, contracts[0]);
 
     initialTestContractBalance = Number(
       await lumerin.methods.balanceOf(testContract.options.address)
@@ -217,9 +216,20 @@ describe("marketplace", function () {
       // console.log(results);
     });
 
-    it("should close out and distribute funds approx. 50/50", async function () {
+    it("should close out and distribute funds approx. 50/50 (buyer balance and contract balance)", async function () {
       let contractRunDuration =
         (await testContract.methods.length().call()) / 2;
+
+      const assertContractWithdawalWithBalance = (
+        contractCompletionRatio,
+        contractPrice,
+        contractBalanceAfterCloseout,
+        contractBalanceAfterPurchase
+      ) => {
+        expect(contractBalanceAfterCloseout).not.to.be.equal(0);
+
+        assertContractWithdawal(contractCompletionRatio, contractPrice, contractBalanceAfterCloseout, contractBalanceAfterPurchase);
+      };
 
       const results = await testCloseout(
         0,
@@ -227,8 +237,8 @@ describe("marketplace", function () {
         withPOE,
         withoutPOE,
         assertBuyerPayout,
-        assertSellerPayout,
-        assertContractWithdawal,
+        Function(),
+        assertContractWithdawalWithBalance,
         assertHashrateContractState,
         withoutPOE
       );
@@ -295,7 +305,7 @@ describe("marketplace", function () {
 
       //wait for the contract to emit "contractClosed" event
       let closedEvents = await testContract.getPastEvents("contractClosed");
-      
+
       if (closeoutType != 1) {
         expect(closedEvents.length).to.be.greaterThanOrEqual(1);
       } else {
@@ -500,7 +510,6 @@ describe("marketplace", function () {
       sellerBalanceAfterCloseout,
       sellerBalance
     ) {
-
       const expectedSellerPayoutWithoutFee =
         contractCompletionRatio * contractPrice;
 
@@ -526,9 +535,8 @@ describe("marketplace", function () {
     closeoutType = 3,
     delay
   ) {
-    
     delay = delay || (await contractInstance.methods.length().call());
-    
+
     // wait for contract to expire
     await time.increase(Number(delay) + 60);
 
@@ -541,7 +549,7 @@ describe("marketplace", function () {
 
   async function tryIncreaseAllowanceForContract(contract1, owner) {
     let state = await contract1.methods.contractState().call();
-    
+
     if (state == 0) {
       let price = BigInt(await contract1.methods.price().call());
       let requiredAmount = price + price / BigInt(100);
@@ -573,7 +581,7 @@ describe("marketplace", function () {
 
     if (!contract) {
       let contracts = await cloneFactory.methods.getContractList().call();
-      
+
       // find a contract that is in state 0
       for (let i = 0; i < contracts.length; i++) {
         if (contractNumber == count) {
@@ -586,9 +594,9 @@ describe("marketplace", function () {
           contractAddress,
           contractNumber
         ));
-        
+
         await purchaseContract(contract, buyer);
-        
+
         results[contract.address] = contract;
       }
     } else {
@@ -600,15 +608,14 @@ describe("marketplace", function () {
   }
 
   async function purchaseContract(contract, buyer) {
-
     let shouldNotClose = await tryIncreaseAllowanceForContract(contract, buyer);
-    
+
     if (!shouldNotClose) {
       await closeContract(contract, buyer);
-      
+
       await tryIncreaseAllowanceForContract(contract, buyer);
     }
-    
+
     let purchaseContract = await cloneFactory.methods
       .setPurchaseRentalContract(contract.options.address, "123")
       .send({ from: buyer.address });

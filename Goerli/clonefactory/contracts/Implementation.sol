@@ -229,7 +229,7 @@ contract Implementation is Initializable, Escrow {
             
             uint256 buyerPayout = buyerPayoutCalc();
 
-            withdrawFunds(price - buyerPayout, buyerPayout);
+            withdrawFunds(0, buyerPayout);
 
             bool comp = block.timestamp - startingBlockTimestamp >= length;
             
