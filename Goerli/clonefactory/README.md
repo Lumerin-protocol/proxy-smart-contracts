@@ -1,18 +1,31 @@
-# Basic Sample Hardhat Project
+# Smart contracts
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts.
+### Smart contract development
 
-Try running some of the following tasks:
+### How to run tests
 
-```shell
-npx hardhat accounts
-npx hardhat compile
-npx hardhat clean
-npx hardhat test
-npx hardhat node
-node scripts/sample-script.js
-npx hardhat help
-```
+### How to deploy contracts
+#### Common first steps
+1. Copy `.env.example`  to  `.env` file providing required variables (if known, it refers to contract addresses) 
+2. Run `yarn` to install dependencies
+3. Run `make compile` to compile smart contracts
+4. Check `hardhat.config.js` to ensure deployment target is configured correctly. You can deploy to any of the configured networks by replacing `--network sepolia` to the alias of target network
 
+#### Deploy Lumerin token
+1. Deploy LMR with `yarn hardhat run --network sepolia ./scripts/deploy-lumerin.js`. Lumerin address will be displayed in the console.
 
-proof of work on gorelli is 0xe8bb848CC4ad094Ee1De2689D416B783c1294246
+#### Deploy Clonefactory
+1. Update `.env` with relevant Lumerin token address. 
+2. Run `yarn hardhat run --network sepolia ./scripts/deploy-clonefactory.js`
+3. Clonefactory address will be displayed in the console.
+
+#### Deploy hashrate contracts
+1. Update `.env` with relevant Clonefactory address
+2. To allow some user to create contracts we need to whitelist his address. Update `CLONE_FACTORY_WHITELIST_ADDRESSES=` with json array of addresses to be whitelisted.
+3. Run `yarn hardhat run --network sepolia ./scripts/whitelist-clonefactory.js`
+4. To deploy sample contracts run `yarn hardhat run --network sepolia ./scripts/populate-contracts.js`
+
+#### Deploy faucet
+1. Update `.env` with relevant Lumerin token address. 
+2. Run `yarn hardhat run --network sepolia ./scripts/deploy-faucet.js`
+
