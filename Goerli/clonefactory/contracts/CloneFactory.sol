@@ -47,7 +47,7 @@ contract CloneFactory {
     event contractDeleteUpdated(address _address, bool _isDeleted); //emitted whenever a contract is deleted/restored
 
     modifier onlyOwner() {
-        require(msg.sender, "you are not authorized");
+        require(msg.sender == owner, "you are not authorized");
         _;
     }
 
