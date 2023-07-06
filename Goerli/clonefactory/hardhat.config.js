@@ -37,11 +37,6 @@ module.exports = {
       gas: "auto",
     },
   },
-  etherscan: {
-    apiKey: {
-      ropsten: process.env.ETHERSCAN_API_KEY,
-    },
-  },
   abiExporter: {
     path: "./abi",
     runOnCompile: true,
