@@ -51,7 +51,7 @@ contract Implementation is Initializable, Escrow {
         address _lmn,
         address _cloneFactory, //used to restrict purchasing power to only the clonefactory
         address _validator,
-        string calldata _pubKey
+        string memory _pubKey
     ) public initializer {
         price = _price;
         limit = _limit;
