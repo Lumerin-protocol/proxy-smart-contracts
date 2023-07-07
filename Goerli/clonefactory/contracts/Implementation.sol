@@ -51,7 +51,7 @@ contract Implementation is Initializable, Escrow {
         address _lmn,
         address _cloneFactory, //used to restrict purchasing power to only the clonefactory
         address _validator,
-        string memory _pubKey
+        string calldata _pubKey
     ) public initializer {
         price = _price;
         limit = _limit;
@@ -129,7 +129,7 @@ contract Implementation is Initializable, Escrow {
 
     //function that the clone factory calls to purchase the contract
     function setPurchaseContract(
-        string memory _encryptedPoolData,
+        string calldata _encryptedPoolData,
         address _buyer,
         address marketPlaceFeeRecipient, 
         uint256 marketplaceFeeRate
@@ -152,7 +152,7 @@ contract Implementation is Initializable, Escrow {
 
     //allows the buyers to update their mining pool information
     //during the lifecycle of the contract
-    function setUpdateMiningInformation(string memory _newEncryptedPoolData)
+    function setUpdateMiningInformation(string calldata _newEncryptedPoolData)
         external
     {
         require(
