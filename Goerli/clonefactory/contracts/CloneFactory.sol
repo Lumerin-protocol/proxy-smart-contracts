@@ -53,7 +53,7 @@ contract CloneFactory {
 
     modifier onlyInWhitelist() {
         require(
-            whitelist[msg.sender] == true || noMoreWhitelist == true,
+            whitelist[msg.sender] || noMoreWhitelist,
             "you are not an approved seller on this marketplace"
         );
         _;
@@ -66,7 +66,7 @@ contract CloneFactory {
         uint256 _speed,
         uint256 _length,
         address _validator,
-        string memory _pubKey
+        string calldata _pubKey
     ) external onlyInWhitelist returns (address) {
         address _newContract = Clones.clone(baseImplementation);
         Implementation(_newContract).initialize(
@@ -90,7 +90,7 @@ contract CloneFactory {
     //requires the clonefactory to be able to spend tokens on behalf of the purchaser
     function setPurchaseRentalContract(
         address _contractAddress,
-        string memory _cipherText
+        string calldata _cipherText
     ) external {
         // TODO: add a test case so any third-party implementations will be discarded
         require(rentalContractsMap[_contractAddress], "unknown contract address");
@@ -151,7 +151,7 @@ contract CloneFactory {
     }
 
     function checkWhitelist(address _address) external view returns (bool) {
-        if (noMoreWhitelist == true) {
+        if (noMoreWhitelist) {
             return true;
         }
         return whitelist[_address];
