@@ -47,13 +47,13 @@ contract CloneFactory {
     event contractDeleteUpdated(address _address, bool _isDeleted); //emitted whenever a contract is deleted/restored
 
     modifier onlyOwner() {
-        require(msg.sender, "you are not authorized");
+        require(msg.sender == owner, "you are not authorized");
         _;
     }
 
     modifier onlyInWhitelist() {
         require(
-            whitelist[msg.sender] || noMoreWhitelist,
+            whitelist[msg.sender] == true || noMoreWhitelist == true,
             "you are not an approved seller on this marketplace"
         );
         _;
@@ -66,7 +66,7 @@ contract CloneFactory {
         uint256 _speed,
         uint256 _length,
         address _validator,
-        string calldata _pubKey
+        string memory _pubKey
     ) external onlyInWhitelist returns (address) {
         address _newContract = Clones.clone(baseImplementation);
         Implementation(_newContract).initialize(
@@ -90,12 +90,12 @@ contract CloneFactory {
     //requires the clonefactory to be able to spend tokens on behalf of the purchaser
     function setPurchaseRentalContract(
         address _contractAddress,
-        string calldata _cipherText
+        string memory _cipherText
     ) external {
         // TODO: add a test case so any third-party implementations will be discarded
         require(rentalContractsMap[_contractAddress], "unknown contract address");
         Implementation targetContract = Implementation(_contractAddress);
-        require(targetContract.isDeleted(), "cannot purchase deleted contract");
+        require(targetContract.isDeleted() == false, "cannot purchase deleted contract");
         require(
             targetContract.seller() != msg.sender,
             "cannot purchase your own contract"
@@ -151,7 +151,7 @@ contract CloneFactory {
     }
 
     function checkWhitelist(address _address) external view returns (bool) {
-        if (noMoreWhitelist) {
+        if (noMoreWhitelist == true) {
             return true;
         }
         return whitelist[_address];

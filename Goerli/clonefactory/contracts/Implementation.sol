@@ -129,7 +129,7 @@ contract Implementation is Initializable, Escrow {
 
     //function that the clone factory calls to purchase the contract
     function setPurchaseContract(
-        string calldata _encryptedPoolData,
+        string memory _encryptedPoolData,
         address _buyer,
         address marketPlaceFeeRecipient, 
         uint256 marketplaceFeeRate
@@ -152,7 +152,7 @@ contract Implementation is Initializable, Escrow {
 
     //allows the buyers to update their mining pool information
     //during the lifecycle of the contract
-    function setUpdateMiningInformation(string calldata _newEncryptedPoolData)
+    function setUpdateMiningInformation(string memory _newEncryptedPoolData)
         external
     {
         require(
