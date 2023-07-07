@@ -3,22 +3,18 @@ pragma solidity >=0.8.0;
 import "./LumerinToken.sol";
 
 contract Faucet {
-    /*
-       this is a token faucet
-       it allows people to claim tokens in a controlled manner
-       */
       address owner;
       uint public dayDuration;
       uint public startOfDay;
       uint public distributedTodayLmr;
       uint public dailyLimitLmr;
-      uint public lmrAmount;
-      uint public ethAmount;
+      uint public lmrPayout;
+      uint public ethPayout;
       mapping(address => uint) lastClaimed;
       mapping(string => uint) lastClaimedIP;
       Lumerin lumerin;
 
-      constructor(address _lmr, uint _dailyLimitLmr, uint _lmrAmount, uint _ethAmount) payable {
+      constructor(address _lmr, uint _dailyLimitLmr, uint _lmrPayout, uint _ethPayout) payable {
           owner = payable(msg.sender);
           startOfDay = block.timestamp;
           dayDuration = 24*60*60;
@@ -26,8 +22,8 @@ contract Faucet {
           lumerin = Lumerin(_lmr);
           distributedTodayLmr = 0;
           dailyLimitLmr = _dailyLimitLmr;
-          lmrAmount = _lmrAmount;
-          ethAmount = _ethAmount;
+          lmrPayout = _lmrPayout;
+          ethPayout = _ethPayout;
       }
 
       modifier onlyOwner {
@@ -48,11 +44,11 @@ contract Faucet {
 
           lastClaimed[_claiment] = block.timestamp;
           lastClaimedIP[_ipAddress] = block.timestamp;
-          distributedTodayLmr = distributedTodayLmr + lmrAmount;
+          distributedTodayLmr = distributedTodayLmr + lmrPayout;
           refreshDailyLimitLmr();
 
-          lumerin.transfer(_claiment, lmrAmount);
-          payable(_claiment).transfer(ethAmount); //sends amount in wei to recipient
+          lumerin.transfer(_claiment, lmrPayout);
+          payable(_claiment).transfer(ethPayout); //sends amount in wei to recipient
       }
 
       function refreshDailyLimitLmr() internal {
@@ -62,12 +58,12 @@ contract Faucet {
         }
       }
 
-      function setUpdateEthAmount(uint _ethAmount) public onlyOwner {
-          ethAmount = _ethAmount;
+      function setUpdateEthPayout(uint _ethPayout) public onlyOwner {
+          ethPayout = _ethPayout;
       }
 
-      function setUpdateLmrAmount(uint _lmrAmount) public onlyOwner {
-          lmrAmount = _lmrAmount;
+      function setUpdateLmrPayout(uint _lmrPayout) public onlyOwner {
+          lmrPayout = _lmrPayout;
       }
 
       function setUpdateDailyLimitLmr(uint _dailyLimitLmr) public onlyOwner {

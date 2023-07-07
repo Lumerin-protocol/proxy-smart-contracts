@@ -42,8 +42,8 @@ describe("Faucet", function () {
     );
     const claimentETHBalance = Number(await web3.eth.getBalance(claiment));
 
-     expect(claimentLMNBalance).equals(Number(process.env.FAUCET_LMR_AMOUNT))
-     expect(claimentETHBalance).equals(Number(process.env.FAUCET_ETH_AMOUNT))
+     expect(claimentLMNBalance).equals(Number(process.env.FAUCET_LMR_PAYOUT))
+     expect(claimentETHBalance).equals(Number(process.env.FAUCET_ETH_PAYOUT))
    })
 
   it("should disallow for the same eth address within 24 hours", async function () {

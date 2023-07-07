@@ -18,8 +18,8 @@ async function main() {
   const faucet = await Faucet.deploy(
     process.env.LUMERIN_TOKEN_ADDRESS,
     process.env.FAUCET_DAILY_LIMIT_LMR,
-    process.env.FAUCET_LMR_AMOUNT,
-    process.env.FAUCET_ETH_AMOUNT,
+    process.env.FAUCET_LMR_PAYOUT,
+    process.env.FAUCET_ETH_PAYOUT,
   );
   await faucet.deployed();
 
