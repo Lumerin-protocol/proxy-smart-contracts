@@ -47,7 +47,7 @@ contract CloneFactory {
     event contractDeleteUpdated(address _address, bool _isDeleted); //emitted whenever a contract is deleted/restored
 
     modifier onlyOwner() {
-        require(msg.sender, "you are not authorized");
+        require(msg.sender == owner, "you are not authorized");
         _;
     }
 
@@ -95,7 +95,8 @@ contract CloneFactory {
         // TODO: add a test case so any third-party implementations will be discarded
         require(rentalContractsMap[_contractAddress], "unknown contract address");
         Implementation targetContract = Implementation(_contractAddress);
-        require(targetContract.isDeleted(), "cannot purchase deleted contract");
+        require(
+            !targetContract.isDeleted(), "cannot purchase deleted contract");
         require(
             targetContract.seller() != msg.sender,
             "cannot purchase your own contract"
