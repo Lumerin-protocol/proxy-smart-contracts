@@ -10,6 +10,14 @@ contract Faucet {
       uint public dailyLimitLmr;
       uint public lmrPayout;
       uint public ethPayout;
+
+      // uint public cooldownPeriod;
+      // uint public startOfDay;
+      // uint public dailyLimitCount;
+      // uint public dailyLimitMax;
+      // uint public txAmount;
+      // uint public gethAmount;
+
       mapping(address => uint) lastClaimed;
       mapping(string => uint) lastClaimedIP;
       Lumerin lumerin;
