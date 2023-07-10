@@ -35,6 +35,7 @@ variables:
 
 # Deploys clonefactory to the blockchain using env variables from the corresponding environment
 # Updates the environment url to the etherscan url of the contract
+# TODO: fix hardcoded etherscan url
 .deploy_clonefactory_template: &deploy_clonefactory_template
   stage: deploy-contracts
   needs: ["compile-contracts", "test"]
