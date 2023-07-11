@@ -6,23 +6,27 @@ contract Faucet {
       address owner;
       uint public cooldownPeriod;
       uint public cooldownStartingTime;
-      uint public currentPeriodLMRDistribution;
-      uint public lmrDistributionLimit;
+      uint public currentLMRTokenDistribution;
+      uint public lmrTokenDistributionLimit;
       uint public lmrPayout;
       uint public ethPayout;
+      //    uint public cooldownPeriod;
+      // uint public cooldownStartingTime;
+      // uint public currentPeriodLMRDistribution;
+      // uint public lmrDistributionLimit;
 
       mapping(address => uint) lastClaimed;
       mapping(string => uint) lastClaimedIP;
       Lumerin lumerin;
 
-      constructor(address _lmr, uint _dailyLimitLmr, uint _lmrPayout, uint _ethPayout) payable {
+      constructor(address _lmr, uint _dailyMaxLmr, uint _lmrPayout, uint _ethPayout) payable {
           owner = payable(msg.sender);
           cooldownStartingTime = block.timestamp;
           cooldownPeriod = 24*60*60;
           
           lumerin = Lumerin(_lmr);
-          currentPeriodLMRDistribution = 0;
-          lmrDistributionLimit = _dailyLimitLmr;
+          currentLMRTokenDistribution = 0;
+          lmrTokenDistributionLimit = _dailyMaxLmr;
           lmrPayout = _lmrPayout;
           ethPayout = _ethPayout;
       }
@@ -32,30 +36,30 @@ contract Faucet {
         _;
       }
 
-      modifier dailyLimitLmrModifier {
-        require(currentPeriodLMRDistribution < lmrDistributionLimit, "the daily limit of test lumerin has been distributed");
+      modifier dailyMaxLmrModifier {
+        require(currentLMRTokenDistribution < lmrTokenDistributionLimit, "the daily limit of test lumerin has been distributed");
         _;
       }
 
       receive() external payable {}
 
       //allows the owner of this contract to send tokens to the claiment
-      function supervisedClaim(address _claiment, string calldata _ipAddress) public onlyOwner dailyLimitLmrModifier {
+      function supervisedClaim(address _claiment, string calldata _ipAddress) public onlyOwner dailyMaxLmrModifier {
           require(canClaimTokens(_claiment, _ipAddress), "you need to wait before claiming");
 
           lastClaimed[_claiment] = block.timestamp;
           lastClaimedIP[_ipAddress] = block.timestamp;
-          currentPeriodLMRDistribution = currentPeriodLMRDistribution + lmrPayout;
-          refreshDailyLimitLmr();
+          currentLMRTokenDistribution = currentLMRTokenDistribution + lmrPayout;
+          refreshDailyMaxLmr();
 
           lumerin.transfer(_claiment, lmrPayout);
           payable(_claiment).transfer(ethPayout); //sends amount in wei to recipient
       }
 
-      function refreshDailyLimitLmr() internal {
+      function refreshDailyMaxLmr() internal {
         if (cooldownStartingTime + cooldownPeriod < block.timestamp) {
           cooldownStartingTime = block.timestamp;
-          currentPeriodLMRDistribution = 0;
+          currentLMRTokenDistribution = 0;
         }
       }
 
@@ -67,13 +71,13 @@ contract Faucet {
           lmrPayout = _lmrPayout;
       }
 
-      function setUpdateDailyLimitLmr(uint _dailyLimitLmr) public onlyOwner {
-          lmrDistributionLimit = _dailyLimitLmr;
+      function setUpdatedailyMaxLmr(uint _dailyMaxLmr) public onlyOwner {
+          lmrTokenDistributionLimit = _dailyMaxLmr;
       }
 
       function resetDistributedTodayLmr() public onlyOwner {
           cooldownStartingTime = block.timestamp;
-          currentPeriodLMRDistribution = 0;
+          currentLMRTokenDistribution = 0;
       }
 
       function setUpdateLumerin(address _lmr) public onlyOwner {

@@ -17,7 +17,7 @@ async function main() {
   const Faucet = await ethers.getContractFactory("Faucet");
   const faucet = await Faucet.deploy(
     process.env.LUMERIN_TOKEN_ADDRESS,
-    process.env.FAUCET_DAILY_LIMIT_LMR,
+    process.env.FAUCET_DAILY_MAX_LMR,
     process.env.FAUCET_LMR_PAYOUT,
     process.env.FAUCET_ETH_PAYOUT,
   );
