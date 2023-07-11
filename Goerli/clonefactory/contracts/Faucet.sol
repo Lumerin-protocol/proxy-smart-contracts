@@ -7,7 +7,7 @@ contract Faucet {
       uint public cooldownPeriod;
       uint public cooldownStartingTime;
       uint public currentLMRTokenDistribution;
-      uint public lmrTokenDistributionLimit;
+      uint public lmrTokenDistributionMax;
       uint public lmrPayout;
       uint public ethPayout;
 
@@ -22,7 +22,7 @@ contract Faucet {
           
           lumerin = Lumerin(_lmr);
           currentLMRTokenDistribution = 0;
-          lmrTokenDistributionLimit = _dailyMaxLmr;
+          lmrTokenDistributionMax = _dailyMaxLmr;
           lmrPayout = _lmrPayout;
           ethPayout = _ethPayout;
       }
@@ -33,7 +33,7 @@ contract Faucet {
       }
 
       modifier dailyMaxLmrModifier {
-        require(currentLMRTokenDistribution < lmrTokenDistributionLimit, "the daily limit of test lumerin has been distributed");
+        require(currentLMRTokenDistribution < lmrTokenDistributionMax, "the daily limit of test lumerin has been distributed");
         _;
       }
 
@@ -68,7 +68,7 @@ contract Faucet {
       }
 
       function setUpdatedailyMaxLmr(uint _dailyMaxLmr) public onlyOwner {
-          lmrTokenDistributionLimit = _dailyMaxLmr;
+          lmrTokenDistributionMax = _dailyMaxLmr;
       }
 
       function resetDistributedTodayLmr() public onlyOwner {
