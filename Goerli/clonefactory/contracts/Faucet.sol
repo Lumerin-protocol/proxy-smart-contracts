@@ -10,10 +10,6 @@ contract Faucet {
       uint public lmrTokenDistributionLimit;
       uint public lmrPayout;
       uint public ethPayout;
-      //    uint public cooldownPeriod;
-      // uint public cooldownStartingTime;
-      // uint public currentPeriodLMRDistribution;
-      // uint public lmrDistributionLimit;
 
       mapping(address => uint) lastClaimed;
       mapping(string => uint) lastClaimedIP;
