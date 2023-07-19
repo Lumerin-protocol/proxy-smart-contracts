@@ -180,7 +180,9 @@ describe("marketplace", function () {
     it("should close out and distribute full price to seller minus fees", async function () {
       await testCloseout(
         3,
-        await testContract.methods.length().call(),
+        (
+          await testContract.methods.getTerms().call()
+        )._length,
         withPOE,
         withoutPOE,
         assertBuyerPayout,
@@ -193,7 +195,9 @@ describe("marketplace", function () {
     it("should close out and not distribute funds", async function () {
       await testCloseout(
         2,
-        await testContract.methods.length().call(),
+        (
+          await testContract.methods.getTerms().call()
+        )._length,
         withPOE,
         withoutPOE,
         Function(),
@@ -206,7 +210,7 @@ describe("marketplace", function () {
     it("should not close out and distribute funds approx. 50% to seller", async function () {
       const results = await testCloseout(
         1,
-        (await testContract.methods.length().call()) / 2,
+        (await testContract.methods.getTerms().call())._length / 2,
         seller,
         withoutPOE,
         Function(),
@@ -218,7 +222,7 @@ describe("marketplace", function () {
 
     it("should close out and distribute funds approx. 50/50 (buyer balance and contract balance)", async function () {
       let contractRunDuration =
-        (await testContract.methods.length().call()) / 2;
+        (await testContract.methods.getTerms().call())._length / 2;
 
       const assertContractWithdawalWithBalance = (
         contractCompletionRatio,
@@ -228,7 +232,12 @@ describe("marketplace", function () {
       ) => {
         expect(contractBalanceAfterCloseout).not.to.be.equal(0);
 
-        assertContractWithdawal(contractCompletionRatio, contractPrice, contractBalanceAfterCloseout, contractBalanceAfterPurchase);
+        assertContractWithdawal(
+          contractCompletionRatio,
+          contractPrice,
+          contractBalanceAfterCloseout,
+          contractBalanceAfterPurchase
+        );
       };
 
       const results = await testCloseout(
@@ -256,7 +265,7 @@ describe("marketplace", function () {
       closer = seller
     ) {
       let sellerAddress = seller.address;
-      let contractPrice = Number(await testContract.methods.price().call());
+      let contractPrice = Number((await testContract.methods.getTerms().call())._price);
       let sellerBalance = Number(
         await lumerin.methods.balanceOf(sellerAddress).call()
       );
@@ -327,7 +336,9 @@ describe("marketplace", function () {
 
       // There will be some difference between the expected payout and the actual payout given latency in the transaction
       // For the purposes of this test, pass if the percent difference between expected and actual payout is less than 1%
-      const contractLength = Number(await testContract.methods.length().call());
+      const contractLength = Number(
+        (await testContract.methods.getTerms().call())._length
+      );
 
       const contractCompletionRatio = closeoutAfterSeconds / contractLength;
 
@@ -535,7 +546,7 @@ describe("marketplace", function () {
     closeoutType = 3,
     delay
   ) {
-    delay = delay || (await contractInstance.methods.length().call());
+    delay = delay || (await contractInstance.methods.getTerms().call())._length;
 
     // wait for contract to expire
     await time.increase(Number(delay) + 60);
@@ -551,7 +562,7 @@ describe("marketplace", function () {
     let state = await contract1.methods.contractState().call();
 
     if (state == 0) {
-      let price = BigInt(await contract1.methods.price().call());
+      let price = BigInt((await contract1.methods.getTerms().call())._price);
       let requiredAmount = price + price / BigInt(100);
       // console.log("wallet balance before transfer - ", owner.address, ": ", await lumerin.balanceOf(owner.address));
       // console.log("lumerin allowance before transfer - ", owner.address, ": ", await lumerin.allowance(owner.address, cloneFactory.address));
