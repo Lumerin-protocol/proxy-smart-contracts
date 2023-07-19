@@ -51,9 +51,9 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable {
     ) internal nonReentrant {
         if (_seller != 0) {
             uint256 fee = calculateFee(_seller);
-            myToken.transfer(marketPlaceFeeRecipient, fee);
+            lumerin.transfer(marketPlaceFeeRecipient, fee);
 
-            myToken.transfer(escrow_seller, _seller - fee);
+            lumerin.transfer(escrow_seller, _seller - fee);
         }
 
         if (_buyer != 0) {

@@ -1,14 +1,10 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >0.8.10;
 
-pragma solidity >0.8.0;
-
-import "@openzeppelin/contracts/proxy/Clones.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "./Implementation.sol";
-import "./LumerinToken.sol";
-import "./Common.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import {Implementation} from "./Implementation.sol";
+import {Lumerin} from "./LumerinToken.sol";
 
 /// @title CloneFactory
 /// @author Josh Kean (Lumerin)
@@ -83,7 +79,7 @@ contract CloneFactory is Initializable {
         BeaconProxy beaconProxy = new BeaconProxy(baseImplementation, data);
         address newContractAddr = address(beaconProxy);
         rentalContracts.push(newContractAddr); //add clone to list of contracts
-        rentalContractsMap[_newContract] = true;
+        rentalContractsMap[newContractAddr] = true;
         emit contractCreated(newContractAddr, _pubKey); //broadcasts a new contract and the pubkey to use for encryption
         return newContractAddr;
     }

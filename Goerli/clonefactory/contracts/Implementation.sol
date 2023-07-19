@@ -14,6 +14,8 @@ contract Implementation is Initializable, Escrow {
     uint256 public startingBlockTimestamp; //the timestamp of the block when the contract was purchased
     address public buyer; //address of the current purchaser of the contract
     address public seller; //address of the seller of the contract
+    address public cloneFactory;
+    address public validator;
     string public encryptedPoolData; //encrypted data for pool target info
     string public pubKey; //encrypted data for pool target info
     bool public isDeleted; //used to track if the contract is deleted, separate variable to account for the possibility of a contract being deleted when it is still running
@@ -58,6 +60,7 @@ contract Implementation is Initializable, Escrow {
         cloneFactory = _cloneFactory;
         contractState = ContractState.Available;
         pubKey = _pubKey;
+        validator = _validator;
         Escrow.initialize(_lmrAddress);
     }
 
@@ -88,8 +91,8 @@ contract Implementation is Initializable, Escrow {
             buyer,
             seller,
             encryptedPoolData,
-            lumerin.balanceOf(address(this))
             isDeleted,
+            lumerin.balanceOf(address(this))
         );
     }
 
@@ -214,17 +217,15 @@ contract Implementation is Initializable, Escrow {
         return 0;
     }
 
-    function setContractCloseOut(uint256 closeOutType) public {
+function setContractCloseOut(uint256 closeOutType) public {
         if (closeOutType == 0) {
             //this is a function call to be triggered by the buyer or validator
             //in the event that a contract needs to be canceled early for any reason
             require(
-                msg.sender == buyer,
+                msg.sender == buyer || msg.sender == validator,
                 "this account is not authorized to trigger an early closeout"
             );
             
-            addHistoryEntry(false);
-
             uint256 buyerPayout = buyerPayoutCalc();
 
             withdrawFunds(0, buyerPayout);
@@ -249,9 +250,6 @@ contract Implementation is Initializable, Escrow {
                 block.timestamp - startingBlockTimestamp >= length,
                 "the contract has yet to be carried to term"
             );
-            
-            addHistoryEntry(true);
-            
             if (closeOutType == 3) {
                 withdrawFunds(lumerin.balanceOf(address(this)), 0);
             }
@@ -279,4 +277,11 @@ contract Implementation is Initializable, Escrow {
         
         isDeleted = _isDeleted;
     }
+
+    function setContractVariableUpdate() internal {
+        buyer = seller;
+        encryptedPoolData = "";
+        contractState = ContractState.Available;
+    }
+
 }
