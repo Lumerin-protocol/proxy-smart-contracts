@@ -25,7 +25,7 @@ export CLONE_FACTORY_ADDRESS="$(cat clonefactory-addr.tmp)"
 
 # whitelist clonefactory addresses
 export CONTRACTS_OWNER_PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-# yarn hardhat run --network localhost --config hardhat-base.config.js ./scripts/whitelist-clonefactory.js
+yarn hardhat run --network localhost --config hardhat-base.config.js ./scripts/whitelist-clonefactory.js
 
 # populate contracts
 yarn hardhat run --network localhost --config hardhat-base.config.js ./scripts/populate-contracts.js
