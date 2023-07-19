@@ -45,7 +45,7 @@ contract Implementation is Initializable, Escrow {
 
     event contractPurchased(address indexed _buyer); //make indexed
     event contractClosed(address indexed _buyer);
-    event purchaseInfoUpdated();
+    event purchaseInfoUpdated(address indexed _address);
     event cipherTextUpdated(string newCipherText);
 
     function initialize(
@@ -193,8 +193,8 @@ contract Implementation is Initializable, Escrow {
             newTerms = Terms(_price, _limit, _speed, _length);
         } else {
             terms = Terms(_price, _limit, _speed, _length);
+            emit purchaseInfoUpdated(address(this));
         }
-        emit purchaseInfoUpdated();
     }
 
     function setContractVariableUpdate() internal {
@@ -202,9 +202,10 @@ contract Implementation is Initializable, Escrow {
         encryptedPoolData = "";
         contractState = ContractState.Available;
 
-        if(newTerms._limit != 0 && newTerms._length != 0 && newTerms._price != 0 && newTerms._speed != 0) {
+        if(newTerms._length != 0) {
             terms = Terms(newTerms._price, newTerms._limit, newTerms._speed, newTerms._length);
             newTerms = Terms(0, 0, 0, 0);
+            emit purchaseInfoUpdated(address(this));
         }
     }
 

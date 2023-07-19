@@ -66,7 +66,7 @@ describe("Contract update", function () {
     expect(data._speed).equal('3');
     expect(data._length).equal('4');
 
-    const events = await cf.getPastEvents('purchaseInfoUpdated', {fromBlock: receipt.blockNumber, toBlock: "latest"})
+    const events = await impl.getPastEvents('purchaseInfoUpdated', {fromBlock: receipt.blockNumber, toBlock: "latest"})
     const isEventFound = events.find((e)=>
       e.returnValues._address === hrContractAddr
     )
@@ -75,7 +75,7 @@ describe("Contract update", function () {
   })
 
 
-  it("should update contract and emit event with newTerms update if contract is running", async function(){
+  it("should store newTerms for contract and should not emit update event if contract is running", async function(){
     const price = ToString(2 * 10**8);
     const newPrice = ToString(3 * 10**8);
     await cf.methods.setPurchaseRentalContract(hrContractAddr, '').send({from: buyer});
@@ -95,18 +95,18 @@ describe("Contract update", function () {
     expect(data._length).equal('4');
 
 
-    const events = await cf.getPastEvents('purchaseInfoUpdated', {fromBlock: receipt.blockNumber, toBlock: "latest"})
-    const isEventFound = events.find((e)=>
+    const events = await impl.getPastEvents('purchaseInfoUpdated', {fromBlock: receipt.blockNumber, toBlock: "latest"})
+    const isEventFound = !!events.find((e)=>
       e.returnValues._address === hrContractAddr
     )
 
-    expect(isEventFound).not.undefined
+    expect(isEventFound).to.be.false;
   })
 
-  it("should apply newTerms after contract closed", async function(){
+  it("should apply newTerms after contract closed and emit event", async function(){
     const newPrice = ToString(3 * 10**8);
     const impl = Implementation(web3, hrContractAddr)
-    await impl.methods.setContractCloseOut("0").send({from: buyer})
+    const receipt = await impl.methods.setContractCloseOut("0").send({from: buyer})
 
     const newTerms = await impl.methods.getNewTerms().call()
 
@@ -120,5 +120,12 @@ describe("Contract update", function () {
     expect(data._limit).equal('22');
     expect(data._speed).equal('33');
     expect(data._length).equal('44');
+
+    const events = await impl.getPastEvents('purchaseInfoUpdated', {fromBlock: receipt.blockNumber, toBlock: "latest"})
+    const isEventFound = events.find((e)=>
+      e.returnValues._address === hrContractAddr
+    )
+
+    expect(isEventFound).not.undefined
   })
 })

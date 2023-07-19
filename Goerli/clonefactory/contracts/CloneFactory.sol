@@ -196,7 +196,6 @@ contract CloneFactory {
         Implementation _contract = Implementation(_contractAddress);
         require(msg.sender == _contract.seller(), "you are not authorized");
         Implementation(_contractAddress).setUpdatePurchaseInformation(_price, _limit, _speed, _length);
-        emit purchaseInfoUpdated(_contractAddress);
     }
 
     // for test purposes, this allows us to configure our test environment so the ABI's can be matched with the Implementation contract source.
