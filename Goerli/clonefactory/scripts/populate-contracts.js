@@ -34,8 +34,7 @@ const main = async function () {
       );
 
     const tx = await contractCreate.wait();
-    console.log(tx);
-    console.log(`contract created, tx hash:`, contractCreate.hash);
+    console.log(`contract created, tx hash:`, contractCreate.hash, " gas used: ", tx.gasUsed.toString());
     break
   }
 };

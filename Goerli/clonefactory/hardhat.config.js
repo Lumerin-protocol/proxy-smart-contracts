@@ -45,6 +45,13 @@ module.exports = {
       gasPrice: "auto",
       gas: "auto",
     },
+    arbitrum_goerli:{
+      url: process.env.ETH_NODE_ADDRESS,
+      accounts: [process.env.CONTRACTS_OWNER_PRIVATE_KEY],
+      gasPrice: "auto",
+      gas: "auto",
+      chainId: 421613,
+    }
   },
   etherscan: {
     apiKey: {
