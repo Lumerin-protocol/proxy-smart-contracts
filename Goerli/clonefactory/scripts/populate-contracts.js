@@ -2,7 +2,7 @@
 require("dotenv").config();
 const { buildContractsList } = require("./populate-contracts-lib");
 const { ethers } = require("hardhat");
-const ethereumWallet = require('ethereumjs-wallet').default
+const ethereumWallet = require('ethereumjs-wallet')
 
 const remove0xPrefix = privateKey => privateKey.replace('0x', '');
 
@@ -26,8 +26,8 @@ const main = async function () {
     Buffer.from(remove0xPrefix(process.env.CONTRACTS_OWNER_PRIVATE_KEY), 'hex')
   ).getPublicKey()
 
-  for (let c of variableList) {
-    let contractCreate = await cloneFactory
+  for (const c of variableList) {
+    const contractCreate = await cloneFactory
       .connect(seller)
       .setCreateNewRentalContract(
         c.price,
@@ -41,8 +41,9 @@ const main = async function () {
         }
       );
 
-    await contractCreate.wait();
-    console.log(`contract created, tx hash:`, contractCreate.hash);
+    const tx = await contractCreate.wait();
+    
+    console.log(`contract created, tx hash:`, contractCreate.hash, " gas used: ", tx.gasUsed);
   }
 };
 

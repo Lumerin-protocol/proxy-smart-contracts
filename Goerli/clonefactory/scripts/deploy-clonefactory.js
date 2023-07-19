@@ -17,8 +17,9 @@ async function main() {
     process.env.VALIDATOR_ADDRESS
   );
   await cloneFactory.deployed();
+  const receipt = await ethers.provider.getTransactionReceipt(cloneFactory.deployTransaction.hash);
 
-  console.log("CLONEFACTORY address:", cloneFactory.address);
+  console.log("CLONEFACTORY address:", cloneFactory.address, " gas used: ", receipt.gasUsed);
   fs.writeFileSync("clonefactory-addr.tmp", String(cloneFactory.address));
 }
 main()
