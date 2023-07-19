@@ -17,8 +17,9 @@ async function main() {
   const Faucet = await ethers.getContractFactory("Faucet");
   const faucet = await Faucet.deploy(process.env.LUMERIN_TOKEN_ADDRESS);
   await faucet.deployed();
+  const receipt = await ethers.provider.getTransactionReceipt(faucet.deployTransaction.hash);
 
-  console.log("Faucet address:", faucet.address);
+  console.log("Faucet address:", faucet.address, " gas used: ", receipt.gasUsed);
   fs.writeFileSync("faucet-addr.tmp", String(faucet.address));
 }
 

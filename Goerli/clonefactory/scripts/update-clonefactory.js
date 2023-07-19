@@ -13,15 +13,16 @@ async function main() {
   console.log("CLONE FACTORY address:", process.env.CLONE_FACTORY_ADDRESS);
   console.log()
   
-  const currentCloneFactoryImpl = await   upgrades.erc1967.getImplementationAddress(process.env.CLONE_FACTORY_ADDRESS)
+  const currentCloneFactoryImpl = await upgrades.erc1967.getImplementationAddress(process.env.CLONE_FACTORY_ADDRESS)
   console.log("Current CLONE FACTORY implementation:", currentCloneFactoryImpl);
 
-  const CloneFactory = await ethers.getContractFactory("CloneFactory");
+  const CloneFactory = await ethers.getContractFactory("CloneFactory2");
   const cloneFactory = await upgrades.upgradeProxy(process.env.CLONE_FACTORY_ADDRESS, CloneFactory, { unsafeAllow: ['constructor'] });
   await cloneFactory.deployed();
+  const receipt = await ethers.provider.getTransactionReceipt(cloneFactory.deployTransaction.hash);
 
   const newCloneFactoryImpl = await upgrades.erc1967.getImplementationAddress(process.env.CLONE_FACTORY_ADDRESS)
-  console.log("New CLONE FACTORY implementation:", newCloneFactoryImpl);
+  console.log("New CLONE FACTORY implementation:", newCloneFactoryImpl, " gas used: ", receipt.gasUsed);
   console.log()
 
   if (currentCloneFactoryImpl == newCloneFactoryImpl) {

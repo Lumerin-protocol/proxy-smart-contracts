@@ -36,12 +36,8 @@ async function main() {
   );
   await cloneFactory.deployed();
   receipt = await ethers.provider.getTransactionReceipt(cloneFactory.deployTransaction.hash);
-  console.log("CloneFactory proxy deployed to:", cloneFactory.address, " gas used: ", receipt.gasUsed);
 
-  console.log()
-  console.log("Success!")
-  console.log("CLONE_FACTORY_ADDRESS=" + cloneFactory.address)
-
+  console.log("CLONEFACTORY address:", cloneFactory.address, " gas used: ", receipt.gasUsed);
   fs.writeFileSync("clonefactory-addr.tmp", String(cloneFactory.address));
 }
 

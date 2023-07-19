@@ -11,8 +11,9 @@ async function main() {
   const Lumerin = await ethers.getContractFactory("Lumerin");
   const lumerin = await Lumerin.deploy();
   await lumerin.deployed();
+  const receipt = await ethers.provider.getTransactionReceipt(lumerin.deployTransaction.hash);
 
-  console.log("LUMERIN address:", lumerin.address);
+  console.log("LUMERIN address:", lumerin.address, " gas used: ", receipt.gasUsed);
   fs.writeFileSync("lumerin-addr.tmp", String(lumerin.address));
 }
 
