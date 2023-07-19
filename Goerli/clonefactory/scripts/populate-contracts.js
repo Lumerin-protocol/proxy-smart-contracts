@@ -1,6 +1,10 @@
+//@ts-check
 require("dotenv").config();
 const { buildContractsList } = require("./populate-contracts-lib");
 const { ethers } = require("hardhat");
+const ethereumWallet = require('ethereumjs-wallet')
+
+const remove0xPrefix = privateKey => privateKey.replace('0x', '');
 
 const main = async function () {
   const CloneFactory = await ethers.getContractFactory("CloneFactory");
@@ -18,6 +22,10 @@ const main = async function () {
     process.env.BUILD_FULL_MARKETPLACE === "true"
   );
 
+  const pubKey = ethereumWallet.fromPrivateKey(
+    Buffer.from(remove0xPrefix(process.env.CONTRACTS_OWNER_PRIVATE_KEY), 'hex')
+  ).getPublicKey()
+
   for (const c of contractList) {
     const contractCreate = await cloneFactory
       .connect(seller)
@@ -27,7 +35,7 @@ const main = async function () {
         c.speed,
         c.length,
         process.env.VALIDATOR_ADDRESS,
-        "0x",
+        pubKey.toString('hex'),
         {
           gasLimit: 10000000,
         }

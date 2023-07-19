@@ -53,11 +53,6 @@ module.exports = {
       chainId: 421613,
     }
   },
-  etherscan: {
-    apiKey: {
-      ropsten: process.env.ETHERSCAN_API_KEY,
-    },
-  },
   abiExporter: {
     path: "./abi",
     runOnCompile: true,

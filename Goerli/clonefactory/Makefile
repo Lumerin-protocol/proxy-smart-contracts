@@ -4,8 +4,11 @@ clean:
 	rm -rf abi artifacts cache build-go build-js
 
 test:
-	yarn hardhat node & ./node-local-deploy.sh && yarn hardhat test --network localhost tests/*.js
-
+	npx kill-port 8545 || true
+	make compile
+	make -B build-js
+	yarn hardhat node --config hardhat-base.config.js & ./node-local-deploy.sh && yarn hardhat test --network localhost tests/*.js --config hardhat-base.config.js
+	
 compile:
 	yarn hardhat compile --config hardhat-base.config.js
 

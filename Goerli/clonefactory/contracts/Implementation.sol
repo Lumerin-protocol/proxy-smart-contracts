@@ -6,8 +6,6 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 
 //MyToken is place holder for actual lumerin token, purely for testing purposes
 contract Implementation is Initializable, Escrow {
-    address cloneFactory; //used to limit where the purchase can be made
-
     ContractState public contractState;
     uint256 public price; //cost to purchase contract
     uint256 public limit; //variable used to aid in the lumerin nodes decision making
@@ -18,28 +16,25 @@ contract Implementation is Initializable, Escrow {
     address public seller; //address of the seller of the contract
     string public encryptedPoolData; //encrypted data for pool target info
     string public pubKey; //encrypted data for pool target info
-
-    PurchaseInfo[] public sellerHistory;
-    mapping(address => PurchaseInfo[]) public buyerHistory;
-
-    string public kiki;
+    bool public isDeleted; //used to track if the contract is deleted, separate variable to account for the possibility of a contract being deleted when it is still running
+    HistoryEntry[] public history;
 
     enum ContractState {
         Available,
         Running
     }
 
-    struct PurchaseInfo {
-        bool goodCloseout;
+    struct HistoryEntry {
+        bool _goodCloseout; // consider dropping and use instead _purchaseTime + _length >= _endTime
         uint256 _purchaseTime;
-        uint256 endingTime;
+        uint256 _endTime;
         uint256 _price;
         uint256 _speed;
         uint256 _length;
         address _buyer;
     }
 
-    event contractPurchased(address indexed _buyer);
+    event contractPurchased(address indexed _buyer); //make indexed
     event contractClosed(address indexed _buyer);
     event purchaseInfoUpdated();
     event cipherTextUpdated(string newCipherText);
@@ -52,8 +47,8 @@ contract Implementation is Initializable, Escrow {
         address _seller,
         address _lmrAddress,
         address _cloneFactory, //used to restrict purchasing power to only the clonefactory
-        address, // _validator not used
-        string memory _pubKey
+        address _validator,
+        string calldata _pubKey
     ) public initializer {
         price = _price;
         limit = _limit;
@@ -70,16 +65,17 @@ contract Implementation is Initializable, Escrow {
         public
         view
         returns (
-            ContractState,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            address,
-            address,
-            string memory,
-            uint256
+            ContractState _state,
+            uint256 _price,
+            uint256 _limit,
+            uint256 _speed,
+            uint256 _length,
+            uint256 _startingBlockTimestamp,
+            address _buyer,
+            address _seller,
+            string memory _encryptedPoolData,
+            bool _isDeleted,
+            uint256 _balance
         )
     {
         return (
@@ -93,23 +89,54 @@ contract Implementation is Initializable, Escrow {
             seller,
             encryptedPoolData,
             lumerin.balanceOf(address(this))
+            isDeleted,
         );
+    }
+
+    function getHistory(uint256 _offset, uint256 _limit) public view returns (HistoryEntry[] memory) {
+        if (_offset > history.length) {
+            _offset = history.length;
+        }
+        if (_offset + _limit > history.length) {
+            _limit = history.length - _offset;
+        }
+         
+        HistoryEntry[] memory values = new HistoryEntry[](_limit);
+        for (uint256 i = 0; i < _limit; i++) {
+            // return values in reverse historical for displaying purposes
+            values[i] = history[history.length - 1 - _offset - i];
+        }
+
+        return values;
+    }
+
+    function getStats() public view returns (uint256 _successCount, uint256 _failCount){
+        uint256 successCount = 0;
+        uint256 failCount = 0;
+        for (uint256 i = 0; i < history.length; i++) {
+            if (history[i]._goodCloseout) {
+                successCount++;
+            } else {
+                failCount++;
+            }
+        }
+        return (successCount, failCount);
     }
 
     //function that the clone factory calls to purchase the contract
     function setPurchaseContract(
-        string memory _encryptedPoolData,
+        string calldata _encryptedPoolData,
         address _buyer,
         address marketPlaceFeeRecipient, 
         uint256 marketplaceFeeRate
     ) public {
         require(
-            contractState == ContractState.Available,
-            "contract is not in an available state"
-        );
-        require(
             msg.sender == cloneFactory,
             "this address is not approved to call the purchase function"
+        );
+        require(
+            contractState == ContractState.Available,
+            "contract is not in an available state"
         );
         encryptedPoolData = _encryptedPoolData;
         buyer = _buyer;
@@ -121,7 +148,7 @@ contract Implementation is Initializable, Escrow {
 
     //allows the buyers to update their mining pool information
     //during the lifecycle of the contract
-    function setUpdateMiningInformation(string memory _newEncryptedPoolData)
+    function setUpdateMiningInformation(string calldata _newEncryptedPoolData)
         external
     {
         require(
@@ -184,7 +211,7 @@ contract Implementation is Initializable, Escrow {
                 uint256(length);
         }
 
-        return price;
+        return 0;
     }
 
     function setContractCloseOut(uint256 closeOutType) public {
@@ -199,9 +226,14 @@ contract Implementation is Initializable, Escrow {
             addHistoryEntry(false);
 
             uint256 buyerPayout = buyerPayoutCalc();
-            withdrawFunds(price - buyerPayout, buyerPayout);
+
+            withdrawFunds(0, buyerPayout);
+
+            bool comp = block.timestamp - startingBlockTimestamp >= length;
             
-            resetContractVariables();
+            history.push(HistoryEntry(comp, startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
+            
+            setContractVariableUpdate();
             emit contractClosed(buyer);
         } else if (closeOutType == 1) {
             //this is a function call for the seller to withdraw their funds
@@ -211,7 +243,7 @@ contract Implementation is Initializable, Escrow {
                 "this account is not authorized to trigger a mid-contract closeout"
             );
 
-            getDepositContractHodlingsToSeller(price - buyerPayoutCalc());
+            getDepositContractHodlingsToSeller(buyerPayoutCalc());
         } else if (closeOutType == 2 || closeOutType == 3) {
             require(
                 block.timestamp - startingBlockTimestamp >= length,
@@ -224,34 +256,27 @@ contract Implementation is Initializable, Escrow {
                 withdrawFunds(lumerin.balanceOf(address(this)), 0);
             }
 
-            resetContractVariables();
+            if (contractState == ContractState.Running) {
+                history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, price, speed, length, buyer));
+            }
+            setContractVariableUpdate();
             emit contractClosed(buyer);
-        } else if (closeOutType == 4) {
-            require(
-                block.timestamp - startingBlockTimestamp >= length,
-                "the contract has yet to be carried to term"
-            );
-            require(
-                msg.sender == cloneFactory,
-                "only the clonefactory can call this method"
-            );
-
-            addHistoryEntry(true);
-
-            withdrawFunds(lumerin.balanceOf(address(this)), 0);
         } else {
-            require(
-                closeOutType < 5,
-                "you must make a selection from 0 to 4"
-            );
+            revert("you must make a selection from 0 to 3");
         }
     }
 
-    function addHistoryEntry(bool goodCloseout) internal {
-        PurchaseInfo memory purchaseInfo = PurchaseInfo(
-            goodCloseout, startingBlockTimestamp, block.timestamp, price, speed, length, buyer
+    function setContractDeleted(bool _isDeleted) public {
+        require(
+            msg.sender == cloneFactory,
+            "this address is not approved to call this function"
         );
-        buyerHistory[buyer].push(purchaseInfo);
-        sellerHistory.push(purchaseInfo);
+
+        require(
+            isDeleted != _isDeleted,
+            "contract delete state is already set to this value"
+        );
+        
+        isDeleted = _isDeleted;
     }
 }

@@ -12,7 +12,7 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable {
     address public escrow_purchaser; // Entity making a payment...
     address public escrow_seller; // Entity to receive funds...
     uint256 public contractTotal; // How much should be escrowed...
-    uint256 public receivedTotal; // Optional; Keep a balance for how much has been received...
+    // uint256 public receivedTotal; // Optional; Keep a balance for how much has been received...
     uint256 marketplaceFeeRate; // amount of fee to be sent to the fee recipient (marketPlaceFeeRecipient)
     address marketPlaceFeeRecipient; //address where the marketplace fee's are sent
 
@@ -40,30 +40,22 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable {
         marketplaceFeeRate = _marketplaceFeeRate;
     }
 
-    // @notice Find out how much is left to fullfill the Escrow to say it's funded.
-    // @dev This is used to determine if the contract amount has been
-    // fullfilled and return how much is left to be fullfilled.
-    function dueAmount() internal returns (uint256) {
-        if (lumerin.balanceOf(address(this)) > contractTotal) {
-            lumerin.transfer(
-                escrow_purchaser,
-                lumerin.balanceOf(address(this)) - contractTotal
-            );
-            return 0;
-        }
-        return contractTotal - lumerin.balanceOf(address(this));
-    }
-
     // @notice Validator can request the funds to be released once determined it's safe to do.
     // @dev Function makes sure the contract was fully funded
     // by checking the State and if so, release the funds to the seller.
     // sends lumerin tokens to the appropriate entities.
     // _buyer will obtain a 0 value unless theres a penalty involved
-    function withdrawFunds(uint256 _seller, uint256 _buyer) internal nonReentrant {
-        uint256 fee = calculateFee(_seller);
-        lumerin.transfer(marketPlaceFeeRecipient, fee);
+    function withdrawFunds(
+        uint256 _seller,
+        uint256 _buyer
+    ) internal nonReentrant {
+        if (_seller != 0) {
+            uint256 fee = calculateFee(_seller);
+            myToken.transfer(marketPlaceFeeRecipient, fee);
 
-        lumerin.transfer(escrow_seller, _seller - fee);
+            myToken.transfer(escrow_seller, _seller - fee);
+        }
+
         if (_buyer != 0) {
             lumerin.transfer(escrow_purchaser, _buyer);
         }

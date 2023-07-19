@@ -13,7 +13,8 @@ async function main() {
     throw new Error(`Invalid CLONE_FACTORY_WHITELIST_ADDRESSES, should be a JSON array of strings: ${err}`);
   }
 
-  console.log(`Whitelisting ${whitelistedAddresses.length} addresses`);
+  console.log(`Whitelisting ${whitelistedAddresses.length} addresses:`);
+  console.log(`${whitelistedAddresses}`);
   console.log(`CLONEFACTORY address: ${process.env.CLONE_FACTORY_ADDRESS}`);
   console.log("\n");
 
