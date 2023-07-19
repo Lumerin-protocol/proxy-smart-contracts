@@ -17,7 +17,7 @@ export LUMERIN_TOKEN_ADDRESS="$(cat lumerin-addr.tmp)"
 export VALIDATOR_ADDRESS="$(cat lumerin-addr.tmp)" # currently unused
 
 # deploy faucet
-# yarn hardhat run --network localhost --config hardhat-base.config.js ./scripts/deploy-faucet.js 
+yarn hardhat run --network localhost --config hardhat-base.config.js ./scripts/deploy-faucet.js 
 
 # deploy clonefactory
 yarn hardhat run --network localhost --config hardhat-base.config.js ./scripts/deploy-clonefactory.js
@@ -28,7 +28,7 @@ export CONTRACTS_OWNER_PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cb
 # yarn hardhat run --network localhost --config hardhat-base.config.js ./scripts/whitelist-clonefactory.js
 
 # populate contracts
-# yarn hardhat run --network localhost --config hardhat-base.config.js ./scripts/populate-contracts.js
+yarn hardhat run --network localhost --config hardhat-base.config.js ./scripts/populate-contracts.js
 
 # update clonefactory
-# yarn hardhat run --network localhost --config hardhat-base.config.js ./scripts/update-clonefactory.js
+yarn hardhat run --network localhost --config hardhat-base.config.js ./scripts/update-clonefactory.js
