@@ -82,7 +82,11 @@ contract Implementation is Initializable, Escrow {
             address _seller,
             string memory _encryptedPoolData,
             bool _isDeleted,
-            uint256 _balance
+            uint256 _balance,
+            uint256 _futurePrice,
+            uint256 _futureLimit,
+            uint256 _futureSpeed,
+            uint256 _futureLength
         )
     {
         return (
@@ -96,7 +100,11 @@ contract Implementation is Initializable, Escrow {
             seller,
             encryptedPoolData,
             isDeleted,
-            myToken.balanceOf(address(this))
+            myToken.balanceOf(address(this)),
+            futureTerms._price,
+            futureTerms._limit,
+            futureTerms._speed,
+            futureTerms._length
         );
     }
 
@@ -115,14 +123,6 @@ contract Implementation is Initializable, Escrow {
         }
 
         return values;
-    }
-
-    function getFutureTerms() public view returns (Terms memory) {
-        return futureTerms;
-    }
-
-    function getTerms() public view returns (Terms memory) {
-        return terms;
     }
 
     function getStats() public view returns (uint256 _successCount, uint256 _failCount){

@@ -34,8 +34,8 @@ describe("Contract update", function () {
     const receipt = await cf.methods.setCreateNewRentalContract(price, "0", "1", "3600", cloneFactoryAddress, "123").send({from: seller})
     hrContractAddr = receipt.events?.contractCreated.returnValues._address;
     const impl = Implementation(web3, hrContractAddr)
-    const newData = await impl.methods.getFutureTerms().call()
-    const data = await impl.methods.getTerms().call()
+    const newData = await impl.methods.futureTerms().call()
+    const data = await impl.methods.terms().call()
 
     expect(newData._length).equal('0')
     expect(newData._price).equal('0')
@@ -57,7 +57,7 @@ describe("Contract update", function () {
     const receipt = await cf.methods.setUpdateContractInformation(hrContractAddr, newPrice, '2', '3', '4').send({from: seller})
 
     const impl = Implementation(web3, hrContractAddr)
-    const futureTerms = await impl.methods.getFutureTerms().call()
+    const futureTerms = await impl.methods.futureTerms().call()
     const data = await impl.methods.getPublicVariables().call()
 
     expect(futureTerms._price).equal('0')
@@ -81,7 +81,7 @@ describe("Contract update", function () {
     await cf.methods.setPurchaseRentalContract(hrContractAddr, '').send({from: buyer});
     const receipt = await cf.methods.setUpdateContractInformation(hrContractAddr,  newPrice, '22', '33', '44').send({from: seller})
     const impl = Implementation(web3, hrContractAddr)
-    const futureTerms = await impl.methods.getFutureTerms().call()
+    const futureTerms = await impl.methods.futureTerms().call()
     const data = await impl.methods.getPublicVariables().call()
 
     expect(futureTerms._price).equal(newPrice);
@@ -108,7 +108,7 @@ describe("Contract update", function () {
     const impl = Implementation(web3, hrContractAddr)
     const receipt = await impl.methods.setContractCloseOut("0").send({from: buyer})
 
-    const futureTerms = await impl.methods.getFutureTerms().call()
+    const futureTerms = await impl.methods.futureTerms().call()
 
     expect(futureTerms._price).equal('0');
     expect(futureTerms._length).equal('0');

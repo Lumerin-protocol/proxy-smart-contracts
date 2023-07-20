@@ -102,7 +102,8 @@ contract CloneFactory {
             targetContract.seller() != msg.sender,
             "cannot purchase your own contract"
         );
-        uint256 _price = targetContract.getTerms()._price;
+
+        (uint256 _price,,,) = targetContract.terms();
         uint256 _marketplaceFee = _price / buyerFeeRate;
 
         uint256 requiredAllowance = _price + _marketplaceFee;
