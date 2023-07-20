@@ -83,12 +83,13 @@ contract Implementation is Initializable, Escrow {
             string memory _encryptedPoolData,
             bool _isDeleted,
             uint256 _balance,
-            uint256 _futurePrice,
-            uint256 _futureLimit,
-            uint256 _futureSpeed,
-            uint256 _futureLength
+            bool _hasFutureTerms
         )
     {
+        bool hasFutureTerms = false;
+        if(futureTerms._length != 0) {
+            hasFutureTerms = true;
+        }
         return (
             contractState,
             terms._price,
@@ -101,10 +102,7 @@ contract Implementation is Initializable, Escrow {
             encryptedPoolData,
             isDeleted,
             myToken.balanceOf(address(this)),
-            futureTerms._price,
-            futureTerms._limit,
-            futureTerms._speed,
-            futureTerms._length
+            hasFutureTerms
         );
     }
 
