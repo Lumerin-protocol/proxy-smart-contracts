@@ -19,7 +19,7 @@ contract Implementation is Initializable, Escrow {
     string public pubKey; //encrypted data for pool target info
     bool public isDeleted; //used to track if the contract is deleted, separate variable to account for the possibility of a contract being deleted when it is still running
     HistoryEntry[] public history;
-    Terms public newTerms;
+    Terms public futureTerms;
 
     enum ContractState {
         Available,
@@ -117,8 +117,8 @@ contract Implementation is Initializable, Escrow {
         return values;
     }
 
-    function getNewTerms() public view returns (Terms memory) {
-        return newTerms;
+    function getFutureTerms() public view returns (Terms memory) {
+        return futureTerms;
     }
 
     function getTerms() public view returns (Terms memory) {
@@ -190,7 +190,7 @@ contract Implementation is Initializable, Escrow {
             "this address is not approved to call this function"
         );
         if (contractState == ContractState.Running) {
-            newTerms = Terms(_price, _limit, _speed, _length);
+            futureTerms = Terms(_price, _limit, _speed, _length);
         } else {
             terms = Terms(_price, _limit, _speed, _length);
             emit purchaseInfoUpdated(address(this));
@@ -202,9 +202,9 @@ contract Implementation is Initializable, Escrow {
         encryptedPoolData = "";
         contractState = ContractState.Available;
 
-        if(newTerms._length != 0) {
-            terms = Terms(newTerms._price, newTerms._limit, newTerms._speed, newTerms._length);
-            newTerms = Terms(0, 0, 0, 0);
+        if(futureTerms._length != 0) {
+            terms = Terms(futureTerms._price, futureTerms._limit, futureTerms._speed, futureTerms._length);
+            futureTerms = Terms(0, 0, 0, 0);
             emit purchaseInfoUpdated(address(this));
         }
     }

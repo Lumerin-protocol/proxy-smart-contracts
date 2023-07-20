@@ -34,7 +34,7 @@ describe("Contract update", function () {
     const receipt = await cf.methods.setCreateNewRentalContract(price, "0", "1", "3600", cloneFactoryAddress, "123").send({from: seller})
     hrContractAddr = receipt.events?.contractCreated.returnValues._address;
     const impl = Implementation(web3, hrContractAddr)
-    const newData = await impl.methods.getNewTerms().call()
+    const newData = await impl.methods.getFutureTerms().call()
     const data = await impl.methods.getTerms().call()
 
     expect(newData._length).equal('0')
@@ -53,14 +53,14 @@ describe("Contract update", function () {
     }
   })
 
-  it("should update contract and emit event without newTerms update", async function() {
+  it("should update contract and emit event without futureTerms update", async function() {
     const receipt = await cf.methods.setUpdateContractInformation(hrContractAddr, newPrice, '2', '3', '4').send({from: seller})
 
     const impl = Implementation(web3, hrContractAddr)
-    const newTerms = await impl.methods.getNewTerms().call()
+    const futureTerms = await impl.methods.getFutureTerms().call()
     const data = await impl.methods.getPublicVariables().call()
 
-    expect(newTerms._price).equal('0')
+    expect(futureTerms._price).equal('0')
     expect(data._price).equal(newPrice);
     expect(data._limit).equal('2');
     expect(data._speed).equal('3');
@@ -75,19 +75,19 @@ describe("Contract update", function () {
   })
 
 
-  it("should store newTerms for contract and should not emit update event if contract is running", async function(){
+  it("should store futureTerms for contract and should not emit update event if contract is running", async function(){
     const price = ToString(2 * 10**8);
     const newPrice = ToString(3 * 10**8);
     await cf.methods.setPurchaseRentalContract(hrContractAddr, '').send({from: buyer});
     const receipt = await cf.methods.setUpdateContractInformation(hrContractAddr,  newPrice, '22', '33', '44').send({from: seller})
     const impl = Implementation(web3, hrContractAddr)
-    const newTerms = await impl.methods.getNewTerms().call()
+    const futureTerms = await impl.methods.getFutureTerms().call()
     const data = await impl.methods.getPublicVariables().call()
 
-    expect(newTerms._price).equal(newPrice);
-    expect(newTerms._limit).equal('22');
-    expect(newTerms._speed).equal('33');
-    expect(newTerms._length).equal('44');
+    expect(futureTerms._price).equal(newPrice);
+    expect(futureTerms._limit).equal('22');
+    expect(futureTerms._speed).equal('33');
+    expect(futureTerms._length).equal('44');
 
     expect(data._price).equal(price);
     expect(data._limit).equal('2');
@@ -103,17 +103,17 @@ describe("Contract update", function () {
     expect(isEventFound).to.be.false;
   })
 
-  it("should apply newTerms after contract closed and emit event", async function(){
+  it("should apply futureTerms after contract closed and emit event", async function(){
     const newPrice = ToString(3 * 10**8);
     const impl = Implementation(web3, hrContractAddr)
     const receipt = await impl.methods.setContractCloseOut("0").send({from: buyer})
 
-    const newTerms = await impl.methods.getNewTerms().call()
+    const futureTerms = await impl.methods.getFutureTerms().call()
 
-    expect(newTerms._price).equal('0');
-    expect(newTerms._length).equal('0');
-    expect(newTerms._limit).equal('0');
-    expect(newTerms._speed).equal('0');
+    expect(futureTerms._price).equal('0');
+    expect(futureTerms._length).equal('0');
+    expect(futureTerms._limit).equal('0');
+    expect(futureTerms._speed).equal('0');
 
     const data = await impl.methods.getPublicVariables().call()
     expect(data._price).equal(newPrice);
