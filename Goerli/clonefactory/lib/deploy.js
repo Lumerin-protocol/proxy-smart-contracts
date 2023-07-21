@@ -1,8 +1,6 @@
 //@ts-check
 const { upgrades, ethers } = require("hardhat");
 const { Wallet } = require("ethers");
-const ethereumWallet = require('ethereumjs-wallet');
-const { remove0xPrefix } = require("./utils");
 
 /**
  * @param {string} deployerPkey 
@@ -167,14 +165,10 @@ async function ApproveSeller(sellerAddr, cloneFactory, deployerPkey, log = noop)
  * @returns {Promise<{address: string, txHash: string}>}
  */
 async function CreateContract(priceDecimalLMR, durationSeconds, hrGHS, cloneFactory, deployerPkey, log = noop){
-  const pubKey = ethereumWallet
-    .fromPrivateKey(Buffer.from(remove0xPrefix(deployerPkey), 'hex'))
-    .getPublicKey()
-    .toString('hex')
-  const fromAddr = new Wallet(deployerPkey).address;
+  const wallet = new Wallet(deployerPkey);
   const receipt = await cloneFactory.methods
-    .setCreateNewRentalContract(priceDecimalLMR, "0", hrGHS, durationSeconds, fromAddr, pubKey)
-    .send({from: fromAddr})
+    .setCreateNewRentalContract(priceDecimalLMR, "0", hrGHS, durationSeconds, wallet.address, wallet.publicKey)
+    .send({from: wallet.address})
   const address = receipt.events?.[0].address || "";
   const txHash = receipt.transactionHash;
   
