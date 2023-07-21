@@ -29,6 +29,7 @@ contract CloneFactory is Initializable {
     event contractCreated(address indexed _address, string _pubkey); //emitted whenever a contract is created
     event clonefactoryContractPurchased(address indexed _address); //emitted whenever a contract is purchased
     event contractDeleteUpdated(address _address, bool _isDeleted); //emitted whenever a contract is deleted/restored
+    event purchaseInfoUpdated(address indexed _address);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "you are not authorized");
@@ -99,7 +100,8 @@ contract CloneFactory is Initializable {
             targetContract.seller() != msg.sender,
             "cannot purchase your own contract"
         );
-        uint256 _price = targetContract.price();
+
+        (uint256 _price,,,) = targetContract.terms();
         uint256 _marketplaceFee = _price / buyerFeeRate;
 
         uint256 requiredAllowance = _price + _marketplaceFee;
@@ -185,5 +187,18 @@ contract CloneFactory is Initializable {
         require(msg.sender == _contract.seller() || msg.sender == owner, "you are not authorized");
         Implementation(_contractAddress).setContractDeleted(_isDeleted);
         emit contractDeleteUpdated(_contractAddress, _isDeleted);
+    }
+
+    function setUpdateContractInformation(
+        address _contractAddress,      
+        uint256 _price,
+        uint256 _limit,
+        uint256 _speed,
+        uint256 _length
+    ) public {
+        require(rentalContractsMap[_contractAddress], "unknown contract address");
+        Implementation _contract = Implementation(_contractAddress);
+        require(msg.sender == _contract.seller(), "you are not authorized");
+        Implementation(_contractAddress).setUpdatePurchaseInformation(_price, _limit, _speed, _length);
     }
 }
