@@ -20,14 +20,9 @@ describe("Contract delete", function () {
 
   before(async ()=>{
     const lumerin = Lumerin(web3, lumerinAddress)
-    console.log("HERERERER 1")
     await lumerin.methods.increaseAllowance(cloneFactoryAddress, "10000").send({from: buyer})
-    console.log("HERERERER 2")
     await lumerin.methods.transfer(buyer, "10000").send({from: owner})
-    console.log("HERERERER 3")
-    console.log("CLONEFACTORY ADDRESS:     ", cloneFactoryAddress)
     await cf.methods.setAddToWhitelist(seller).send({from: owner})
-    console.log("HERERERER 4")
   })
 
   it("should create contract and check its status", async function(){

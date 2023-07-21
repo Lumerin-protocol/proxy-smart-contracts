@@ -6,6 +6,7 @@ const { config } = require("hardhat");
 const { CloneFactory, Implementation } = require("../build-js/dist")
 const { Wallet } = require("ethers");
 
+// TODO: generate gas usage report for this file
 describe("Clonefactory update", function () {
     /** @type {import("web3").default} */
   // @ts-ignore
@@ -75,10 +76,6 @@ describe("Clonefactory update", function () {
     const terms = await contract.methods.terms().call();
     expect(terms._price).to.equal(priceDecimalLMR);
   })
-
-  // SHOULD EXPORT GAS FEE REPORT
-
-  // COMPLETIONS SHOULD WORK
 });
 
 

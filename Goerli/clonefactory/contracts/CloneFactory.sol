@@ -61,7 +61,7 @@ contract CloneFactory is Initializable {
         uint256 _limit,
         uint256 _speed,
         uint256 _length,
-        address, //removed _validator
+        address _validator,
         string calldata _pubKey
     ) external onlyInWhitelist returns (address) {        
         bytes memory data = abi.encodeWithSelector(
@@ -73,7 +73,7 @@ contract CloneFactory is Initializable {
             msg.sender,
             address(lumerin),
             address(this),
-            address(0),
+            _validator,
             _pubKey
         );
 
@@ -106,21 +106,16 @@ contract CloneFactory is Initializable {
 
         uint256 requiredAllowance = _price + _marketplaceFee;
         uint256 actualAllowance = lumerin.allowance(msg.sender, address(this));
+        require(
+            actualAllowance >= requiredAllowance,
+            "not authorized to spend required funds"
+        );
 
-        require(
-            actualAllowance >= requiredAllowance,
-            "not authorized to spend required funds"
-        );
-        require(
-            actualAllowance >= requiredAllowance,
-            "not authorized to spend required funds"
-        );
         bool tokensTransfered = lumerin.transferFrom(
             msg.sender,
             _contractAddress,
             _price
         );
-
         require(tokensTransfered, "lumerin transfer failed");
 
         bool feeTransfer = lumerin.transferFrom(
@@ -128,8 +123,8 @@ contract CloneFactory is Initializable {
             feeRecipient,
             _marketplaceFee
         );
-
         require(feeTransfer, "marketplace fee not paid");
+        
         targetContract.setPurchaseContract(
             _cipherText,
             msg.sender,

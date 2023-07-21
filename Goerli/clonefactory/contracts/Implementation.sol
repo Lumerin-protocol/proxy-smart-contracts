@@ -13,7 +13,7 @@ contract Implementation is Initializable, Escrow {
     address public buyer; //address of the current purchaser of the contract
     address public seller; //address of the seller of the contract
     address public cloneFactory;
-    address public validator;
+    address validator;
     string public encryptedPoolData; //encrypted data for pool target info
     string public pubKey; //encrypted data for pool target info
     bool public isDeleted; //used to track if the contract is deleted, separate variable to account for the possibility of a contract being deleted when it is still running
