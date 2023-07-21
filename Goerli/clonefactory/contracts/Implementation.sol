@@ -86,10 +86,7 @@ contract Implementation is Initializable, Escrow {
             bool _hasFutureTerms
         )
     {
-        bool hasFutureTerms = false;
-        if(futureTerms._length != 0) {
-            hasFutureTerms = true;
-        }
+        bool hasFutureTerms = futureTerms._length != 0;
         return (
             contractState,
             terms._price,
