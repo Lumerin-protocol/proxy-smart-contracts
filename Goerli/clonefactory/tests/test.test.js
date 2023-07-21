@@ -5,6 +5,9 @@ let { time } = require("@nomicfoundation/hardhat-network-helpers");
 const { Lumerin, Implementation, CloneFactory } = require("../build-js/dist");
 const Web3 = require("web3");
 
+// TODO: rewrite all tests in this file to be clean and readable
+// no POE token anymore. Comments are out of date
+
 describe("marketplace", function () {
   process.env.CLONE_FACTORY_ADDRESS =
     "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853";
@@ -115,8 +118,8 @@ describe("marketplace", function () {
     it("should close out and distribute full price to seller minus fees", async function () {
       await testCloseout(
         3,
-        await testContract.methods.terms().call(),
-        buyer,
+        (await testContract.methods.terms().call())._length,
+        seller,
         buyer,
         assertBuyerPayout,
         assertSellerPayout,
@@ -128,9 +131,9 @@ describe("marketplace", function () {
     it("should close out and not distribute funds", async function () {
       await testCloseout(
         2,
-        await testContract.methods.length().call(),
-        withPOE,
-        withoutPOE,
+        (await testContract.methods.terms().call())._length,
+        seller,
+        buyer,
         Function(),
         Function(),
         Function(),

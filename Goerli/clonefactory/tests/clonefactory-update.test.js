@@ -36,14 +36,14 @@ describe("Clonefactory update", function () {
 
   it("should create contract", async function () {
     const cf = CloneFactory(web3, cloneFactoryAddr);
-    const {address, gasUsed} = await CreateContract(priceDecimalLMR, (30*60).toString(), "10000", cf, deployerPkey);
+    const { address } = await CreateContract(priceDecimalLMR, (30*60).toString(), "10000", cf, deployerPkey);
     createdContractAddr = address;
     const contractsList = await cf.methods.getContractList().call()
     expect(contractsList).to.include(createdContractAddr)
 
     const contract = Implementation(web3, createdContractAddr);
-    const actualPrice = await contract.methods.price().call();
-    expect(actualPrice).to.equal(priceDecimalLMR);
+    const terms = await contract.methods.terms().call();
+    expect(terms._price).to.equal(priceDecimalLMR);
   })
 
   it("should update a clonefactory", async function () {
@@ -72,8 +72,8 @@ describe("Clonefactory update", function () {
 
   it("should verify contract state after implementation update", async function () {
     const contract = Implementation(web3, createdContractAddr);
-    const actualPrice = await contract.methods.price().call();
-    expect(actualPrice).to.equal(priceDecimalLMR);
+    const terms = await contract.methods.terms().call();
+    expect(terms._price).to.equal(priceDecimalLMR);
   })
 
   // SHOULD EXPORT GAS FEE REPORT

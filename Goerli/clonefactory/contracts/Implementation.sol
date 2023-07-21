@@ -97,7 +97,7 @@ contract Implementation is Initializable, Escrow {
             seller,
             encryptedPoolData,
             isDeleted,
-            myToken.balanceOf(address(this)),
+            lumerin.balanceOf(address(this)),
             hasFutureTerms
         );
     }
@@ -232,7 +232,7 @@ function setContractCloseOut(uint256 closeOutType) public {
             
             history.push(HistoryEntry(comp, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
             
-            setContractVariableUpdate();
+            resetContractVariables();
             emit contractClosed(buyer);
         } else if (closeOutType == 1) {
             //this is a function call for the seller to withdraw their funds
@@ -255,7 +255,7 @@ function setContractCloseOut(uint256 closeOutType) public {
             if (contractState == ContractState.Running) {
                 history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
             }
-            setContractVariableUpdate();
+            resetContractVariables();
             emit contractClosed(buyer);
         } else {
             revert("you must make a selection from 0 to 3");
@@ -275,11 +275,4 @@ function setContractCloseOut(uint256 closeOutType) public {
         
         isDeleted = _isDeleted;
     }
-
-    function setContractVariableUpdate() internal {
-        buyer = seller;
-        encryptedPoolData = "";
-        contractState = ContractState.Available;
-    }
-
 }
