@@ -21,6 +21,12 @@ deploy-clonefactory:
 deploy-faucet:
 	yarn hardhat run --network sepolia ./scripts/deploy-faucet.js
 
+update-clonefactory:
+	yarn hardhat run --network sepolia ./scripts/update-clonefactory.js
+
+update-implementation:
+	yarn hardhat run --network sepolia ./scripts/update-implementation.js
+
 populate-contracts:
 	yarn hardhat run --network sepolia ./scripts/populate-contracts.js
 
