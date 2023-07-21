@@ -2,7 +2,7 @@
 const { expect } = require("chai");
 const Web3 = require("web3");
 const { DeployCloneFactory, DeployLumerin, CreateContract, ApproveSeller, UpdateCloneFactory, UpdateImplementation } = require("../lib/deploy");
-const { config } = require("hardhat");
+const { config, ethers } = require("hardhat");
 const { CloneFactory, Implementation } = require("../build-js/dist")
 const { Wallet } = require("ethers");
 
@@ -51,6 +51,12 @@ describe("Clonefactory update", function () {
     await UpdateCloneFactory("CloneFactory2", cloneFactoryAddr, deployerPkey);
   });
 
+  it("should verify clonefactory actually updated", async function () {
+    const CloneFactory2 = await ethers.getContractFactory("CloneFactory2");
+    const result = await CloneFactory2.attach(cloneFactoryAddr).doesNothing();
+    expect(result).to.equal(true);
+  })
+
   it("should verify clonefactory state after update (whitelist)", async function () {
     const sellerAddr = new Wallet(deployerPkey).address
 
@@ -70,6 +76,12 @@ describe("Clonefactory update", function () {
   it("should update an implementation", async function () {
     await UpdateImplementation("Implementation2", cloneFactoryAddr, deployerPkey);
   });
+
+  it("should verify implementation actually updated", async function () {
+    const Implementation2 = await ethers.getContractFactory("Implementation2");
+    const result = await Implementation2.attach(createdContractAddr).doesNothing();
+    expect(result).to.equal(true);
+  })
 
   it("should verify contract state after implementation update", async function () {
     const contract = Implementation(web3, createdContractAddr);
