@@ -6,7 +6,7 @@ const { Lumerin, CloneFactory, Implementation } = require("../build-js/dist")
 
 describe("Contract delete", function () {
   const lumerinAddress = "0x5fbdb2315678afecb367f032d93f642f64180aa3"
-  const cloneFactoryAddress = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+  const cloneFactoryAddress = "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
 
   const owner = "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
   const seller = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
@@ -20,9 +20,14 @@ describe("Contract delete", function () {
 
   before(async ()=>{
     const lumerin = Lumerin(web3, lumerinAddress)
+    console.log("HERERERER 1")
     await lumerin.methods.increaseAllowance(cloneFactoryAddress, "10000").send({from: buyer})
+    console.log("HERERERER 2")
     await lumerin.methods.transfer(buyer, "10000").send({from: owner})
+    console.log("HERERERER 3")
+    console.log("CLONEFACTORY ADDRESS:     ", cloneFactoryAddress)
     await cf.methods.setAddToWhitelist(seller).send({from: owner})
+    console.log("HERERERER 4")
   })
 
   it("should create contract and check its status", async function(){
