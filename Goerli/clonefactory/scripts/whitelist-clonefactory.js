@@ -1,13 +1,14 @@
 //@ts-check
 require("dotenv").config();
-const { ethers, config } = require("hardhat");
+const {  config, hardhatArguments } = require("hardhat");
 const { ApproveSeller } = require("../lib/deploy");
 const { CloneFactory } = require("../build-js/dist");
 const Web3 = require("web3");
+const { Wallet,ethers } = require("ethers");
 
 async function main() {
   /** @type {string[]} */
-  let whitelistedAddresses;
+  let whitelistedAddresses = [];
 
   try {
     whitelistedAddresses = JSON.parse(process.env.CLONE_FACTORY_WHITELIST_ADDRESSES);
@@ -18,18 +19,21 @@ async function main() {
     throw new Error(`Invalid CLONE_FACTORY_WHITELIST_ADDRESSES, should be a JSON array of strings: ${err}`);
   }
 
+  const privateKey = process.env.CONTRACTS_OWNER_PRIVATE_KEY
+  const cloneFactoryAddress = process.env.CLONE_FACTORY_ADDRESS
+  
   console.log(`Whitelisting ${whitelistedAddresses.length} addresses:`);
   console.log(`${whitelistedAddresses}`);
-  console.log(`CLONEFACTORY address: ${process.env.CLONE_FACTORY_ADDRESS}`);
+  console.log(`CLONEFACTORY address: ${cloneFactoryAddress}`);
+  console.log(`From address: ${new Wallet(privateKey).address}`);
   console.log("\n");
-
+  
   /** @type {import("web3").default} */
   // @ts-ignore
-  const web3 = new Web3(config.networks.localhost.url)
-  const privateKey = process.env.CONTRACTS_OWNER_PRIVATE_KEY
+  const web3 = new Web3(process.env.ETH_NODE_ADDRESS)
 
   for (const address of whitelistedAddresses) {
-    await ApproveSeller(address, CloneFactory(web3, process.env.CLONE_FACTORY_ADDRESS), privateKey, console.log)
+    await ApproveSeller(address, CloneFactory(web3, cloneFactoryAddress), privateKey, console.log)
     console.log(`Added to whitelist: ${address}`);
   }
 
