@@ -48,12 +48,12 @@ describe("Clonefactory update", function () {
   })
 
   it("should update a clonefactory", async function () {
-    await UpdateCloneFactory("CloneFactory2", cloneFactoryAddr, deployerPkey);
+    await UpdateCloneFactory("CloneFactoryTest", cloneFactoryAddr, deployerPkey);
   });
 
   it("should verify clonefactory actually updated", async function () {
-    const CloneFactory2 = await ethers.getContractFactory("CloneFactory2");
-    const result = await CloneFactory2.attach(cloneFactoryAddr).doesNothing();
+    const CloneFactoryTest = await ethers.getContractFactory("CloneFactoryTest");
+    const result = await CloneFactoryTest.attach(cloneFactoryAddr).doesNothing();
     expect(result).to.equal(true);
   })
 
@@ -74,12 +74,12 @@ describe("Clonefactory update", function () {
   });
 
   it("should update an implementation", async function () {
-    await UpdateImplementation("Implementation2", cloneFactoryAddr, deployerPkey);
+    await UpdateImplementation("ImplementationTest", cloneFactoryAddr, deployerPkey);
   });
 
   it("should verify implementation actually updated", async function () {
-    const Implementation2 = await ethers.getContractFactory("Implementation2");
-    const result = await Implementation2.attach(createdContractAddr).doesNothing();
+    const ImplementationTest = await ethers.getContractFactory("ImplementationTest");
+    const result = await ImplementationTest.attach(createdContractAddr).doesNothing();
     expect(result).to.equal(true);
   })
 
