@@ -4,30 +4,28 @@ pragma solidity >=0.8.0;
 import "./LumerinToken.sol";
 
 contract Faucet {
-    /*
-       this is a token faucet
-       it allows people to claim tokens in a controlled manner
-       */
       address owner;
       uint public cooldownPeriod;
-      uint public startOfDay;
-      uint public dailyLimitCount;
-      uint public dailyLimitMax;
-      uint public txAmount;
-      uint public gethAmount;
+      uint public cooldownStartingTime;
+      uint public currentLMRTokenDistribution;
+      uint public lmrTokenDistributionMax;
+      uint public lmrPayout;
+      uint public ethPayout;
+
       mapping(address => uint) lastClaimed;
       mapping(string => uint) lastClaimedIP;
       Lumerin lumerin;
 
-      constructor(address _lmr) payable {
+      constructor(address _lmr, uint _dailyMaxLmr, uint _lmrPayout, uint _ethPayout) payable {
           owner = payable(msg.sender);
-          startOfDay = block.timestamp;
-          dailyLimitCount = 0;
-          dailyLimitMax = 800;
+          cooldownStartingTime = block.timestamp;
           cooldownPeriod = 24*60*60;
-          lumerin = Lumerin(_lmr); //lumerin token address
-          txAmount = 10*10**lumerin.decimals();
-          gethAmount = 5e16;
+          
+          lumerin = Lumerin(_lmr);
+          currentLMRTokenDistribution = 0;
+          lmrTokenDistributionMax = _dailyMaxLmr;
+          lmrPayout = _lmrPayout;
+          ethPayout = _ethPayout;
       }
 
       modifier onlyOwner {
@@ -35,53 +33,48 @@ contract Faucet {
         _;
       }
 
-      modifier dailyLimit {
-        require(dailyLimitCount < dailyLimitMax, "the daily limit of test lumerin has been distributed");
+      modifier dailyMaxLmrModifier {
+        require(currentLMRTokenDistribution < lmrTokenDistributionMax, "the daily limit of test lumerin has been distributed");
         _;
       }
 
       receive() external payable {}
 
       //allows the owner of this contract to send tokens to the claiment
-      function supervisedClaim(address _claiment, string calldata _ipAddress) public onlyOwner dailyLimit {
+      function supervisedClaim(address _claiment, string calldata _ipAddress) public onlyOwner dailyMaxLmrModifier {
           require(canClaimTokens(_claiment, _ipAddress), "you need to wait before claiming");
 
-          lumerin.transfer(_claiment, txAmount);
-          payable(_claiment).transfer(gethAmount); //sends amount in wei to recipient
-          
           lastClaimed[_claiment] = block.timestamp;
           lastClaimedIP[_ipAddress] = block.timestamp;
-          
-          dailyLimitCount = dailyLimitCount + 10;
-          refreshDailyLimit();
+          currentLMRTokenDistribution = currentLMRTokenDistribution + lmrPayout;
+          refreshDailyMaxLmr();
+
+          lumerin.transfer(_claiment, lmrPayout);
+          payable(_claiment).transfer(ethPayout); //sends amount in wei to recipient
       }
 
-      function refreshDailyLimit() internal {
-        if (startOfDay + cooldownPeriod < block.timestamp) {
-          startOfDay = block.timestamp;
-          dailyLimitCount = 0;
+      function refreshDailyMaxLmr() internal {
+        if (cooldownStartingTime + cooldownPeriod < block.timestamp) {
+          cooldownStartingTime = block.timestamp;
+          currentLMRTokenDistribution = 0;
         }
       }
 
-      function setUpdateCooldownPeriod(uint _cooldownPeriod) public onlyOwner {
-          cooldownPeriod = _cooldownPeriod;
+      function setUpdateEthPayout(uint _ethPayout) public onlyOwner {
+          ethPayout = _ethPayout;
       }
 
-      function setUpdateGWEIAmount(uint _gwei) public onlyOwner {
-          gethAmount = _gwei;
+      function setUpdateLmrPayout(uint _lmrPayout) public onlyOwner {
+          lmrPayout = _lmrPayout;
       }
 
-      function setUpdateTxAmount(uint _txAmount) public onlyOwner {
-          txAmount = _txAmount*10**lumerin.decimals();
+      function setUpdatedailyMaxLmr(uint _dailyMaxLmr) public onlyOwner {
+          lmrTokenDistributionMax = _dailyMaxLmr;
       }
 
-      function setUpdateDailyLimit(uint _dailyLimitMax) public onlyOwner {
-          dailyLimitMax = _dailyLimitMax;
-      }
-
-      function resetTodaysLimit() public onlyOwner {
-          startOfDay = block.timestamp;
-          dailyLimitCount = 0;
+      function resetDistributedTodayLmr() public onlyOwner {
+          cooldownStartingTime = block.timestamp;
+          currentLMRTokenDistribution = 0;
       }
 
       function setUpdateLumerin(address _lmr) public onlyOwner {
