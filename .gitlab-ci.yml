@@ -3,9 +3,29 @@ stages:
   - test
   - build-test
   - release-bindings
-  - deploy-contracts
+  - update-contracts
   - whitelist-clonefactory
   - populate-hr-contracts
+  - deploy-contracts
+
+# Tags for all jobs
+.tags-dev: &tags-dev
+  - devops
+  - bedrock
+  - docker
+  - titanio-dev
+
+.tags-stg: &tags-stg
+  - devops
+  - bedrock
+  - docker
+  - titanio-stg
+
+.tags-lmn: &tags-lmn
+  - devops
+  - bedrock
+  - docker
+  - titanio-lmn
 
 variables:
   CI_GROUP_ID: "15533332" # id of the proxy group
@@ -56,6 +76,28 @@ variables:
     - cd ../..
     - echo "DYNAMIC_ENVIRONMENT_URL=$DYNAMIC_ENVIRONMENT_URL" >> deploy.env
 
+.update_clonefactory_template: &update_clonefactory_template
+  stage: update-contracts
+  needs: ["compile-contracts", "test"]
+  image: node:14-buster
+  when: manual
+  environment:
+    name: dev
+  script:
+    - cd ./Goerli/clonefactory/
+    - make update-clonefactory
+
+.update_implementation_template: &update_implementation_template
+  stage: update-contracts
+  needs: ["compile-contracts", "test"]
+  image: node:14-buster
+  when: manual
+  environment:
+    name: dev
+  script:
+    - cd ./Goerli/clonefactory/
+    - make update-implementation
+
 .deploy_hr_contracts_template: &deploy_hr_contracts_template
   stage: populate-hr-contracts
   needs: ["compile-contracts", "test"]
@@ -93,11 +135,7 @@ variables:
 compile-contracts:
   stage: build
   image: node:14-buster
-  tags:
-    - glrred
-    - bedrock
-    - docker
-    - titanio-dev
+  tags: *tags-dev
   environment:
     name: dev
     action: prepare
@@ -114,11 +152,7 @@ build-contracts-go:
   stage: build
   needs: ["compile-contracts"]
   image: ethereum/client-go:alltools-stable
-  tags:
-    - devops
-    - bedrock
-    - docker
-    - titanio-lmn
+  tags: *tags-lmn
   script: cd ./Goerli/clonefactory && ./build-go.sh
   artifacts:
     untracked: true
@@ -129,11 +163,7 @@ build-contracts-js:
   stage: build
   needs: ["compile-contracts"]
   image: node:14-buster
-  tags:
-    - devops
-    - bedrock
-    - docker
-    - titanio-dev
+  tags: *tags-dev
   script: cd ./Goerli/clonefactory && make build-js
   artifacts:
     untracked: true
@@ -144,11 +174,7 @@ test:
   environment: test
   stage: test
   image: node:14-buster
-  tags:
-    - glrred
-    - bedrock
-    - docker
-    - titanio-dev
+  tags: *tags-dev
   allow_failure: false
   needs: ["build-contracts-js", "compile-contracts"]
   only:
@@ -161,21 +187,13 @@ deploy-lumerintoken-dev:
   <<: *deploy_lumerintoken_dev_stg
   environment:
     name: dev
-  tags:
-    - glrred
-    - bedrock
-    - docker
-    - titanio-dev
+  tags: *tags-dev
 
 deploy-lumerintoken-stg:
   <<: *deploy_lumerintoken_dev_stg
   environment:
     name: stg
-  tags:
-    - devops
-    - bedrock
-    - docker
-    - titanio-stg
+  tags: *tags-stg
 
 # Will be used only when we will have a separate lumerin token for LMN environment
 #
@@ -183,6 +201,7 @@ deploy-lumerintoken-stg:
 #   stage: deploy-contracts
 #   needs: ["compile-contracts"]
 #   image: node:14-buster
+#   tags: *tags-lmn
 #   when: manual
 #   only:
 #     - main
@@ -192,15 +211,71 @@ deploy-lumerintoken-stg:
 #     - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp) ENV_ENV="lmn"
 #     - *set-env
 
+update-clonefactory-dev:
+  <<: *update_clonefactory_template
+  environment:
+    name: dev
+  tags: *tags-dev
+
+update-clonefactory-stg:
+  <<: *update_clonefactory_template
+  environment:
+    name: stg
+  tags: *tags-stg
+
+update-clonefactory-lmn:
+  <<: *update_clonefactory_template
+  environment:
+    name: lmn
+  tags: *tags-lmn
+
+update-implementation-dev:
+  <<: *update_implementation_template
+  environment:
+    name: dev
+  tags: *tags-dev
+
+update-implementation-stg:
+  <<: *update_implementation_template
+  environment:
+    name: stg
+  tags: *tags-stg
+
+update-implementation-lmn:
+  <<: *update_implementation_template
+  environment:
+    name: lmn
+  tags: *tags-lmn
+
+whitelist-clonefactory-dev:
+  <<: *whitelist_clonefactory_template
+  environment:
+    name: dev
+  tags: *tags-dev
+  # only:
+  #   - dev
+
+whitelist-clonefactory-stg:
+  <<: *whitelist_clonefactory_template
+  environment:
+    name: stg
+  tags: *tags-stg
+  # only:
+  #   - stg
+
+whitelist-clonefactory-lmn:
+  <<: *whitelist_clonefactory_template
+  environment:
+    name: lmn
+  tags: *tags-lmn
+  # only:
+  #   - lmn
+
 deploy-clonefactory-dev:
   <<: *deploy_clonefactory_template
   environment:
     name: dev
-  tags:
-    - glrred
-    - bedrock
-    - docker
-    - titanio-dev
+  tags: *tags-dev
   # only:
   #   - dev
 
@@ -208,11 +283,7 @@ deploy-clonefactory-stg:
   <<: *deploy_clonefactory_template
   environment:
     name: stg
-  tags:
-    - devops
-    - bedrock
-    - docker
-    - titanio-stg
+  tags: *tags-stg
   # only:
   #   - stg
 
@@ -220,63 +291,16 @@ deploy-clonefactory-lmn:
   <<: *deploy_clonefactory_template
   environment:
     name: lmn
-  tags:
-    - devops
-    - bedrock
-    - docker
-    - titanio-lmn
+  tags: *tags-lmn
   # only:
   #   - main
-
-whitelist-clonefactory-dev:
-  <<: *whitelist_clonefactory_template
-  needs: ["compile-contracts"]
-  environment:
-    name: dev
-  tags:
-    - glrred
-    - bedrock
-    - docker
-    - titanio-dev
-  # only:
-  #   - dev
-
-whitelist-clonefactory-stg:
-  <<: *whitelist_clonefactory_template
-  needs: ["compile-contracts"]
-  environment:
-    name: stg
-  tags:
-    - devops
-    - bedrock
-    - docker
-    - titanio-stg
-  # only:
-  #   - stg
-
-whitelist-clonefactory-lmn:
-  <<: *whitelist_clonefactory_template
-  needs: ["compile-contracts"]
-  environment:
-    name: lmn
-  tags:
-    - devops
-    - bedrock
-    - docker
-    - titanio-lmn
-  # only:
-  #   - lmn
 
 populate-hr-contracts-dev:
   <<: *deploy_hr_contracts_template
   needs: ["compile-contracts"]
   environment:
     name: dev
-  tags:
-    - devops
-    - bedrock
-    - docker
-    - titanio-dev
+  tags: *tags-dev
   # only:
   #   - dev
 
@@ -285,11 +309,7 @@ populate-hr-contracts-stg:
   needs: ["compile-contracts"]
   environment:
     name: stg
-  tags:
-    - devops
-    - bedrock
-    - docker
-    - titanio-stg
+  tags: *tags-stg
   # only:
   #   - stg
 
@@ -298,11 +318,7 @@ populate-hr-contracts-lmn:
   needs: ["compile-contracts"]
   environment:
     name: lmn
-  tags:
-    - devops
-    - bedrock
-    - docker
-    - titanio-lmn
+  tags: *tags-lmn
   # only:
   #   - main
 
@@ -311,11 +327,7 @@ release-contracts-go:
   needs: ["build-contracts-go"]
   image: node:14-buster
   when: manual
-  tags:
-    - devops
-    - bedrock
-    - docker
-    - titanio-lmn
+  tags: *tags-lmn
   # only:
   #   - main
   before_script:
@@ -332,11 +344,7 @@ release-contracts-js:
   needs: ["build-contracts-js"]
   image: node:14-buster
   when: manual
-  tags:
-    - devops
-    - bedrock
-    - docker
-    - titanio-lmn
+  tags: *tags-lmn
   # only:
   #   - main
   before_script:
@@ -353,11 +361,7 @@ release-contracts-audit:
   needs: ["release-contracts-js", "release-contracts-go"]
   image: node:14-buster
   # when: manual
-  tags:
-    - devops
-    - bedrock
-    - docker
-    - titanio-lmn
+  tags: *tags-lmn
   # only:
   #   - main
   before_script:

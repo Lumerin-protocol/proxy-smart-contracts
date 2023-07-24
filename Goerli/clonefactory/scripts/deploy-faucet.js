@@ -9,7 +9,8 @@ const { ethers } = require("hardhat");
 
 async function main() {
   const [deployer] = await ethers.getSigners();
-
+  
+  //TODO: extract deployment code to separate file in lib folder
   console.log("Deploying FAUCET with the account:", deployer.address);
   console.log("Account balance:", (await deployer.getBalance()).toString());
   console.log("LUMERIN address:", process.env.LUMERIN_TOKEN_ADDRESS);
@@ -22,8 +23,9 @@ async function main() {
     process.env.FAUCET_ETH_PAYOUT,
   );
   await faucet.deployed();
+  const receipt = await ethers.provider.getTransactionReceipt(faucet.deployTransaction.hash);
 
-  console.log("Faucet address:", faucet.address);
+  console.log("Faucet address:", faucet.address, " gas used: ", receipt.gasUsed);
   fs.writeFileSync("faucet-addr.tmp", String(faucet.address));
 }
 
