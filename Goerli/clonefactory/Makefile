@@ -13,25 +13,25 @@ compile:
 	yarn hardhat compile --config hardhat-base.config.js
 
 deploy-lumerin:
-	yarn hardhat run --network sepolia ./scripts/deploy-lumerin.js
+	yarn hardhat run --network default ./scripts/deploy-lumerin.js
 
 deploy-clonefactory:
-	yarn hardhat run --network sepolia ./scripts/deploy-clonefactory.js
+	yarn hardhat run --network default ./scripts/deploy-clonefactory.js
 
 deploy-faucet:
-	yarn hardhat run --network sepolia ./scripts/deploy-faucet.js
+	yarn hardhat run --network default ./scripts/deploy-faucet.js
 
 update-clonefactory:
-	yarn hardhat run --network sepolia ./scripts/update-clonefactory.js
+	yarn hardhat run --network default ./scripts/update-clonefactory.js
 
 update-implementation:
-	yarn hardhat run --network sepolia ./scripts/update-implementation.js
+	yarn hardhat run --network default ./scripts/update-implementation.js
 
 populate-contracts:
-	yarn hardhat run --network sepolia ./scripts/populate-contracts.js
+	yarn hardhat run --network default ./scripts/populate-contracts.js
 
 whitelist-clonefactory:
-	yarn hardhat run --network sepolia ./scripts/whitelist-clonefactory.js
+	yarn hardhat run --network default ./scripts/whitelist-clonefactory.js
 
 build-go:
 	./build-go.sh
