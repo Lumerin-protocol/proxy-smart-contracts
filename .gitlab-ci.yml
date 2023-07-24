@@ -58,7 +58,7 @@ variables:
 # TODO: fix hardcoded etherscan url
 .deploy_clonefactory_template: &deploy_clonefactory_template
   stage: deploy-contracts
-  needs: ["compile-contracts", "test"]
+  needs: ["compile-contracts", "test", "build-contracts-js"]
   image: node:14-buster
   when: manual
   artifacts:
@@ -76,9 +76,20 @@ variables:
     - cd ../..
     - echo "DYNAMIC_ENVIRONMENT_URL=$DYNAMIC_ENVIRONMENT_URL" >> deploy.env
 
+.deploy_faucet_template: &deploy_faucet_template
+  stage: deploy-contracts
+  needs: ["compile-contracts", "test", "build-contracts-js"]
+  image: node:14-buster
+  when: manual
+  environment:
+    name: dev # The environment.name should be overriden
+  script:
+    - cd ./Goerli/clonefactory/
+    - make deploy-faucet
+
 .update_clonefactory_template: &update_clonefactory_template
   stage: update-contracts
-  needs: ["compile-contracts", "test"]
+  needs: ["compile-contracts", "test", "build-contracts-js"]
   image: node:14-buster
   when: manual
   environment:
@@ -89,7 +100,7 @@ variables:
 
 .update_implementation_template: &update_implementation_template
   stage: update-contracts
-  needs: ["compile-contracts", "test"]
+  needs: ["compile-contracts", "test", "build-contracts-js"]
   image: node:14-buster
   when: manual
   environment:
@@ -100,7 +111,7 @@ variables:
 
 .deploy_hr_contracts_template: &deploy_hr_contracts_template
   stage: populate-hr-contracts
-  needs: ["compile-contracts", "test"]
+  needs: ["compile-contracts", "test", "build-contracts-js"]
   image: node:14-buster
   when: manual
   environment:
@@ -111,7 +122,7 @@ variables:
 
 .whitelist_clonefactory_template: &whitelist_clonefactory_template
   stage: whitelist-clonefactory
-  needs: ["compile-contracts", "test"]
+  needs: ["compile-contracts", "test", "build-contracts-js"]
   image: node:14-buster
   when: manual
   environment:
@@ -123,7 +134,7 @@ variables:
 
 .deploy_lumerintoken_dev_stg: &deploy_lumerintoken_dev_stg
   stage: deploy-contracts
-  needs: ["compile-contracts", "test"]
+  needs: ["compile-contracts", "test", "build-contracts-js"]
   image: node:14-buster
   when: manual
   script:
@@ -294,6 +305,30 @@ deploy-clonefactory-lmn:
   tags: *tags-lmn
   # only:
   #   - main
+
+deploy-faucet-dev:
+  <<: *deploy_faucet_template
+  environment:
+    name: dev
+  tags: *tags-dev
+  # only:
+  #   - dev
+
+deploy-faucet-stg:
+  <<: *deploy_faucet_template
+  environment:
+    name: stg
+  tags: *tags-stg
+  # only:
+  #   - stg
+
+deploy-faucet-lmn:
+  <<: *deploy_faucet_template
+  environment:
+    name: lmn
+  tags: *tags-lmn
+  # only:
+  #   - lmn
 
 populate-hr-contracts-dev:
   <<: *deploy_hr_contracts_template
