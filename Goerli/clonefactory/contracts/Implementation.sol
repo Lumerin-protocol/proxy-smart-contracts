@@ -1,9 +1,8 @@
-//SPDX-License-Identifier: UNLICENSED
-
+// SPDX-License-Identifier: MIT
 pragma solidity >0.8.0;
 
-import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import "./Escrow.sol";
+import {Escrow} from "./Escrow.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 //MyToken is place holder for actual lumerin token, purely for testing purposes
 contract Implementation is Initializable, Escrow {
@@ -13,8 +12,8 @@ contract Implementation is Initializable, Escrow {
     uint256 public startingBlockTimestamp; //the timestamp of the block when the contract was purchased
     address public buyer; //address of the current purchaser of the contract
     address public seller; //address of the seller of the contract
-    address cloneFactory; //used to limit where the purchase can be made
-    address validator; //validator to be used. Can be set to 0 address if validator not being used
+    address public cloneFactory;
+    address validator;
     string public encryptedPoolData; //encrypted data for pool target info
     string public pubKey; //encrypted data for pool target info
     bool public isDeleted; //used to track if the contract is deleted, separate variable to account for the possibility of a contract being deleted when it is still running
@@ -54,7 +53,7 @@ contract Implementation is Initializable, Escrow {
         uint256 _speed,
         uint256 _length,
         address _seller,
-        address _lmn,
+        address _lmrAddress,
         address _cloneFactory, //used to restrict purchasing power to only the clonefactory
         address _validator,
         string calldata _pubKey
@@ -62,10 +61,10 @@ contract Implementation is Initializable, Escrow {
         terms = Terms(_price, _limit, _speed, _length);
         seller = _seller;
         cloneFactory = _cloneFactory;
-        validator = _validator;
         contractState = ContractState.Available;
         pubKey = _pubKey;
-        setParameters(_lmn);
+        validator = _validator;
+        Escrow.initialize(_lmrAddress);
     }
 
     function getPublicVariables()
@@ -98,7 +97,7 @@ contract Implementation is Initializable, Escrow {
             seller,
             encryptedPoolData,
             isDeleted,
-            myToken.balanceOf(address(this)),
+            lumerin.balanceOf(address(this)),
             hasFutureTerms
         );
     }
@@ -192,8 +191,8 @@ contract Implementation is Initializable, Escrow {
         }
     }
 
-    function setContractVariableUpdate() internal {
-        buyer = seller;
+    function resetContractVariables() internal {
+        buyer = address(0);
         encryptedPoolData = "";
         contractState = ContractState.Available;
 
@@ -216,7 +215,7 @@ contract Implementation is Initializable, Escrow {
         return 0;
     }
 
-    function setContractCloseOut(uint256 closeOutType) public {
+function setContractCloseOut(uint256 closeOutType) public {
         if (closeOutType == 0) {
             //this is a function call to be triggered by the buyer or validator
             //in the event that a contract needs to be canceled early for any reason
@@ -233,7 +232,7 @@ contract Implementation is Initializable, Escrow {
             
             history.push(HistoryEntry(comp, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
             
-            setContractVariableUpdate();
+            resetContractVariables();
             emit contractClosed(buyer);
         } else if (closeOutType == 1) {
             //this is a function call for the seller to withdraw their funds
@@ -250,13 +249,13 @@ contract Implementation is Initializable, Escrow {
                 "the contract has yet to be carried to term"
             );
             if (closeOutType == 3) {
-                withdrawFunds(myToken.balanceOf(address(this)), 0);
+                withdrawFunds(lumerin.balanceOf(address(this)), 0);
             }
 
             if (contractState == ContractState.Running) {
                 history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
             }
-            setContractVariableUpdate();
+            resetContractVariables();
             emit contractClosed(buyer);
         } else {
             revert("you must make a selection from 0 to 3");

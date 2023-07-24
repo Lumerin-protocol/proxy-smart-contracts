@@ -5,10 +5,10 @@ pragma solidity ^0.8.0;
 /// @author Lance Seidman (Lumerin)
 /// @notice This first version will be used to hold lumerin temporarily for the Marketplace Hash Rental.
 
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "./LumerinToken.sol";
 
-contract Escrow is ReentrancyGuard {
+contract Escrow is Initializable, ReentrancyGuardUpgradeable {
     address public escrow_purchaser; // Entity making a payment...
     address public escrow_seller; // Entity to receive funds...
     uint256 public contractTotal; // How much should be escrowed...
@@ -16,11 +16,12 @@ contract Escrow is ReentrancyGuard {
     uint256 marketplaceFeeRate; // amount of fee to be sent to the fee recipient (marketPlaceFeeRecipient)
     address marketPlaceFeeRecipient; //address where the marketplace fee's are sent
 
-    Lumerin myToken;
+    Lumerin lumerin;
 
     //internal function which will be called by the hashrate contract
-    function setParameters(address _titanToken) internal {
-        myToken = Lumerin(_titanToken);
+    function initialize(address _lmrAddress) internal onlyInitializing {
+        lumerin = Lumerin(_lmrAddress);
+        __ReentrancyGuard_init();
     }
 
     // @notice This will create a new escrow based on the seller, buyer, and total.
@@ -50,26 +51,26 @@ contract Escrow is ReentrancyGuard {
     ) internal nonReentrant {
         if (_seller != 0) {
             uint256 fee = calculateFee(_seller);
-            myToken.transfer(marketPlaceFeeRecipient, fee);
+            lumerin.transfer(marketPlaceFeeRecipient, fee);
 
-            myToken.transfer(escrow_seller, _seller - fee);
+            lumerin.transfer(escrow_seller, _seller - fee);
         }
 
         if (_buyer != 0) {
-            myToken.transfer(escrow_purchaser, _buyer);
+            lumerin.transfer(escrow_purchaser, _buyer);
         }
 
     }
 
     //internal function which transfers current hodled tokens into sellers account
     function getDepositContractHodlingsToSeller(uint256 remaining) internal {
-        uint256 balance = myToken.balanceOf(address(this)) - remaining;
+        uint256 balance = lumerin.balanceOf(address(this)) - remaining;
         uint256 fee = calculateFee(balance);
         uint256 transferrableBalance = balance - fee;
 
-        myToken.transfer(marketPlaceFeeRecipient, fee);
+        lumerin.transfer(marketPlaceFeeRecipient, fee);
 
-        myToken.transfer(escrow_seller, transferrableBalance);
+        lumerin.transfer(escrow_seller, transferrableBalance);
     }
 
     function calculateFee(uint256 revenue) internal view returns (uint256) {

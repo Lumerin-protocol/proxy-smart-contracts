@@ -1,7 +1,12 @@
+//@ts-check
 require("dotenv").config();
-const { ethers } = require("hardhat");
+const { ethers, config } = require("hardhat");
+const { ApproveSeller } = require("../lib/deploy");
+const { CloneFactory } = require("../build-js/dist");
+const Web3 = require("web3");
 
 async function main() {
+  /** @type {string[]} */
   let whitelistedAddresses;
 
   try {
@@ -18,19 +23,13 @@ async function main() {
   console.log(`CLONEFACTORY address: ${process.env.CLONE_FACTORY_ADDRESS}`);
   console.log("\n");
 
-  const CloneFactory = await ethers.getContractFactory("CloneFactory");
-  const [account] = await ethers.getSigners();
-  const cloneFactory = CloneFactory.attach(process.env.CLONE_FACTORY_ADDRESS);
-  console.log("Using account:", account.address);
-  console.log("Account balance:", (await account.getBalance()).toString());
-  console.log("\n");
+  /** @type {import("web3").default} */
+  // @ts-ignore
+  const web3 = new Web3(config.networks.localhost.url)
+  const privateKey = process.env.CONTRACTS_OWNER_PRIVATE_KEY
 
   for (const address of whitelistedAddresses) {
-    const addToWhitelist = await cloneFactory
-      .connect(account)
-      .setAddToWhitelist(address);
-    await addToWhitelist.wait();
-
+    await ApproveSeller(address, CloneFactory(web3, process.env.CLONE_FACTORY_ADDRESS), privateKey, console.log)
     console.log(`Added to whitelist: ${address}`);
   }
 
