@@ -1,10 +1,9 @@
 //@ts-check
 require("dotenv").config();
-const {  config, hardhatArguments } = require("hardhat");
 const { ApproveSeller } = require("../lib/deploy");
 const { CloneFactory } = require("../build-js/dist");
+const { Wallet } = require("ethers");
 const Web3 = require("web3");
-const { Wallet,ethers } = require("ethers");
 
 async function main() {
   /** @type {string[]} */
