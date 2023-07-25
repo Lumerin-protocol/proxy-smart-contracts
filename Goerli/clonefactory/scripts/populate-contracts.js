@@ -15,10 +15,11 @@ const main = async function () {
   console.log("CLONEFACTORY address:", process.env.CLONE_FACTORY_ADDRESS);
   console.log("VALIDATOR address:", process.env.VALIDATOR_ADDRESS)
 
-
   /** @type {import("web3").default} */
   // @ts-ignore
   const web3 = new Web3(process.env.ETH_NODE_ADDRESS)
+  const account = web3.eth.accounts.privateKeyToAccount(seller.privateKey)
+  web3.eth.accounts.wallet.create(0).add(account)
   const cf = CloneFactory(web3, process.env.CLONE_FACTORY_ADDRESS)
 
   const contractList = buildContractsList(
@@ -26,9 +27,8 @@ const main = async function () {
   );
 
   for (const c of contractList) {
-    const { address, txHash } = await CreateContract(c.price, c.length, c.speed, cf, seller.privateKey, console.log)
+    const { address, txHash } = await CreateContract(c.price, c.length, c.speed, cf, seller, console.log)
     console.log(`contract created, address: ${address} tx hash: ${txHash}`);
-    break
   }
 };
 

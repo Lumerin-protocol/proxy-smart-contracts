@@ -2,6 +2,8 @@
 const { upgrades, ethers } = require("hardhat");
 const { Wallet } = require("ethers");
 
+const GAS_LIMIT = 5_000_000;
+
 /**
  * @param {string} deployerPkey 
  * @param {(...arg)=>void} log 
@@ -51,7 +53,7 @@ async function DeployCloneFactory(lumerinAddr, deployerPkey, log = noop){
   log()
 
   log("2. Deploying upgradeable CLONEFACTORY")
-  const CloneFactory = await ethers.getContractFactory("CloneFactory");
+  const CloneFactory = await ethers.getContractFactory("CloneFactory", deployer);
   const cloneFactory = await upgrades.deployProxy(
     CloneFactory, 
     [implementation.address, process.env.LUMERIN_TOKEN_ADDRESS, deployer.address], 
@@ -84,7 +86,7 @@ async function UpdateCloneFactory(newCloneFactoryContractName, cloneFactoryAddr,
   const currentCloneFactoryImpl = await upgrades.erc1967.getImplementationAddress(cloneFactoryAddr)
   log("Current CLONEFACTORY implementation:", currentCloneFactoryImpl);
 
-  const CloneFactory = await ethers.getContractFactory(newCloneFactoryContractName);
+  const CloneFactory = await ethers.getContractFactory(newCloneFactoryContractName, deployer);
   const cloneFactory = await upgrades.upgradeProxy(cloneFactoryAddr, CloneFactory, { unsafeAllow: ['constructor'] });
   await cloneFactory.deployed();
   
@@ -118,7 +120,7 @@ async function UpdateImplementation(newImplementationContractName, cloneFactoryA
   log();
 
   const CloneFactory = await ethers.getContractFactory("CloneFactory");  
-  const Implementation = await ethers.getContractFactory(newImplementationContractName);  
+  const Implementation = await ethers.getContractFactory(newImplementationContractName, deployer);  
 
   const baseImplementationAddr = await CloneFactory.attach(cloneFactoryAddr).baseImplementation();
   log("Updating base implementation contract:", baseImplementationAddr);
@@ -145,13 +147,13 @@ async function UpdateImplementation(newImplementationContractName, cloneFactoryA
 /**
  * @param {string} sellerAddr
  * @param {import("../build-js/dist").CloneFactoryContext} cloneFactory 
- * @param {string} deployerPkey 
+ * @param {string} from from address 
  * @param {(...arg)=>void} log
  * @returns {Promise<void>} 
  */
-async function ApproveSeller(sellerAddr, cloneFactory, deployerPkey, log = noop){
+async function ApproveSeller(sellerAddr, cloneFactory, from, log = noop){
   log(`Approving seller ${sellerAddr}`)
-  const tx = await cloneFactory.methods.setAddToWhitelist(sellerAddr).send({from: new Wallet(deployerPkey).address});
+  const tx = await cloneFactory.methods.setAddToWhitelist(sellerAddr).send({from, gas: GAS_LIMIT});
   log("Seller approved");
 }
 
@@ -160,15 +162,14 @@ async function ApproveSeller(sellerAddr, cloneFactory, deployerPkey, log = noop)
  * @param {string} durationSeconds 
  * @param {string} hrGHS 
  * @param {import("../build-js/dist").CloneFactoryContext} cloneFactory
- * @param {string} deployerPkey 
+ * @param {Wallet} fromWallet 
  * @param {(...args)=>void} log
  * @returns {Promise<{address: string, txHash: string}>}
  */
-async function CreateContract(priceDecimalLMR, durationSeconds, hrGHS, cloneFactory, deployerPkey, log = noop){
-  const wallet = new Wallet(deployerPkey);
+async function CreateContract(priceDecimalLMR, durationSeconds, hrGHS, cloneFactory, fromWallet, log = noop){
   const receipt = await cloneFactory.methods
-    .setCreateNewRentalContract(priceDecimalLMR, "0", hrGHS, durationSeconds, wallet.address, wallet.publicKey)
-    .send({from: wallet.address})
+    .setCreateNewRentalContract(priceDecimalLMR, "0", hrGHS, durationSeconds, fromWallet.address, fromWallet.publicKey)
+    .send({from: fromWallet.address, gas: GAS_LIMIT})
   const address = receipt.events?.[0].address || "";
   const txHash = receipt.transactionHash;
   
