@@ -2,8 +2,8 @@
 require("dotenv").config();
 const { ApproveSeller } = require("../lib/deploy");
 const { CloneFactory } = require("../build-js/dist");
-const Web3 = require("web3");
 const { Wallet } = require("ethers");
+const Web3 = require("web3");
 
 async function main() {
   /** @type {string[]} */
