@@ -30,7 +30,7 @@ async function main() {
   
   /** @type {import("web3").default} */
   // @ts-ignore
-  const web3 = new Web3(process.env.ETH_NODE_ADDRESS)
+  const web3 = new Web3(config.networks.localhost.url)
   const account = web3.eth.accounts.privateKeyToAccount(deployerWallet.privateKey)
   web3.eth.accounts.wallet.create(0).add(account)
   
