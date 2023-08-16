@@ -1,40 +1,34 @@
+//@ts-check
 require("dotenv").config();
-const { buildContractsList } = require("./populate-contracts-lib");
-const { ethers } = require("hardhat");
+const { config, ethers } = require("hardhat");
+const Web3 = require("web3");
+const { Wallet } = require("ethers");
+const { CloneFactory } = require("../build-js/dist");
+const { CreateContract } = require("../lib/deploy");
+const { buildContractsList } = require("../lib/populate-contracts");
 
 const main = async function () {
-  const CloneFactory = await ethers.getContractFactory("CloneFactory");
-  const [seller] = await ethers.getSigners();
-  const cloneFactory =  CloneFactory.attach(
-    process.env.CLONE_FACTORY_ADDRESS
-  );
+  const seller = new Wallet(process.env.CONTRACTS_OWNER_PRIVATE_KEY).connect(ethers.provider)
 
   console.log("Deploying contracts with the seller account:", seller.address);
   console.log("Account balance:", (await seller.getBalance()).toString());
   console.log("CLONEFACTORY address:", process.env.CLONE_FACTORY_ADDRESS);
   console.log("VALIDATOR address:", process.env.VALIDATOR_ADDRESS)
 
-  const variableList = buildContractsList(
+  /** @type {import("web3").default} */
+  // @ts-ignore
+  const web3 = new Web3(config.networks.localhost.url)
+  const account = web3.eth.accounts.privateKeyToAccount(seller.privateKey)
+  web3.eth.accounts.wallet.create(0).add(account)
+  const cf = CloneFactory(web3, process.env.CLONE_FACTORY_ADDRESS)
+
+  const contractList = buildContractsList(
     process.env.BUILD_FULL_MARKETPLACE === "true"
   );
 
-  for (let c of variableList) {
-    let contractCreate = await cloneFactory
-      .connect(seller)
-      .setCreateNewRentalContract(
-        c.price,
-        0,
-        c.speed,
-        c.length,
-        process.env.VALIDATOR_ADDRESS,
-        "",
-        {
-          gasLimit: 10000000,
-        }
-      );
-
-    await contractCreate.wait();
-    console.log(`contract created, tx hash:`, contractCreate.hash);
+  for (const c of contractList) {
+    const { address, txHash } = await CreateContract(c.price, c.length, c.speed, cf, seller, console.log)
+    console.log(`contract created, address: ${address} tx hash: ${txHash}`);
   }
 };
 

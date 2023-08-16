@@ -28,19 +28,18 @@ function RandomIPAddress(){
 }
 
 /**
- * Simulates passing time on blockchain
- * @param {import("web3").default} web3 
- * @param {number} durationSeconds 
+ * @param {import("web3").default} web3
+ * @param {number} seconds
+ * @returns {Promise<void>}
  */
-async function WaitBlockchain(web3, durationSeconds){
+async function AdvanceBlockTime(web3, seconds){
   const { timestamp } = await web3.eth.getBlock(await web3.eth.getBlockNumber());
-
   await new Promise((resolve,reject)=>{
     web3.currentProvider.send({
-      jsonrpc: '2.0',
       method: "evm_mine",
+      params: [Number(timestamp) + seconds],
+      jsonrpc: '2.0',
       id: new Date().getTime(),
-      params: [Number(timestamp) + durationSeconds],
     }, (err, data) => err ? reject(err) : resolve(data))
   })
 }
@@ -60,4 +59,5 @@ module.exports = {
   ToLMNDecimals,
   ETHDecimals,
   ToETHDecimals,
+  AdvanceBlockTime,
 }
