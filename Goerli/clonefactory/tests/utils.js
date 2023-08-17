@@ -54,7 +54,6 @@ module.exports = {
   ToString,
   RandomEthAddress,
   RandomIPAddress,
-  WaitBlockchain,
   LMNDecimals,
   ToLMNDecimals,
   ETHDecimals,
