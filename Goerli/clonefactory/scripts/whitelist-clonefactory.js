@@ -1,8 +1,13 @@
+//@ts-check
 require("dotenv").config();
-const { ethers } = require("hardhat");
+const { ApproveSeller } = require("../lib/deploy");
+const { CloneFactory } = require("../build-js/dist");
+const { Wallet } = require("ethers");
+const Web3 = require("web3");
 
 async function main() {
-  let whitelistedAddresses;
+  /** @type {string[]} */
+  let whitelistedAddresses = [];
 
   try {
     whitelistedAddresses = JSON.parse(process.env.CLONE_FACTORY_WHITELIST_ADDRESSES);
@@ -13,24 +18,24 @@ async function main() {
     throw new Error(`Invalid CLONE_FACTORY_WHITELIST_ADDRESSES, should be a JSON array of strings: ${err}`);
   }
 
+  const privateKey = process.env.CONTRACTS_OWNER_PRIVATE_KEY
+  const cloneFactoryAddress = process.env.CLONE_FACTORY_ADDRESS
+  const deployerWallet = new Wallet(privateKey);
+  
   console.log(`Whitelisting ${whitelistedAddresses.length} addresses:`);
   console.log(`${whitelistedAddresses}`);
-  console.log(`CLONEFACTORY address: ${process.env.CLONE_FACTORY_ADDRESS}`);
+  console.log(`CLONEFACTORY address: ${cloneFactoryAddress}`);
+  console.log(`From address: ${deployerWallet.address}`);
   console.log("\n");
-
-  const CloneFactory = await ethers.getContractFactory("CloneFactory");
-  const [account] = await ethers.getSigners();
-  const cloneFactory = CloneFactory.attach(process.env.CLONE_FACTORY_ADDRESS);
-  console.log("Using account:", account.address);
-  console.log("Account balance:", (await account.getBalance()).toString());
-  console.log("\n");
-
+  
+  /** @type {import("web3").default} */
+  // @ts-ignore
+  const web3 = new Web3(config.networks.localhost.url)
+  const account = web3.eth.accounts.privateKeyToAccount(deployerWallet.privateKey)
+  web3.eth.accounts.wallet.create(0).add(account)
+  
   for (const address of whitelistedAddresses) {
-    const addToWhitelist = await cloneFactory
-      .connect(account)
-      .setAddToWhitelist(address);
-    await addToWhitelist.wait();
-
+    await ApproveSeller(address, CloneFactory(web3, cloneFactoryAddress), deployerWallet.address, console.log)
     console.log(`Added to whitelist: ${address}`);
   }
 

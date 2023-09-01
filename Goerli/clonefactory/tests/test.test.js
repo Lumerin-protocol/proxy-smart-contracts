@@ -5,27 +5,31 @@ let { time } = require("@nomicfoundation/hardhat-network-helpers");
 const { Lumerin, Implementation, CloneFactory } = require("../build-js/dist");
 const Web3 = require("web3");
 
+// TODO: rewrite all tests in this file to be clean and readable
+// no POE token anymore. Comments are out of date
+
 describe("marketplace", function () {
-  let purchase_price = 100;
-  let contract_length = 100;
-  let seller, withPOE, withoutPOE;
-  let cloneFactory;
-  let lumerin;
-  let poe;
-  let testContract;
+  process.env.CLONE_FACTORY_ADDRESS =
+    "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853";
+  process.env.LUMERIN_TOKEN_ADDRESS =
+    "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+  process.env.VALIDATOR_ADDRESS =
+    "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
   /** @type {import("web3").default} */
+  //@ts-ignore
   let web3 = new Web3(config.networks.localhost.url);
 
-  before(async function () {
-    [seller, withPOE, withoutPOE] = await ethers.getSigners();
+  const lumerin = Lumerin(web3, process.env.LUMERIN_TOKEN_ADDRESS);
+  const cloneFactory = CloneFactory(web3, process.env.CLONE_FACTORY_ADDRESS);
 
-    process.env.CLONE_FACTORY_ADDRESS =
-      "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
-    process.env.LUMERIN_TOKEN_ADDRESS =
-      "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-    process.env.VALIDATOR_ADDRESS =
-      "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+  let purchase_price = 100;
+  let contract_length = 100;
+  let seller, buyer;
+  let testContract;
+
+  before(async function () {
+    [seller, buyer] = await ethers.getSigners();
 
     console.log({
       CLONE_FACTORY_ADDRESS: process.env.CLONE_FACTORY_ADDRESS,
@@ -33,62 +37,12 @@ describe("marketplace", function () {
       VALIDATOR_ADDRESS: process.env.VALIDATOR_ADDRESS,
     });
 
-    // Implementation = await ethers.getContractFactory("Implementation");
-
-    //deploy lumeirn token
-    // let Lumerin = await ethers.getContractFactory("Lumerin");
-
-    let lumerinAttachErr = null;
-
-    try {
-      lumerin = Lumerin(web3, process.env.LUMERIN_TOKEN_ADDRESS);
-    } catch (e) {
-      lumerinAttachErr = e;
-      console.log(
-        "error attaching to LUMERIN_TOKEN_ADDRESS, deploying new token; error: ",
-        e
-      );
-    }
-
-    // if (lumerinAttachErr) {
-    //   lumerin = await Lumerin.deploy();
-    //   await lumerin.deployed();
-    // }
-
-    //deploy POE token
-    // let POE = await ethers.getContractFactory("Lumerin");
-    // poe = await POE.deploy();
-    // await poe.deployed();
-
-    // let CloneFactory = await ethers.getContractFactory("CloneFactory");
-
-    let cloneFactoryAttachErr = null;
-    try {
-      cloneFactory = CloneFactory(web3, process.env.CLONE_FACTORY_ADDRESS);
-    } catch (e) {
-      cloneFactoryAttachErr = e;
-      console.log(
-        "error attaching to clone factory, deploying new one; error: ",
-        e
-      );
-    }
-
-    if (cloneFactoryAttachErr) {
-      //deploying with the lumerin as the address collecting titans lumerin
-      // cloneFactory = await CloneFactory.deploy(
-      //   lumerin.address,
-      //   process.env.VALIDATOR_ADDRESS
-      //   //      poe.address
-      // );
-      // await cloneFactory.deployed();
-    }
-
     let contracts = await cloneFactory.methods.getContractList().call();
 
     testContract = Implementation(web3, contracts[0]);
 
     initialTestContractBalance = Number(
-      await lumerin.methods.balanceOf(testContract.options.address)
+      await lumerin.methods.balanceOf(testContract.options.address).call()
     );
   });
 
@@ -114,7 +68,7 @@ describe("marketplace", function () {
 
   //account without POE token fails to create a contract
   it("should fail contract creation", async function () {
-    let contractsBefore = await cloneFactory.methods.getContractList();
+    let contractsBefore = await cloneFactory.methods.getContractList().call();
     try {
       let contractCreate = await cloneFactory.methods
         .setCreateNewRentalContract(
@@ -126,9 +80,9 @@ describe("marketplace", function () {
           "123",
           "private key"
         )
-        .send({ from: withoutPOE.address });
+        .send({ from: buyer.address });
     } catch {}
-    let contractsAfter = await cloneFactory.methods.getContractList();
+    let contractsAfter = await cloneFactory.methods.getContractList().call();
     expect(contractsAfter.length).to.equal(contractsBefore.length);
   });
 
@@ -136,29 +90,13 @@ describe("marketplace", function () {
   it("should purchase a contract", async function () {
     //buyer calls purchase function on clone factory
 
-    let contracts = await purchaseContracts(1, withPOE);
+    let contracts = await purchaseContracts(1, buyer);
 
     expect(await Object.values(contracts)[0].methods.buyer().call()).to.equal(
-      withPOE.address
+      buyer.address
     );
   });
 
-  //account without POE token fails to buy a contract
-  it.skip("should failContractPurchase", async function () {
-    //buyer calls purchase function on clone factory
-
-    let contracts = await cloneFactory.methods.getContractList();
-    let contractAddress = contracts[contracts.length - 1];
-    try {
-      let purchaseContract = await cloneFactory
-        .setPurchaseRentalContract(contractAddress, "123")
-        .send({ from: withoutPOE.address });
-    } catch {}
-    //seller closes out the contract and collects the lumerin tokens
-    let contract1 = await Implementation(web3, contractAddress);
-    let contractBuyer = await contract1.buyer();
-    expect(contractBuyer).to.not.equal(withoutPOE.address);
-  });
 
   describe("hash power contract", function () {
     let testContract;
@@ -170,19 +108,19 @@ describe("marketplace", function () {
         contracts[0]
         // process.env.TEST_CONTRACT_ADDRESS
       );
-      const status = await testContract.methods.contractState();
+      const status = await testContract.methods.contractState().call();
 
-      if (status !== 0) {
-        await closeContract(testContract, withPOE);
+      if (status !== "0") {
+        await closeContract(testContract, buyer);
       }
     });
 
     it("should close out and distribute full price to seller minus fees", async function () {
       await testCloseout(
         3,
-        await testContract.methods.length().call(),
-        withPOE,
-        withoutPOE,
+        (await testContract.methods.terms().call())._length,
+        seller,
+        buyer,
         assertBuyerPayout,
         assertSellerPayout,
         assertContractWithdawal,
@@ -193,9 +131,9 @@ describe("marketplace", function () {
     it("should close out and not distribute funds", async function () {
       await testCloseout(
         2,
-        await testContract.methods.length().call(),
-        withPOE,
-        withoutPOE,
+        (await testContract.methods.terms().call())._length,
+        seller,
+        buyer,
         Function(),
         Function(),
         Function(),
@@ -206,9 +144,9 @@ describe("marketplace", function () {
     it("should not close out and distribute funds approx. 50% to seller", async function () {
       const results = await testCloseout(
         1,
-        (await testContract.methods.length().call()) / 2,
+        (await testContract.methods.terms().call())._length / 2,
         seller,
-        withoutPOE,
+        buyer,
         Function(),
         assertSellerPayout,
         assertContractWithdawal
@@ -218,7 +156,7 @@ describe("marketplace", function () {
 
     it("should close out and distribute funds approx. 50/50 (buyer balance and contract balance)", async function () {
       let contractRunDuration =
-        (await testContract.methods.length().call()) / 2;
+        (await testContract.methods.terms().call())._length / 2;
 
       const assertContractWithdawalWithBalance = (
         contractCompletionRatio,
@@ -228,19 +166,24 @@ describe("marketplace", function () {
       ) => {
         expect(contractBalanceAfterCloseout).not.to.be.equal(0);
 
-        assertContractWithdawal(contractCompletionRatio, contractPrice, contractBalanceAfterCloseout, contractBalanceAfterPurchase);
+        assertContractWithdawal(
+          contractCompletionRatio,
+          contractPrice,
+          contractBalanceAfterCloseout,
+          contractBalanceAfterPurchase
+        );
       };
 
       const results = await testCloseout(
         0,
         contractRunDuration,
-        withPOE,
-        withoutPOE,
+        buyer,
+        buyer,
         assertBuyerPayout,
         Function(),
         assertContractWithdawalWithBalance,
         assertHashrateContractState,
-        withoutPOE
+        buyer
       );
     });
 
@@ -256,7 +199,7 @@ describe("marketplace", function () {
       closer = seller
     ) {
       let sellerAddress = seller.address;
-      let contractPrice = Number(await testContract.methods.price().call());
+      let contractPrice = Number((await testContract.methods.terms().call())._price);
       let sellerBalance = Number(
         await lumerin.methods.balanceOf(sellerAddress).call()
       );
@@ -327,7 +270,9 @@ describe("marketplace", function () {
 
       // There will be some difference between the expected payout and the actual payout given latency in the transaction
       // For the purposes of this test, pass if the percent difference between expected and actual payout is less than 1%
-      const contractLength = Number(await testContract.methods.length().call());
+      const contractLength = Number(
+        (await testContract.methods.terms().call())._length
+      );
 
       const contractCompletionRatio = closeoutAfterSeconds / contractLength;
 
@@ -371,7 +316,7 @@ describe("marketplace", function () {
     //
     //TODO: fix test so it doesn't interfere with other deployed contracts
     it.skip("should track closeout with buyer and seller information", async function () {
-      const contracts = await purchaseContracts(10, withPOE);
+      const contracts = await purchaseContracts(10, buyer);
 
       let contractCloseoutPromises = [];
       //close out all contracts with option 3
@@ -380,7 +325,7 @@ describe("marketplace", function () {
 
         const contractInstance = contracts[contract];
 
-        await closeContract(contractInstance, withPOE);
+        await closeContract(contractInstance, buyer);
 
         let closedEvents = await contractInstance.getPastEvents(
           "contractClosed"
@@ -389,7 +334,7 @@ describe("marketplace", function () {
         expect(closedEvents.length).to.be.greaterThanOrEqual(1);
 
         let buyerHistory = await contractInstance.methods
-          .buyerHistory(withPOE.address, 0)
+          .buyerHistory(buyer.address, 0)
           .call();
 
         expect(buyerHistory._purchaseTime).to.not.NaN;
@@ -535,7 +480,8 @@ describe("marketplace", function () {
     closeoutType = 3,
     delay
   ) {
-    delay = delay || (await contractInstance.methods.length().call());
+    const terms = await contractInstance.methods.terms().call();
+    delay = delay || terms._length;
 
     // wait for contract to expire
     await time.increase(Number(delay) + 60);
@@ -551,7 +497,8 @@ describe("marketplace", function () {
     let state = await contract1.methods.contractState().call();
 
     if (state == 0) {
-      let price = BigInt(await contract1.methods.price().call());
+      const terms = await contract1.methods.terms().call();
+      let price = BigInt(terms._price);
       let requiredAmount = price + price / BigInt(100);
       // console.log("wallet balance before transfer - ", owner.address, ": ", await lumerin.balanceOf(owner.address));
       // console.log("lumerin allowance before transfer - ", owner.address, ": ", await lumerin.allowance(owner.address, cloneFactory.address));
