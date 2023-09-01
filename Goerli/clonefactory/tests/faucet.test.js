@@ -14,6 +14,7 @@ describe("Faucet", function () {
   const ethWallet = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 
   /** @type {import("web3").default} */
+  /*  @ts-ignore */
   const web3 = new Web3(hardhat.config.networks.localhost.url);
   const lumerinInstance = Lumerin(web3, lumerinAddress);
   const faucetInstance = Faucet(web3, faucetAddress);
@@ -41,9 +42,9 @@ describe("Faucet", function () {
     );
     const claimentETHBalance = Number(await web3.eth.getBalance(claiment));
 
-    expect(claimentLMNBalance).equals(10 * 10 ** 8);
-    expect(claimentETHBalance).equals(0.05 * 10 ** 18);
-  });
+     expect(claimentLMNBalance).equals(Number(process.env.FAUCET_LMR_PAYOUT))
+     expect(claimentETHBalance).equals(Number(process.env.FAUCET_ETH_PAYOUT))
+   })
 
   it("should disallow for the same eth address within 24 hours", async function () {
     try {

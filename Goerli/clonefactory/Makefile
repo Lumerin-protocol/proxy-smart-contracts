@@ -4,28 +4,34 @@ clean:
 	rm -rf abi artifacts cache build-go build-js
 
 test:
-	npx kill-port 8545 || true
+	kill "$$(lsof -t -i:8545)" || true
 	make compile
 	make -B build-js
 	yarn hardhat node --config hardhat-base.config.js & ./node-local-deploy.sh && yarn hardhat test --network localhost tests/*.js --config hardhat-base.config.js
-	
+
 compile:
 	yarn hardhat compile --config hardhat-base.config.js
 
 deploy-lumerin:
-	yarn hardhat run --network sepolia ./scripts/deploy-lumerin.js
+	yarn hardhat run --network default ./scripts/deploy-lumerin.js
 
 deploy-clonefactory:
-	yarn hardhat run --network sepolia ./scripts/deploy-clonefactory.js
+	yarn hardhat run --network default ./scripts/deploy-clonefactory.js
 
 deploy-faucet:
-	yarn hardhat run --network sepolia ./scripts/deploy-faucet.js
+	yarn hardhat run --network default ./scripts/deploy-faucet.js
+
+update-clonefactory:
+	yarn hardhat run --network default ./scripts/update-clonefactory.js
+
+update-implementation:
+	yarn hardhat run --network default ./scripts/update-implementation.js
 
 populate-contracts:
-	yarn hardhat run --network sepolia ./scripts/populate-contracts.js
+	yarn hardhat run --network default ./scripts/populate-contracts.js
 
 whitelist-clonefactory:
-	yarn hardhat run --network sepolia ./scripts/whitelist-clonefactory.js
+	yarn hardhat run --network default ./scripts/whitelist-clonefactory.js
 
 build-go:
 	./build-go.sh

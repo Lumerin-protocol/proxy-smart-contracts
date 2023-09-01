@@ -1,47 +1,29 @@
+//@ts-check
 require("@nomiclabs/hardhat-waffle");
 require("@nomiclabs/hardhat-etherscan");
 require("hardhat-abi-exporter");
+require('@openzeppelin/hardhat-upgrades');
 require("dotenv").config();
+const base = require("./hardhat-base.config.js");
 
-task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
-  const accounts = await hre.ethers.getSigners();
-
-  for (const account of accounts) {
-    console.log(account);
-  }
-});
-
-// This config is used for blockchain deployment
+// This config is used for blockchain deploymente
+//
+// Two configs are required because hardhat validates each network entry 
+// config for compile and test jobs, even it is not needed. Only deployment
+// job needs eth node url and private key
 
 /**
  * @type import('hardhat/config').HardhatUserConfig
  */
 module.exports = {
-  solidity: "0.8.9",
+  ...base,
   networks: {
-    hardhat: {
-      mining: {
-        auto: true,
-      },
-    },
-    goerli: {
+    ...base.networks,
+    default: {
       url: process.env.ETH_NODE_ADDRESS,
       accounts: [process.env.CONTRACTS_OWNER_PRIVATE_KEY],
       gasPrice: "auto",
       gas: "auto",
-    },
-    sepolia: {
-      url: process.env.ETH_NODE_ADDRESS,
-      accounts: [process.env.CONTRACTS_OWNER_PRIVATE_KEY],
-      gasPrice: "auto",
-      gas: "auto",
-    },
-  },
-  abiExporter: {
-    path: "./abi",
-    runOnCompile: true,
-    clear: true,
-    flat: true,
-    spacing: 2,
-  },
+    }
+  }
 };
