@@ -2,7 +2,7 @@
 require("dotenv").config();
 const { ApproveSeller } = require("../lib/deploy");
 const { CloneFactory } = require("../build-js/dist");
-const { Wallet } = require("ethers");
+const  { network } = require("hardhat");
 const Web3 = require("web3");
 
 async function main() {
@@ -20,8 +20,13 @@ async function main() {
 
   const privateKey = process.env.CONTRACTS_OWNER_PRIVATE_KEY
   const cloneFactoryAddress = process.env.CLONE_FACTORY_ADDRESS
-  const deployerWallet = new Wallet(privateKey);
-  
+
+
+
+  const web3 = new Web3(network.config.url)
+  const deployerWallet = web3.eth.accounts.privateKeyToAccount(privateKey)
+  web3.eth.accounts.wallet.create(0).add(deployerWallet)
+
   console.log(`Whitelisting ${whitelistedAddresses.length} addresses:`);
   console.log(`${whitelistedAddresses}`);
   console.log(`CLONEFACTORY address: ${cloneFactoryAddress}`);
@@ -30,9 +35,6 @@ async function main() {
   
   /** @type {import("web3").default} */
   // @ts-ignore
-  const web3 = new Web3(config.networks.localhost.url)
-  const account = web3.eth.accounts.privateKeyToAccount(deployerWallet.privateKey)
-  web3.eth.accounts.wallet.create(0).add(account)
   
   for (const address of whitelistedAddresses) {
     await ApproveSeller(address, CloneFactory(web3, cloneFactoryAddress), deployerWallet.address, console.log)

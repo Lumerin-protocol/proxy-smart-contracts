@@ -27,7 +27,6 @@
     "dotenv": "^16.0.3",
     "glob": "7.2.0",
     "hardhat-abi-exporter": "^2.10.0",
-    "sleep": "^6.3.0",
     "solidity-coverage": "^0.7.21",
     "wait-on": "^7.0.1"
   }
