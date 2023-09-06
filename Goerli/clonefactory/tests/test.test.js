@@ -4,6 +4,7 @@ let { config, ethers } = require("hardhat");
 let { time } = require("@nomicfoundation/hardhat-network-helpers");
 const { Lumerin, Implementation, CloneFactory } = require("../build-js/dist");
 const Web3 = require("web3");
+const MARKETPLACE_FEE = 0.0002e18;
 
 // TODO: rewrite all tests in this file to be clean and readable
 // no POE token anymore. Comments are out of date
@@ -59,7 +60,7 @@ describe("marketplace", function () {
         lumerin.options.address,
         lumerin.options.address //validator placeholder
       )
-      .send({ from: seller.address });
+      .send({ from: seller.address, value: MARKETPLACE_FEE });
 
     let contractsAfter = await cloneFactory.methods.getContractList().call();
 
@@ -80,7 +81,7 @@ describe("marketplace", function () {
           "123",
           "private key"
         )
-        .send({ from: buyer.address });
+        .send({ from: buyer.address, value: MARKETPLACE_FEE });
     } catch {}
     let contractsAfter = await cloneFactory.methods.getContractList().call();
     expect(contractsAfter.length).to.equal(contractsBefore.length);
@@ -111,11 +112,11 @@ describe("marketplace", function () {
       const status = await testContract.methods.contractState().call();
 
       if (status !== "0") {
-        await closeContract(testContract, buyer);
+        await closeContract(testContract, buyer, 0);
       }
     });
 
-    it("should close out and distribute full price to seller minus fees", async function () {
+    it("should close out and distribute full price to seller", async function () {
       await testCloseout(
         3,
         (await testContract.methods.terms().call())._length,
@@ -412,7 +413,7 @@ describe("marketplace", function () {
         sellerBalance
       );
 
-      expect(sellerPayoutPercentError).to.be.lessThan(1);
+      expect(sellerPayoutPercentError).to.be.lessThan(2);
     }
     function assertBuyerPayout(
       contractCompletionRatio,
@@ -420,7 +421,7 @@ describe("marketplace", function () {
       buyerBalanceAfterCloseout,
       buyerBalance
     ) {
-      const { expectedPayout, payoutPercentError } =
+      const { payoutPercentError } =
         calculateBuyerPayoutExpectations(
           contractCompletionRatio,
           contractPrice,
@@ -428,11 +429,7 @@ describe("marketplace", function () {
           buyerBalance
         );
 
-      if (expectedPayout > 0) {
-        expect(payoutPercentError).to.be.lessThan(1);
-      } else {
-        expect(Number(buyerBalanceAfterCloseout)).to.equal(buyerBalance);
-      }
+      expect(payoutPercentError).to.be.lessThan(1);
     }
 
     function calculateBuyerPayoutExpectations(
@@ -455,22 +452,14 @@ describe("marketplace", function () {
       sellerBalanceAfterCloseout,
       sellerBalance
     ) {
-      const expectedSellerPayoutWithoutFee =
-        contractCompletionRatio * contractPrice;
-
-      const expectedSellerPayout =
-        expectedSellerPayoutWithoutFee - expectedSellerPayoutWithoutFee * 0.01;
-      // const sellerBalanceDiff = sellerBalanceAfterCloseout - sellerBalance;
-      const sellerPayoutDiff = Math.abs(expectedSellerPayout - contractPrice);
-      let sellerPayoutPercentError;
-
-      if (sellerPayoutDiff < expectedSellerPayout) {
-        sellerPayoutPercentError = sellerPayoutDiff / expectedSellerPayout;
-      } else {
-        sellerPayoutPercentError = expectedSellerPayout / sellerPayoutDiff;
-      }
-
-      return sellerPayoutPercentError;
+      const expectedPayout = contractCompletionRatio * contractPrice;
+      const actualPayout = sellerBalanceAfterCloseout - sellerBalance;
+      if (expectedPayout == 0 && actualPayout != 0)
+          return 100;
+      else if (expectedPayout == 0 && actualPayout == 0)
+          return 0;
+      else
+          return Math.round(Math.abs(1.0 - actualPayout / expectedPayout) * 100);
     }
   });
 
@@ -486,9 +475,10 @@ describe("marketplace", function () {
     // wait for contract to expire
     await time.increase(Number(delay) + 60);
 
+    let f = (closeoutType == 1 || closeoutType == 3) ? MARKETPLACE_FEE : 0;
     let closeout = await contractInstance.methods
       .setContractCloseOut(closeoutType)
-      .send({ from: closer.address });
+      .send({ from: closer.address, value: f });
 
     // await closeout.wait();
   }
@@ -565,7 +555,7 @@ describe("marketplace", function () {
 
     let purchaseContract = await cloneFactory.methods
       .setPurchaseRentalContract(contract.options.address, "123")
-      .send({ from: buyer.address });
+      .send({ from: buyer.address, value: MARKETPLACE_FEE });
   }
 
   async function attachToContractAndIncrement(contractAddress, contractNumber) {

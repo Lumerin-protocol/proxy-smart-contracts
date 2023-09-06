@@ -13,9 +13,6 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable {
     address public escrow_seller; // Entity to receive funds...
     uint256 public contractTotal; // How much should be escrowed...
     // uint256 public receivedTotal; // Optional; Keep a balance for how much has been received...
-    uint256 marketplaceFeeRate; // amount of fee to be sent to the fee recipient (marketPlaceFeeRecipient)
-    address marketPlaceFeeRecipient; //address where the marketplace fee's are sent
-
     Lumerin lumerin;
 
     //internal function which will be called by the hashrate contract
@@ -29,15 +26,11 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable {
     function createEscrow(
         address _escrow_seller,
         address _escrow_purchaser,
-        uint256 _lumerinTotal,
-        address _marketPlaceFeeRecipient,
-        uint256 _marketplaceFeeRate
+        uint256 _lumerinTotal
     ) internal {
         escrow_seller = _escrow_seller;
         escrow_purchaser = _escrow_purchaser;
         contractTotal = _lumerinTotal;
-        marketPlaceFeeRecipient = _marketPlaceFeeRecipient;
-        marketplaceFeeRate = _marketplaceFeeRate;
     }
 
     // @notice Validator can request the funds to be released once determined it's safe to do.
@@ -50,10 +43,7 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable {
         uint256 _buyer
     ) internal nonReentrant {
         if (_seller != 0) {
-            uint256 fee = calculateFee(_seller);
-            lumerin.transfer(marketPlaceFeeRecipient, fee);
-
-            lumerin.transfer(escrow_seller, _seller - fee);
+            lumerin.transfer(escrow_seller, _seller);
         }
 
         if (_buyer != 0) {
@@ -65,15 +55,7 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable {
     //internal function which transfers current hodled tokens into sellers account
     function getDepositContractHodlingsToSeller(uint256 remaining) internal {
         uint256 balance = lumerin.balanceOf(address(this)) - remaining;
-        uint256 fee = calculateFee(balance);
-        uint256 transferrableBalance = balance - fee;
-
-        lumerin.transfer(marketPlaceFeeRecipient, fee);
-
+        uint256 transferrableBalance = balance;
         lumerin.transfer(escrow_seller, transferrableBalance);
-    }
-
-    function calculateFee(uint256 revenue) internal view returns (uint256) {
-        return revenue / marketplaceFeeRate;
     }
 }

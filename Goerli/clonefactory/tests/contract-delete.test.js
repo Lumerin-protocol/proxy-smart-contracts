@@ -3,6 +3,7 @@ const { expect } = require("chai");
 const ethers  = require("hardhat");
 const Web3 = require("web3");
 const { Lumerin, CloneFactory, Implementation } = require("../build-js/dist")
+const MARKETPLACE_FEE = 0.0002e18;
 
 describe("Contract delete", function () {
   const lumerinAddress = "0x5fbdb2315678afecb367f032d93f642f64180aa3"
@@ -26,7 +27,7 @@ describe("Contract delete", function () {
   })
 
   it("should create contract and check its status", async function(){
-    const receipt = await cf.methods.setCreateNewRentalContract("1", "0", "1", "3600", cloneFactoryAddress, "123").send({from: seller})
+    const receipt = await cf.methods.setCreateNewRentalContract("1", "0", "1", "3600", cloneFactoryAddress, "123").send({from: seller, value: MARKETPLACE_FEE})
     hrContractAddr = receipt.events?.contractCreated.returnValues._address;
     const impl = Implementation(web3, hrContractAddr)
     const data = await impl.methods.getPublicVariables().call()
@@ -70,7 +71,7 @@ describe("Contract delete", function () {
 
   it("should block purchase if contract deleted", async function(){
     try{
-      await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({from: buyer})
+      await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({from: buyer, value: MARKETPLACE_FEE})
       expect.fail("should throw error")
     } catch(e){
       expect(e.message).includes("cannot purchase deleted contract")
@@ -94,7 +95,7 @@ describe("Contract delete", function () {
   })
 
   it("should allow purchase if contract undeleted", async function(){
-    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({from: buyer})
+    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({from: buyer, value: MARKETPLACE_FEE})
   })
 
   it("should allow delete contract if contract is purchased", async function(){

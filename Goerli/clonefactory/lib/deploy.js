@@ -3,6 +3,7 @@ const { upgrades, ethers } = require("hardhat");
 const { Wallet } = require("ethers");
 
 const GAS_LIMIT = 5_000_000;
+const MARKETPLACE_FEE = 0.0002e18;
 
 /**
  * @param {string} deployerPkey 
@@ -169,7 +170,7 @@ async function ApproveSeller(sellerAddr, cloneFactory, from, log = noop){
 async function CreateContract(priceDecimalLMR, durationSeconds, hrGHS, cloneFactory, fromWallet, log = noop){
   const receipt = await cloneFactory.methods
     .setCreateNewRentalContract(priceDecimalLMR, "0", hrGHS, durationSeconds, fromWallet.address, fromWallet.publicKey)
-    .send({from: fromWallet.address, gas: GAS_LIMIT})
+    .send({from: fromWallet.address, value: MARKETPLACE_FEE, gas: GAS_LIMIT})
   const address = receipt.events?.[0].address || "";
   const txHash = receipt.transactionHash;
   
