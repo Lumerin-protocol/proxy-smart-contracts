@@ -4,6 +4,7 @@ const { Wallet } = require("ethers");
 const { remove0xPrefix, trimRight64Bytes } = require("./utils");
 
 const GAS_LIMIT = 5_000_000;
+const MARKETPLACE_FEE = 0.0002e18;
 
 /**
  * @param {string} deployerPkey 

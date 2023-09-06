@@ -3,6 +3,7 @@ pragma solidity >0.8.0;
 
 import {Escrow} from "./Escrow.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "./Shared.sol";
 
 //MyToken is place holder for actual lumerin token, purely for testing purposes
 contract Implementation is Initializable, Escrow {
@@ -19,6 +20,7 @@ contract Implementation is Initializable, Escrow {
     bool public isDeleted; //used to track if the contract is deleted, separate variable to account for the possibility of a contract being deleted when it is still running
     HistoryEntry[] public history;
     Terms public futureTerms;
+    FeeRecipient feeRecipient;
 
     enum ContractState {
         Available,
@@ -56,7 +58,8 @@ contract Implementation is Initializable, Escrow {
         address _lmrAddress,
         address _cloneFactory, //used to restrict purchasing power to only the clonefactory
         address _validator,
-        string calldata _pubKey
+        string calldata _pubKey,
+        FeeRecipient calldata _feeRecipient
     ) public initializer {
         terms = Terms(_price, _limit, _speed, _length);
         seller = _seller;
@@ -65,6 +68,7 @@ contract Implementation is Initializable, Escrow {
         pubKey = _pubKey;
         validator = _validator;
         Escrow.initialize(_lmrAddress);
+        feeRecipient = _feeRecipient;
     }
 
     function getPublicVariables()
@@ -135,9 +139,7 @@ contract Implementation is Initializable, Escrow {
     //function that the clone factory calls to purchase the contract
     function setPurchaseContract(
         string calldata _encryptedPoolData,
-        address _buyer,
-        address marketPlaceFeeRecipient, 
-        uint256 marketplaceFeeRate
+        address _buyer
     ) public {
         require(
             msg.sender == cloneFactory,
@@ -151,7 +153,7 @@ contract Implementation is Initializable, Escrow {
         buyer = _buyer;
         startingBlockTimestamp = block.timestamp;
         contractState = ContractState.Running;
-        createEscrow(seller, buyer, terms._price, marketPlaceFeeRecipient, marketplaceFeeRate);
+        createEscrow(seller, buyer, terms._price);
         emit contractPurchased(msg.sender);
     }
 
@@ -215,7 +217,7 @@ contract Implementation is Initializable, Escrow {
         return 0;
     }
 
-function setContractCloseOut(uint256 closeOutType) public {
+function setContractCloseOut(uint256 closeOutType) public payable {
         if (closeOutType == 0) {
             //this is a function call to be triggered by the buyer or validator
             //in the event that a contract needs to be canceled early for any reason
@@ -242,6 +244,12 @@ function setContractCloseOut(uint256 closeOutType) public {
                 "this account is not authorized to trigger a mid-contract closeout"
             );
 
+            /* ETH seller marketplace withdrawal fee */
+            require(msg.value >= feeRecipient.fee,
+                    "Insufficient ETH provided for marketplace fee");
+            (bool sent,) = payable(feeRecipient.recipient).call{value: feeRecipient.fee}("");
+            require(sent, "Failed to pay marketplace withdrawal fee");
+
             getDepositContractHodlingsToSeller(buyerPayoutCalc());
         } else if (closeOutType == 2 || closeOutType == 3) {
             require(
@@ -249,6 +257,15 @@ function setContractCloseOut(uint256 closeOutType) public {
                 "the contract has yet to be carried to term"
             );
             if (closeOutType == 3) {
+                /* ETH seller marketplace withdrawal fee */
+                require(
+                    msg.sender == seller,
+                    "only the seller can closeout AND withdraw after contract term"
+                );
+                require(msg.value >= feeRecipient.fee,
+                        "Insufficient ETH provided for marketplace fee");
+                (bool sent,) = payable(feeRecipient.recipient).call{value: feeRecipient.fee}("");
+                require(sent, "Failed to pay marketplace withdrawal fee");
                 withdrawFunds(lumerin.balanceOf(address(this)), 0);
             }
 
