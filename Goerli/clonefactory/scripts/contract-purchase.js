@@ -1,11 +1,17 @@
+//@ts-check
 require("dotenv").config();
+/**
+ * @type {import("hardhat/types/runtime").HardhatRuntimeEnvironment}
+ */
 const { ethers } = require("hardhat");
+const { encrypt } = require('ecies-geth')
+const { add65BytesPrefix } = require("../lib/utils");
 
 async function main() {
-  let contractAddress = ""; //process.env.CONTRACT_ADDRESS || "";
-  let dest = ""; //process.env.DESTINATION || "";
-  let lumerinAddress = "";//process.env.LUMERIN_ADDRESS || "";
-  let cloneFactoryAddress = "";// process.env.CLONE_FACTORY_ADDRESS || "";
+  let contractAddress = process.env.CONTRACT_ADDRESS || "";
+  let dest = process.env.DESTINATION || "";
+  let lumerinAddress = process.env.LUMERIN_ADDRESS || "";
+  let cloneFactoryAddress =  process.env.CLONE_FACTORY_ADDRESS || "";
 
   if (cloneFactoryAddress === ""){
     cloneFactoryAddress = "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
@@ -50,9 +56,21 @@ async function main() {
   console.log(`CLONEFACTORY address: ${cloneFactoryAddress}`);
   console.log("\n");
 
+  const fee = await cloneFactory.marketplaceFee();
+  console.log(`marketplace fee: ${fee} wei`);
+
+  const Implementation = await ethers.getContractFactory("Implementation");
+  const implementation = Implementation.attach(contractAddress);
+  const pubKey = await implementation.pubKey()
+
+  const encryptedDest = await encrypt(
+    Buffer.from(add65BytesPrefix(pubKey), 'hex'),
+    Buffer.from(dest)
+  )
+
   const purchase = await cloneFactory
     .connect(buyer)
-    .setPurchaseRentalContract(contractAddress, dest)
+    .setPurchaseRentalContract(contractAddress, encryptedDest.toString('hex'), { value: fee })
   const receipt = await purchase.wait();
 
   console.log(receipt)
