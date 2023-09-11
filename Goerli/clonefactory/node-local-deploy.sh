@@ -6,7 +6,7 @@
 #
 
 # wait until node is available
-yarn wait-on http://127.0.0.1:8545 -l
+yarn wait-on tcp:127.0.0.1:8545 -l
 
 # set global variables
 # two first default addresses for hardhat local network

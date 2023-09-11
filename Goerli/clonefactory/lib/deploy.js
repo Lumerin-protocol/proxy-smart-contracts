@@ -1,6 +1,7 @@
 //@ts-check
 const { upgrades, ethers } = require("hardhat");
 const { Wallet } = require("ethers");
+const { remove0xPrefix, trimRight64Bytes } = require("./utils");
 
 const GAS_LIMIT = 5_000_000;
 
@@ -167,8 +168,9 @@ async function ApproveSeller(sellerAddr, cloneFactory, from, log = noop){
  * @returns {Promise<{address: string, txHash: string}>}
  */
 async function CreateContract(priceDecimalLMR, durationSeconds, hrGHS, cloneFactory, fromWallet, log = noop){
+  const pubKey = trimRight64Bytes(remove0xPrefix(fromWallet.publicKey));
   const receipt = await cloneFactory.methods
-    .setCreateNewRentalContract(priceDecimalLMR, "0", hrGHS, durationSeconds, fromWallet.address, fromWallet.publicKey)
+    .setCreateNewRentalContract(priceDecimalLMR, "0", hrGHS, durationSeconds, fromWallet.address, pubKey)
     .send({from: fromWallet.address, gas: GAS_LIMIT})
   const address = receipt.events?.[0].address || "";
   const txHash = receipt.transactionHash;
