@@ -4,6 +4,7 @@ pragma solidity >0.8.0;
 import {Escrow} from "./Escrow.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./Shared.sol";
+import "./CloneFactory.sol";
 
 //MyToken is place holder for actual lumerin token, purely for testing purposes
 contract Implementation is Initializable, Escrow {
@@ -20,7 +21,6 @@ contract Implementation is Initializable, Escrow {
     bool public isDeleted; //used to track if the contract is deleted, separate variable to account for the possibility of a contract being deleted when it is still running
     HistoryEntry[] public history;
     Terms public futureTerms;
-    FeeRecipient feeRecipient;
 
     enum ContractState {
         Available,
@@ -58,8 +58,7 @@ contract Implementation is Initializable, Escrow {
         address _lmrAddress,
         address _cloneFactory, //used to restrict purchasing power to only the clonefactory
         address _validator,
-        string calldata _pubKey,
-        FeeRecipient calldata _feeRecipient
+        string calldata _pubKey
     ) public initializer {
         terms = Terms(_price, _limit, _speed, _length);
         seller = _seller;
@@ -68,7 +67,6 @@ contract Implementation is Initializable, Escrow {
         pubKey = _pubKey;
         validator = _validator;
         Escrow.initialize(_lmrAddress);
-        feeRecipient = _feeRecipient;
     }
 
     function getPublicVariables()
@@ -217,7 +215,7 @@ contract Implementation is Initializable, Escrow {
         return 0;
     }
 
-function setContractCloseOut(uint256 closeOutType) public payable {
+    function setContractCloseOut(uint256 closeOutType) public payable {
         if (closeOutType == 0) {
             //this is a function call to be triggered by the buyer or validator
             //in the event that a contract needs to be canceled early for any reason
@@ -243,14 +241,10 @@ function setContractCloseOut(uint256 closeOutType) public payable {
                 msg.sender == seller,
                 "this account is not authorized to trigger a mid-contract closeout"
             );
-
-            /* ETH seller marketplace withdrawal fee */
-            require(msg.value >= feeRecipient.fee,
-                    "Insufficient ETH provided for marketplace fee");
-            (bool sent,) = payable(feeRecipient.recipient).call{value: feeRecipient.fee}("");
-            require(sent, "Failed to pay marketplace withdrawal fee");
-
             getDepositContractHodlingsToSeller(buyerPayoutCalc());
+            /* ETH seller marketplace withdrawal fee */
+            bool sent = CloneFactory(cloneFactory).payMarketplaceFee();
+            require(sent, "Failed to pay marketplace withdrawal fee");
         } else if (closeOutType == 2 || closeOutType == 3) {
             require(
                 block.timestamp - startingBlockTimestamp >= terms._length,
@@ -262,11 +256,9 @@ function setContractCloseOut(uint256 closeOutType) public payable {
                     msg.sender == seller,
                     "only the seller can closeout AND withdraw after contract term"
                 );
-                require(msg.value >= feeRecipient.fee,
-                        "Insufficient ETH provided for marketplace fee");
-                (bool sent,) = payable(feeRecipient.recipient).call{value: feeRecipient.fee}("");
-                require(sent, "Failed to pay marketplace withdrawal fee");
                 withdrawFunds(lumerin.balanceOf(address(this)), 0);
+                bool sent = CloneFactory(cloneFactory).payMarketplaceFee();
+                require(sent, "Failed to pay marketplace withdrawal fee");
             }
 
             if (contractState == ContractState.Running) {

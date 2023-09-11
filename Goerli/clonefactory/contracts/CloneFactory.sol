@@ -14,13 +14,12 @@ import "./Shared.sol";
 //CloneFactory now responsible for minting, purchasing, and tracking contracts
 contract CloneFactory is Initializable {
     Lumerin lumerin;
-    address feeRecipient; //address where the marketplace fee's are sent
     address public baseImplementation;
     address public owner;
-    uint256 public marketplaceFee;
     bool public noMoreWhitelist;
     address[] public rentalContracts; //dynamically allocated list of rental contracts
     mapping(address => bool) rentalContractsMap; //mapping of rental contracts to verify cheaply if implementation was created by this clonefactory
+    FeeRecipient feeRecipient;
 
 
     mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
@@ -37,7 +36,7 @@ contract CloneFactory is Initializable {
     }
 
     modifier sufficientFee() {
-        require(msg.value >= marketplaceFee, "Insufficient ETH provided for marketplace fee");
+        require(msg.value >= feeRecipient.fee, "Insufficient ETH provided for marketplace fee");
         _;
     }
 
@@ -52,11 +51,21 @@ contract CloneFactory is Initializable {
     function initialize(address _baseImplementation, address _lumerin, address _feeRecipient) public initializer {
         lumerin = Lumerin(_lumerin);
         baseImplementation = _baseImplementation;
-        
         owner = msg.sender;
-        feeRecipient = _feeRecipient;
+        feeRecipient.fee = 0.0002 ether;
+        feeRecipient.recipient = _feeRecipient;
+    }
 
-        marketplaceFee = 0.0002 ether;
+    function payMarketplaceFee()
+        public payable sufficientFee returns (bool) {
+        (bool sent,) = payable(feeRecipient.recipient).call{value: feeRecipient.fee}("");
+        require(sent, "Failed to pay marketplace listing fee");
+        return sent;
+    }
+
+    function marketplaceFee()
+        external view  returns (uint256) {
+        return feeRecipient.fee;
     }
 
     //function to create a new Implementation contract
@@ -70,7 +79,7 @@ contract CloneFactory is Initializable {
     ) external payable onlyInWhitelist sufficientFee returns (address) {
 
         /* ETH seller marketplace listing fee */
-        (bool sent,) = payable(feeRecipient).call{value: marketplaceFee}("");
+        bool sent = payMarketplaceFee();
         require(sent, "Failed to pay marketplace listing fee");
 
         bytes memory data = abi.encodeWithSelector(
@@ -83,8 +92,7 @@ contract CloneFactory is Initializable {
             address(lumerin),
             address(this),
             _validator,
-            _pubKey,
-            FeeRecipient(marketplaceFee, feeRecipient)
+            _pubKey
         );
 
         BeaconProxy beaconProxy = new BeaconProxy(baseImplementation, data);
@@ -114,7 +122,7 @@ contract CloneFactory is Initializable {
         (uint256 _price,,,) = targetContract.terms();
 
         /* ETH buyer marketplace purchase fee */
-        (bool sent,) = payable(feeRecipient).call{value: marketplaceFee}("");
+        bool sent = payMarketplaceFee();
         require(sent, "Failed to pay marketplace purchase fee");
 
         uint256 requiredAllowance = _price;
@@ -165,14 +173,9 @@ contract CloneFactory is Initializable {
         noMoreWhitelist = true;
     }
 
-    function setMarketplaceFee(uint256 _newFee) external onlyOwner {
-        marketplaceFee = _newFee;
-    }
-
-    function setMarketplaceFeeRecipient(
-        address _newRecipient
-    ) external onlyOwner {
-        feeRecipient = _newRecipient;
+    function setMarketplaceFeeRecipient(uint256 fee, address recipient) external onlyOwner {
+        feeRecipient.fee = fee;
+        feeRecipient.recipient = recipient;
     }
 
     function setContractDeleted(address _contractAddress, bool _isDeleted) public {
