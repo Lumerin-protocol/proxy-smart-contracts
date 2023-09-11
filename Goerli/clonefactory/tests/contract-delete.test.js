@@ -3,7 +3,6 @@ const { expect } = require("chai");
 const ethers  = require("hardhat");
 const Web3 = require("web3");
 const { Lumerin, CloneFactory, Implementation } = require("../build-js/dist")
-const MARKETPLACE_FEE = 0.0002e18;
 
 describe("Contract delete", function () {
   const lumerinAddress = "0x5fbdb2315678afecb367f032d93f642f64180aa3"
@@ -18,16 +17,18 @@ describe("Contract delete", function () {
   const web3 = new Web3(ethers.config.networks.localhost.url)
   const cf = CloneFactory(web3, cloneFactoryAddress)
   let hrContractAddr = ""
+  let fee = ""
 
   before(async ()=>{
     const lumerin = Lumerin(web3, lumerinAddress)
     await lumerin.methods.increaseAllowance(cloneFactoryAddress, "10000").send({from: buyer})
     await lumerin.methods.transfer(buyer, "10000").send({from: owner})
     await cf.methods.setAddToWhitelist(seller).send({from: owner})
+    fee = await cf.methods.marketplaceFee().call()
   })
 
   it("should create contract and check its status", async function(){
-    const receipt = await cf.methods.setCreateNewRentalContract("1", "0", "1", "3600", cloneFactoryAddress, "123").send({from: seller, value: MARKETPLACE_FEE})
+    const receipt = await cf.methods.setCreateNewRentalContract("1", "0", "1", "3600", cloneFactoryAddress, "123").send({from: seller, value: fee})
     hrContractAddr = receipt.events?.contractCreated.returnValues._address;
     const impl = Implementation(web3, hrContractAddr)
     const data = await impl.methods.getPublicVariables().call()
@@ -71,7 +72,7 @@ describe("Contract delete", function () {
 
   it("should block purchase if contract deleted", async function(){
     try{
-      await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({from: buyer, value: MARKETPLACE_FEE})
+      await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({from: buyer, value: fee})
       expect.fail("should throw error")
     } catch(e){
       expect(e.message).includes("cannot purchase deleted contract")
@@ -95,7 +96,7 @@ describe("Contract delete", function () {
   })
 
   it("should allow purchase if contract undeleted", async function(){
-    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({from: buyer, value: MARKETPLACE_FEE})
+    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({from: buyer, value: fee})
   })
 
   it("should allow delete contract if contract is purchased", async function(){

@@ -43,7 +43,8 @@ describe("Clonefactory update", function () {
 
 
     const cf = CloneFactory(web3, cloneFactoryAddr);
-    const { address } = await CreateContract(priceDecimalLMR, (30*60).toString(), "10000", cf, new Wallet(deployerPrivateKey));
+    const fee = await cf.methods.marketplaceFee().call()
+    const { address } = await CreateContract(priceDecimalLMR, (30*60).toString(), "10000", cf, new Wallet(deployerPrivateKey), fee);
     createdContractAddr = address;
     const contractsList = await cf.methods.getContractList().call()
     expect(contractsList).to.include(createdContractAddr)

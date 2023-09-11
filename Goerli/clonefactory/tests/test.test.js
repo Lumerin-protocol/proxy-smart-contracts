@@ -4,7 +4,6 @@ let { config, ethers } = require("hardhat");
 let { time } = require("@nomicfoundation/hardhat-network-helpers");
 const { Lumerin, Implementation, CloneFactory } = require("../build-js/dist");
 const Web3 = require("web3");
-const MARKETPLACE_FEE = 0.0002e18;
 
 // TODO: rewrite all tests in this file to be clean and readable
 // no POE token anymore. Comments are out of date
@@ -28,6 +27,7 @@ describe("marketplace", function () {
   let contract_length = 100;
   let seller, buyer;
   let testContract;
+  let fee = ""
 
   before(async function () {
     [seller, buyer] = await ethers.getSigners();
@@ -45,6 +45,8 @@ describe("marketplace", function () {
     initialTestContractBalance = Number(
       await lumerin.methods.balanceOf(testContract.options.address).call()
     );
+
+    fee = await cloneFactory.methods.marketplaceFee().call()
   });
 
   //account with POE token creates contract
@@ -60,7 +62,7 @@ describe("marketplace", function () {
         lumerin.options.address,
         lumerin.options.address //validator placeholder
       )
-      .send({ from: seller.address, value: MARKETPLACE_FEE });
+      .send({ from: seller.address, value: fee });
 
     let contractsAfter = await cloneFactory.methods.getContractList().call();
 
@@ -81,7 +83,7 @@ describe("marketplace", function () {
           "123",
           "private key"
         )
-        .send({ from: buyer.address, value: MARKETPLACE_FEE });
+        .send({ from: buyer.address, value: fee });
     } catch {}
     let contractsAfter = await cloneFactory.methods.getContractList().call();
     expect(contractsAfter.length).to.equal(contractsBefore.length);
@@ -475,7 +477,7 @@ describe("marketplace", function () {
     // wait for contract to expire
     await time.increase(Number(delay) + 60);
 
-    let f = (closeoutType == 1 || closeoutType == 3) ? MARKETPLACE_FEE : 0;
+    let f = (closeoutType == 1 || closeoutType == 3) ? fee : 0;
     let closeout = await contractInstance.methods
       .setContractCloseOut(closeoutType)
       .send({ from: closer.address, value: f });
@@ -555,7 +557,7 @@ describe("marketplace", function () {
 
     let purchaseContract = await cloneFactory.methods
       .setPurchaseRentalContract(contract.options.address, "123")
-      .send({ from: buyer.address, value: MARKETPLACE_FEE });
+      .send({ from: buyer.address, value: fee });
   }
 
   async function attachToContractAndIncrement(contractAddress, contractNumber) {

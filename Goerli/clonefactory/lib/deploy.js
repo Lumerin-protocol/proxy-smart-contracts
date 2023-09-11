@@ -4,7 +4,6 @@ const { Wallet } = require("ethers");
 const { remove0xPrefix, trimRight64Bytes } = require("./utils");
 
 const GAS_LIMIT = 5_000_000;
-const MARKETPLACE_FEE = 0.0002e18;
 
 /**
  * @param {string} deployerPkey 
@@ -165,15 +164,15 @@ async function ApproveSeller(sellerAddr, cloneFactory, from, log = noop){
  * @param {string} hrGHS 
  * @param {import("../build-js/dist").CloneFactoryContext} cloneFactory
  * @param {Wallet} fromWallet 
+ * @param {string} marketplaceFee
  * @param {(...args)=>void} log
  * @returns {Promise<{address: string, txHash: string}>}
  */
-async function CreateContract(priceDecimalLMR, durationSeconds, hrGHS, cloneFactory, fromWallet, log = noop){
+async function CreateContract(priceDecimalLMR, durationSeconds, hrGHS, cloneFactory, fromWallet, marketplaceFee, log = noop){
   const pubKey = trimRight64Bytes(remove0xPrefix(fromWallet.publicKey));
   const receipt = await cloneFactory.methods
     .setCreateNewRentalContract(priceDecimalLMR, "0", hrGHS, durationSeconds, fromWallet.address, pubKey)
-    .send({from: fromWallet.address, value: MARKETPLACE_FEE, gas: GAS_LIMIT});
-
+    .send({from: fromWallet.address, gas: GAS_LIMIT, value: marketplaceFee});
   const address = receipt.events?.[0].address || "";
   const txHash = receipt.transactionHash;
   
