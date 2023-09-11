@@ -57,7 +57,7 @@ describe("Contract delete", function () {
 
     await AdvanceBlockTime(web3, 3600)
     const impl = Implementation(web3, hrContractAddr)
-    await impl.methods.setContractCloseOut("3").send({from: buyer, value: MARKETPLACE_FEE})
+    await impl.methods.setContractCloseOut("3").send({from: seller, value: MARKETPLACE_FEE})
     
     const data = await impl.methods.getHistory("0", "100").call()
     const entry = data.find(entry => entry._purchaseTime == purchaseTime)

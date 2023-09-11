@@ -1,4 +1,8 @@
+//@ts-check
 require("dotenv").config();
+/**
+ * @type {import("hardhat/types/runtime").HardhatRuntimeEnvironment}
+ */
 const { ethers } = require("hardhat");
 const { encrypt } = require('ecies-geth')
 const { add65BytesPrefix } = require("../lib/utils");
@@ -52,6 +56,9 @@ async function main() {
   console.log(`CLONEFACTORY address: ${cloneFactoryAddress}`);
   console.log("\n");
 
+  const fee = await cloneFactory.marketplaceFee();
+  console.log(`marketplace fee: ${fee} wei`);
+
   const Implementation = await ethers.getContractFactory("Implementation");
   const implementation = Implementation.attach(contractAddress);
   const pubKey = await implementation.pubKey()
@@ -63,7 +70,7 @@ async function main() {
 
   const purchase = await cloneFactory
     .connect(buyer)
-    .setPurchaseRentalContract(contractAddress, encryptedDest.toString('hex'))
+    .setPurchaseRentalContract(contractAddress, encryptedDest.toString('hex'), { value: fee })
   const receipt = await purchase.wait();
 
   console.log(receipt)
