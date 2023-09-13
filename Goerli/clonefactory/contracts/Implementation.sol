@@ -204,16 +204,12 @@ contract Implementation is Initializable, Escrow {
     }
 
     function getBuyerPayout() internal view returns (uint256) {
-        uint256 buyerPayout = 0;
-
         uint256 elapsedContractTime = (block.timestamp - startingBlockTimestamp);
         if (elapsedContractTime <= terms._length) {
             // order of operations is important as we are dealing with uint256!
-            buyerPayout = terms._price - terms._price * elapsedContractTime / terms._length;
+           return terms._price - terms._price * elapsedContractTime / terms._length;
         }
-        
-
-        return buyerPayout;
+        return 0;
     }
 
     function setContractCloseOut(uint256 closeOutType) public payable {
