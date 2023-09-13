@@ -5,7 +5,7 @@ const Web3 = require("web3");
 const { Lumerin, CloneFactory, Implementation } = require("../build-js/dist");
 const { ToString } = require("./utils");
 
-describe("Contract terms update", function () {
+describe.only("Contract terms update", function () {
   const lumerinAddress = "0x5fbdb2315678afecb367f032d93f642f64180aa3"
   const cloneFactoryAddress = "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
 
@@ -109,6 +109,7 @@ describe("Contract terms update", function () {
     const newPrice = ToString(3 * 10**8);
     const impl = Implementation(web3, hrContractAddr)
     const receipt = await impl.methods.setContractCloseOut("0").send({from: buyer})
+    console.log('herere')
 
     const futureTerms = await impl.methods.futureTerms().call()
 
