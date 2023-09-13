@@ -5,7 +5,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {Implementation} from "./Implementation.sol";
 import {Lumerin} from "./LumerinToken.sol";
-import "./Shared.sol";
+import {FeeRecipient} from "./Shared.sol";
 
 /// @title CloneFactory
 /// @author Josh Kean (Lumerin)
