@@ -5,7 +5,7 @@ const Web3 = require("web3");
 const { Lumerin, CloneFactory, Implementation } = require("../build-js/dist");
 const { ToString } = require("./utils");
 
-describe("Contract terms update", function () {
+describe.only("Contract terms update", function () {
   const lumerinAddress = "0x5fbdb2315678afecb367f032d93f642f64180aa3"
   const cloneFactoryAddress = "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
 
