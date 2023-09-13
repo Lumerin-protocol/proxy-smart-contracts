@@ -32,7 +32,7 @@ describe("Contract closeout", function () {
     fee = await cf.methods.marketplaceFee().call()
   })
 
-  it("should verify balances after 100% completion", async function(){
+  it("should verify closeout type 3 for 100% completion", async function(){
     const receipt = await cf.methods.setCreateNewRentalContract(price, "3", speed, length, cloneFactoryAddress, "123").send({from: seller, value: fee})
     hrContractAddr = receipt.events?.contractCreated.returnValues._address;
     

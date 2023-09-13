@@ -109,7 +109,6 @@ describe.only("Contract terms update", function () {
     const newPrice = ToString(3 * 10**8);
     const impl = Implementation(web3, hrContractAddr)
     const receipt = await impl.methods.setContractCloseOut("0").send({from: buyer})
-    console.log('herere')
 
     const futureTerms = await impl.methods.futureTerms().call()
 
