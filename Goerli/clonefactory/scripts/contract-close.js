@@ -30,9 +30,12 @@ async function main() {
   console.log("Account balance:", (await buyer.getBalance()).toString());
   console.log("\n");
 
+  const fee = await cloneFactory.marketplaceFee();
+  console.log(`marketplace fee: ${fee} wei`);
+
   const closeout = await cloneFactory
     .connect(buyer)
-    .setContractCloseOut(0)
+    .setContractCloseOut(0, {value: fee})
   const receipt = await closeout.wait();
 
   console.log(receipt)

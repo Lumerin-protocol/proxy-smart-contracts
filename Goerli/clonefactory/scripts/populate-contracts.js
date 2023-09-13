@@ -26,8 +26,11 @@ const main = async function () {
     process.env.BUILD_FULL_MARKETPLACE === "true"
   );
 
+  const fee = await cf.methods.marketplaceFee().call()
+  console.log(`marketplace fee: ${fee} wei`);
+
   for (const c of contractList) {
-    const { address, txHash } = await CreateContract(c.price, c.length, c.speed, cf, seller, console.log)
+    const { address, txHash } = await CreateContract(c.price, c.length, c.speed, cf, seller, fee, console.log)
     console.log(`contract created, address: ${address} tx hash: ${txHash}`);
   }
 };

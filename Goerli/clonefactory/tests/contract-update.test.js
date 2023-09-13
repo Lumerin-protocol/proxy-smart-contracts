@@ -5,7 +5,7 @@ const Web3 = require("web3");
 const { Lumerin, CloneFactory, Implementation } = require("../build-js/dist");
 const { ToString } = require("./utils");
 
-describe("Contract terms update", function () {
+describe.only("Contract terms update", function () {
   const lumerinAddress = "0x5fbdb2315678afecb367f032d93f642f64180aa3"
   const cloneFactoryAddress = "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
 
@@ -21,6 +21,7 @@ describe("Contract terms update", function () {
   const web3 = new Web3(ethers.config.networks.localhost.url)
   const cf = CloneFactory(web3, cloneFactoryAddress)
   let hrContractAddr = ""
+  let fee = ""
 
   before(async ()=>{
     const lumerin = Lumerin(web3, lumerinAddress)
@@ -28,10 +29,11 @@ describe("Contract terms update", function () {
     await lumerin.methods.increaseAllowance(cloneFactoryAddress, ToString(10* 10**8)).send({from: buyer})
     await lumerin.methods.transfer(seller,  ToString(10* 10**8)).send({from: owner})
     await cf.methods.setAddToWhitelist(seller).send({from: owner})
+    fee = await cf.methods.marketplaceFee().call()
   })
 
   it("should create contract and check its status", async function(){
-    const receipt = await cf.methods.setCreateNewRentalContract(price, "0", "1", "3600", cloneFactoryAddress, "123").send({from: seller})
+    const receipt = await cf.methods.setCreateNewRentalContract(price, "0", "1", "3600", cloneFactoryAddress, "123").send({from: seller, value: fee})
     hrContractAddr = receipt.events?.contractCreated.returnValues._address;
     const impl = Implementation(web3, hrContractAddr)
     const newData = await impl.methods.futureTerms().call()
@@ -78,7 +80,7 @@ describe("Contract terms update", function () {
   it("should store futureTerms for contract and should not emit update event if contract is running", async function(){
     const price = ToString(2 * 10**8);
     const newPrice = ToString(3 * 10**8);
-    await cf.methods.setPurchaseRentalContract(hrContractAddr, '').send({from: buyer});
+    await cf.methods.setPurchaseRentalContract(hrContractAddr, '').send({from: buyer, value: fee});
     const receipt = await cf.methods.setUpdateContractInformation(hrContractAddr,  newPrice, '22', '33', '44').send({from: seller})
     const impl = Implementation(web3, hrContractAddr)
     const futureTerms = await impl.methods.futureTerms().call()
