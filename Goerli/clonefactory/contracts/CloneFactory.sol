@@ -197,6 +197,6 @@ contract CloneFactory is Initializable {
         Implementation _contract = Implementation(_contractAddress);
         require(msg.sender == _contract.seller(), "you are not authorized");
         Implementation(_contractAddress).setUpdatePurchaseInformation(_price, _limit, _speed, _length);
-        // TODO: emit purchaseInfoUpdated(address(this));
+        emit purchaseInfoUpdated(address(this));
     }
 }
