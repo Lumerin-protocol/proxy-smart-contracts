@@ -27,6 +27,7 @@ describe("marketplace", function () {
   let contract_length = 100;
   let seller, buyer;
   let testContract;
+  let fee = ""
 
   before(async function () {
     [seller, buyer] = await ethers.getSigners();
@@ -44,6 +45,8 @@ describe("marketplace", function () {
     initialTestContractBalance = Number(
       await lumerin.methods.balanceOf(testContract.options.address).call()
     );
+
+    fee = await cloneFactory.methods.marketplaceFee().call()
   });
 
   //account with POE token creates contract
@@ -59,7 +62,7 @@ describe("marketplace", function () {
         lumerin.options.address,
         lumerin.options.address //validator placeholder
       )
-      .send({ from: seller.address });
+      .send({ from: seller.address, value: fee });
 
     let contractsAfter = await cloneFactory.methods.getContractList().call();
 
@@ -80,7 +83,7 @@ describe("marketplace", function () {
           "123",
           "private key"
         )
-        .send({ from: buyer.address });
+        .send({ from: buyer.address, value: fee });
     } catch {}
     let contractsAfter = await cloneFactory.methods.getContractList().call();
     expect(contractsAfter.length).to.equal(contractsBefore.length);
@@ -111,11 +114,11 @@ describe("marketplace", function () {
       const status = await testContract.methods.contractState().call();
 
       if (status !== "0") {
-        await closeContract(testContract, buyer);
+        await closeContract(testContract, buyer, 0);
       }
     });
 
-    it("should close out and distribute full price to seller minus fees", async function () {
+    it("should close out and distribute full price to seller", async function () {
       await testCloseout(
         3,
         (await testContract.methods.terms().call())._length,
@@ -412,7 +415,7 @@ describe("marketplace", function () {
         sellerBalance
       );
 
-      expect(sellerPayoutPercentError).to.be.lessThan(1);
+      expect(sellerPayoutPercentError).to.be.lessThan(2);
     }
     function assertBuyerPayout(
       contractCompletionRatio,
@@ -420,7 +423,7 @@ describe("marketplace", function () {
       buyerBalanceAfterCloseout,
       buyerBalance
     ) {
-      const { expectedPayout, payoutPercentError } =
+      const { payoutPercentError } =
         calculateBuyerPayoutExpectations(
           contractCompletionRatio,
           contractPrice,
@@ -428,11 +431,7 @@ describe("marketplace", function () {
           buyerBalance
         );
 
-      if (expectedPayout > 0) {
-        expect(payoutPercentError).to.be.lessThan(1);
-      } else {
-        expect(Number(buyerBalanceAfterCloseout)).to.equal(buyerBalance);
-      }
+      expect(payoutPercentError).to.be.lessThan(1);
     }
 
     function calculateBuyerPayoutExpectations(
@@ -455,22 +454,14 @@ describe("marketplace", function () {
       sellerBalanceAfterCloseout,
       sellerBalance
     ) {
-      const expectedSellerPayoutWithoutFee =
-        contractCompletionRatio * contractPrice;
-
-      const expectedSellerPayout =
-        expectedSellerPayoutWithoutFee - expectedSellerPayoutWithoutFee * 0.01;
-      // const sellerBalanceDiff = sellerBalanceAfterCloseout - sellerBalance;
-      const sellerPayoutDiff = Math.abs(expectedSellerPayout - contractPrice);
-      let sellerPayoutPercentError;
-
-      if (sellerPayoutDiff < expectedSellerPayout) {
-        sellerPayoutPercentError = sellerPayoutDiff / expectedSellerPayout;
-      } else {
-        sellerPayoutPercentError = expectedSellerPayout / sellerPayoutDiff;
-      }
-
-      return sellerPayoutPercentError;
+      const expectedPayout = contractCompletionRatio * contractPrice;
+      const actualPayout = sellerBalanceAfterCloseout - sellerBalance;
+      if (expectedPayout == 0 && actualPayout != 0)
+          return 100;
+      else if (expectedPayout == 0 && actualPayout == 0)
+          return 0;
+      else
+          return Math.round(Math.abs(1.0 - actualPayout / expectedPayout) * 100);
     }
   });
 
@@ -486,9 +477,10 @@ describe("marketplace", function () {
     // wait for contract to expire
     await time.increase(Number(delay) + 60);
 
+    let f = (closeoutType == 1 || closeoutType == 3) ? fee : 0;
     let closeout = await contractInstance.methods
       .setContractCloseOut(closeoutType)
-      .send({ from: closer.address });
+      .send({ from: closer.address, value: f });
 
     // await closeout.wait();
   }
@@ -565,7 +557,7 @@ describe("marketplace", function () {
 
     let purchaseContract = await cloneFactory.methods
       .setPurchaseRentalContract(contract.options.address, "123")
-      .send({ from: buyer.address });
+      .send({ from: buyer.address, value: fee });
   }
 
   async function attachToContractAndIncrement(contractAddress, contractNumber) {
