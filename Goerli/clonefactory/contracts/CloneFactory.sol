@@ -6,7 +6,6 @@ import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol"
 import {Implementation} from "./Implementation.sol";
 import {Lumerin} from "./LumerinToken.sol";
 import {FeeRecipient} from "./Shared.sol";
-import "hardhat/console.sol";
 
 /// @title CloneFactory
 /// @author Josh Kean (Lumerin)
