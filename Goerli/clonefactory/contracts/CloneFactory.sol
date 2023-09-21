@@ -107,7 +107,8 @@ contract CloneFactory is Initializable {
     //requires the clonefactory to be able to spend tokens on behalf of the purchaser
     function setPurchaseRentalContract(
         address _contractAddress,
-        string calldata _cipherText
+        string calldata _cipherText,
+        uint32 termsVersion
     ) external payable sufficientFee {
         // TODO: add a test case so any third-party implementations will be discarded
         require(rentalContractsMap[_contractAddress], "unknown contract address");
@@ -119,7 +120,12 @@ contract CloneFactory is Initializable {
             "cannot purchase your own contract"
         );
 
-        (uint256 _price,,,) = targetContract.terms();
+        (uint256 _price,,,, uint32 _version) = targetContract.terms();
+
+        require(
+            _version == termsVersion,
+            "cannot purchase, contract terms were updated"
+        );
 
         /* ETH buyer marketplace purchase fee */
         bool sent = payMarketplaceFee();
@@ -192,10 +198,15 @@ contract CloneFactory is Initializable {
         uint256 _limit,
         uint256 _speed,
         uint256 _length
-    ) public {
+    ) external payable sufficientFee {
         require(rentalContractsMap[_contractAddress], "unknown contract address");
         Implementation _contract = Implementation(_contractAddress);
         require(msg.sender == _contract.seller(), "you are not authorized");
+
+        /* ETH seller marketplace listing fee */
+        bool sent = payMarketplaceFee();
+        require(sent, "Failed to pay marketplace listing fee");
+
         Implementation(_contractAddress).setUpdatePurchaseInformation(_price, _limit, _speed, _length);
         // TODO: emit purchaseInfoUpdated(address(this));
     }

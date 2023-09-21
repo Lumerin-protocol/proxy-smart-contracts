@@ -32,6 +32,7 @@ contract Implementation is Initializable, Escrow {
         uint256 _limit; // variable used to aid in the lumerin nodes decision making
         uint256 _speed; // th/s of contract
         uint256 _length; // how long the contract will last in seconds
+        uint32 _version;
     }
 
     struct HistoryEntry {
@@ -60,7 +61,7 @@ contract Implementation is Initializable, Escrow {
         address _validator,
         string calldata _pubKey
     ) public initializer {
-        terms = Terms(_price, _limit, _speed, _length);
+        terms = Terms(_price, _limit, _speed, _length, 0);
         seller = _seller;
         cloneFactory = _cloneFactory;
         contractState = ContractState.Available;
@@ -84,7 +85,8 @@ contract Implementation is Initializable, Escrow {
             string memory _encryptedPoolData,
             bool _isDeleted,
             uint256 _balance,
-            bool _hasFutureTerms
+            bool _hasFutureTerms,
+            uint32 _version
         )
     {
         bool hasFutureTerms = futureTerms._length != 0;
@@ -100,7 +102,8 @@ contract Implementation is Initializable, Escrow {
             encryptedPoolData,
             isDeleted,
             lumerin.balanceOf(address(this)),
-            hasFutureTerms
+            hasFutureTerms,
+            terms._version
         );
     }
 
@@ -184,9 +187,9 @@ contract Implementation is Initializable, Escrow {
             "this address is not approved to call this function"
         );
         if (contractState == ContractState.Running) {
-            futureTerms = Terms(_price, _limit, _speed, _length);
+            futureTerms = Terms(_price, _limit, _speed, _length, terms._version + 1);
         } else {
-            terms = Terms(_price, _limit, _speed, _length);
+            terms = Terms(_price, _limit, _speed, _length, terms._version + 1);
             emit purchaseInfoUpdated(address(this));
         }
     }
@@ -197,8 +200,8 @@ contract Implementation is Initializable, Escrow {
         contractState = ContractState.Available;
 
         if(futureTerms._length != 0) {
-            terms = Terms(futureTerms._price, futureTerms._limit, futureTerms._speed, futureTerms._length);
-            futureTerms = Terms(0, 0, 0, 0);
+            terms = Terms(futureTerms._price, futureTerms._limit, futureTerms._speed, futureTerms._length, futureTerms._version);
+            futureTerms = Terms(0, 0, 0, 0, 0);
             emit purchaseInfoUpdated(address(this));
         }
     }
