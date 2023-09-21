@@ -43,7 +43,7 @@ describe("Contract delete", function () {
   })
 
   it("should add history entry on bad closeout", async function () {
-    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({ from: buyer, value: fee })
+    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
 
     const impl = Implementation(web3, hrContractAddr)
     await impl.methods.setContractCloseOut("0").send({ from: buyer })
@@ -54,7 +54,7 @@ describe("Contract delete", function () {
   })
 
   it("should add history entry on good closeout", async function () {
-    const receipt = await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({ from: buyer, value: fee })
+    const receipt = await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
     const { timestamp: purchaseTime } = await web3.eth.getBlock(receipt.blockNumber);
 
     await AdvanceBlockTime(web3, 3600)
@@ -69,7 +69,7 @@ describe("Contract delete", function () {
   })
 
   it("should verify other fields", async function () {
-    const receipt = await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({ from: buyer, value: fee })
+    const receipt = await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
     const { timestamp: purchaseTime } = await web3.eth.getBlock(receipt.blockNumber);
 
     const impl = Implementation(web3, hrContractAddr)

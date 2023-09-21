@@ -74,7 +74,7 @@ describe("Contract delete", function () {
 
   it("should block purchase if contract deleted", async function () {
     try {
-      await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({ from: buyer, value: fee })
+      await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
       expect.fail("should throw error")
     } catch (e) {
       expect(e.message).includes("cannot purchase deleted contract")
@@ -98,7 +98,7 @@ describe("Contract delete", function () {
   })
 
   it("should allow purchase if contract undeleted", async function () {
-    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({ from: buyer, value: fee })
+    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
   })
 
   it("should allow delete contract if contract is purchased", async function () {

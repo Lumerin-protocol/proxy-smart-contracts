@@ -60,7 +60,7 @@ describe("Contract closeout", function () {
     const receipt = await cf.methods.setCreateNewRentalContract(price, "0", speed, length, cloneFactoryAddress, "123").send({ from: seller, value: fee })
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
-    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({ from: buyer, value: fee })
+    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
     await AdvanceBlockTime(web3, Number(length))
 
     const impl = Implementation(web3, hrContractAddr)
@@ -79,7 +79,7 @@ describe("Contract closeout", function () {
     const receipt = await cf.methods.setCreateNewRentalContract(price, "0", speed, length, cloneFactoryAddress, "123").send({ from: seller, value: fee })
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
-    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({ from: buyer, value: fee })
+    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
     await AdvanceBlockTime(web3, Number(length))
 
     const impl = Implementation(web3, hrContractAddr)
@@ -103,11 +103,12 @@ async function testEarlyCloseout(progress, fee, seller, buyer, cloneFactoryAddre
   const speed = String(1_000_000)
   const length = String(3600)
   const price = String(1_000)
+  const version = String(0)
 
   const receipt = await cf.methods.setCreateNewRentalContract(price, "0", speed, String(length), cloneFactoryAddress, "123").send({ from: seller, value: fee })
   const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
-  await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({ from: buyer, value: fee })
+  await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", version).send({ from: buyer, value: fee })
 
   const sellerBalance = Number(await lumerin.methods.balanceOf(seller).call());
   const buyerBalance = Number(await lumerin.methods.balanceOf(buyer).call());

@@ -36,7 +36,7 @@ describe("Contract closeout", function () {
     const receipt = await cf.methods.setCreateNewRentalContract(price, "3", speed, length, cloneFactoryAddress, "123").send({ from: seller, value: fee })
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
-    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc").send({ from: buyer, value: fee })
+    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
     await AdvanceBlockTime(web3, Number(length))
 
     const impl = Implementation(web3, hrContractAddr)
