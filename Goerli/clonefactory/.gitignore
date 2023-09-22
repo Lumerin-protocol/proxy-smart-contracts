@@ -11,8 +11,10 @@ cache
 artifacts
 abi
 
+# OpenZeppelin
+.openzeppelin/unknown-*.json
+
 # generated code
 build-go
 build-js
 *.tmp
-.openzeppelin
