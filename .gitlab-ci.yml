@@ -238,6 +238,11 @@ update-clonefactory-lmn:
   <<: *update_clonefactory_template
   environment:
     name: lmn
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE != "trigger"
+      when: manualyal
   tags: *tags-lmn
 
 update-implementation-dev:
