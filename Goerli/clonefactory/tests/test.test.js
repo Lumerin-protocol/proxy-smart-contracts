@@ -556,7 +556,7 @@ describe("marketplace", function () {
     }
 
     let purchaseContract = await cloneFactory.methods
-      .setPurchaseRentalContract(contract.options.address, "123")
+      .setPurchaseRentalContract(contract.options.address, "123", "0")
       .send({ from: buyer.address, value: fee });
   }
 
