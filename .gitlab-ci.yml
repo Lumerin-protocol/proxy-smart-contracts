@@ -242,7 +242,7 @@ update-clonefactory-lmn:
     - if: $CI_PIPELINE_SOURCE == "trigger"
       when: on_success
     - if: $CI_PIPELINE_SOURCE != "trigger"
-      when: manualyal
+      when: manual
   tags: *tags-lmn
 
 update-implementation-dev:
