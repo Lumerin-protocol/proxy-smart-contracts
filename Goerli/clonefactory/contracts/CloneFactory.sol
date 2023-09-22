@@ -208,6 +208,6 @@ contract CloneFactory is Initializable {
         require(sent, "Failed to pay marketplace listing fee");
 
         Implementation(_contractAddress).setUpdatePurchaseInformation(_price, _limit, _speed, _length);
-        // TODO: emit purchaseInfoUpdated(address(this));
+        emit purchaseInfoUpdated(address(this));
     }
 }
