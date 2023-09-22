@@ -128,7 +128,7 @@ async function UpdateImplementation(newImplementationContractName, cloneFactoryA
   const baseImplementationAddr = await CloneFactory.attach(cloneFactoryAddr).baseImplementation();
   log("Updating base implementation contract:", baseImplementationAddr);
 
-  await upgrades.forceImport(baseImplementationAddr, Implementation)
+  // await upgrades.forceImport(baseImplementationAddr, Implementation)
 
   const oldLogicAddr = await upgrades.beacon.getImplementationAddress(baseImplementationAddr);
   log("Old beacon proxy logic:", oldLogicAddr)
