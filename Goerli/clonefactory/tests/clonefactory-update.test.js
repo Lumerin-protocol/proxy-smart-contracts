@@ -15,6 +15,7 @@ describe("Clonefactory update", function () {
   const web3 = new Web3(config.networks.localhost.url);
   const deployerPrivateKey = LocalTestnetAddresses.deployerPrivateKey;
   const priceDecimalLMR = (10 ** 8).toString();
+  const feeRecipientAddress = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 
   web3.eth.accounts.wallet.create(0).add(
     web3.eth.accounts.privateKeyToAccount(deployerPrivateKey)
@@ -24,7 +25,7 @@ describe("Clonefactory update", function () {
 
   it("should deploy a new clonefactory", async function () {
     ({ address: lumerinAddr } = await DeployLumerin(deployerPrivateKey));
-    ({ address: cloneFactoryAddr } = await DeployCloneFactory(lumerinAddr, deployerPrivateKey));
+    ({ address: cloneFactoryAddr } = await DeployCloneFactory(lumerinAddr, deployerPrivateKey, feeRecipientAddress));
 
     const cloneFactory = CloneFactory(web3, cloneFactoryAddr);
     const list = await cloneFactory.methods.getContractList().call();
