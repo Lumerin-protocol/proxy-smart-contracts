@@ -21,7 +21,7 @@ module.exports = {
     ...base.networks,
     default: {
       url: process.env.ETH_NODE_ADDRESS,
-      accounts: [process.env.CONTRACTS_OWNER_PRIVATE_KEY],
+      accounts: [process.env.OWNER_PRIVATEKEY, process.env.SELLER_PRIVATEKEY],
       gasPrice: "auto",
       gas: "auto",
     }

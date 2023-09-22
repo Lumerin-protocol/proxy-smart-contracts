@@ -5,9 +5,9 @@ const { DeployLumerin } = require("../lib/deploy");
 
 async function main() {
   console.log("Lumerin deployment script")
-  const privateKey = process.env.CONTRACTS_OWNER_PRIVATE_KEY
+  const privateKey = process.env.OWNER_PRIVATEKEY
 
-  const {address} = await DeployLumerin(privateKey, console.log);
+  const { address } = await DeployLumerin(privateKey, console.log);
 
   console.log("SUCCESS")
   console.log("LUMERIN address:", address);
