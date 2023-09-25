@@ -1,26 +1,28 @@
+//@ts-check
 require("dotenv").config();
-const { ethers } = require("hardhat");
 const fs = require("fs");
+const { DeployCloneFactory } = require("../lib/deploy");
 
 async function main() {
-  const [deployer] = await ethers.getSigners();
+  console.log("CloneFactory deployment script")
+  console.log()
 
-  console.log("Account balance:", (await deployer.getBalance()).toString());
+  const privateKey = process.env.OWNER_PRIVATEKEY;
+  const lumerinAddr = process.env.LUMERIN_TOKEN_ADDRESS;
+  const feeRecipientAddress = process.env.FEE_RECIPIENT_ADDRESS;
 
-  console.log("\nDeploying CLONEFACTORY with the account:", deployer.address);
-  console.log("LUMERIN address:", process.env.LUMERIN_TOKEN_ADDRESS);
-  console.log("VALIDATOR address:", process.env.VALIDATOR_ADDRESS);
+  if (!privateKey) throw new Error("OWNER_PRIVATEKEY is not set")
+  if (!lumerinAddr) throw new Error("LUMERIN_TOKEN_ADDRESS is not set")
+  if (!feeRecipientAddress) throw new Error("FEE_RECIPIENT_ADDRESS is not set")
 
-  const CloneFactory = await ethers.getContractFactory("CloneFactory");
-  const cloneFactory = await CloneFactory.deploy(
-    process.env.LUMERIN_TOKEN_ADDRESS,
-    process.env.VALIDATOR_ADDRESS
-  );
-  await cloneFactory.deployed();
+  const { address } = await DeployCloneFactory(lumerinAddr, privateKey, feeRecipientAddress, console.log);
 
-  console.log("CLONEFACTORY address:", cloneFactory.address);
-  fs.writeFileSync("clonefactory-addr.tmp", String(cloneFactory.address));
+  console.log("SUCCESS")
+  console.log("CLONEFACTORY address:", address);
+
+  fs.writeFileSync("clonefactory-addr.tmp", address);
 }
+
 main()
   .then(() => process.exit(0))
   .catch((error) => {
