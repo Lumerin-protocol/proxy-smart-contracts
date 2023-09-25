@@ -1,19 +1,17 @@
+//@ts-check
 require("dotenv").config();
 const fs = require("fs");
-const { ethers } = require("hardhat");
+const { DeployLumerin } = require("../lib/deploy");
 
 async function main() {
-  const [deployer] = await ethers.getSigners();
+  console.log("Lumerin deployment script")
+  const privateKey = process.env.OWNER_PRIVATEKEY
 
-  console.log("Deploying LUMERIN with the account:", deployer.address);
-  console.log("Account balance:", (await deployer.getBalance()).toString());
+  const { address } = await DeployLumerin(privateKey, console.log);
 
-  const Lumerin = await ethers.getContractFactory("Lumerin");
-  const lumerin = await Lumerin.deploy();
-  await lumerin.deployed();
-
-  console.log("LUMERIN address:", lumerin.address);
-  fs.writeFileSync("lumerin-addr.tmp", String(lumerin.address));
+  console.log("SUCCESS")
+  console.log("LUMERIN address:", address);
+  fs.writeFileSync("lumerin-addr.tmp", String(address));
 }
 
 main()

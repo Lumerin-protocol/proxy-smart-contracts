@@ -1,11 +1,24 @@
+//@ts-check
 require("dotenv").config();
-const { ethers } = require("hardhat");
+const { ApproveSeller } = require("../lib/deploy");
+const { CloneFactory } = require("../build-js/dist");
+const { network } = require("hardhat");
+const Web3 = require("web3");
 
 async function main() {
-  let whitelistedAddresses;
+  const ownerPrivateKey = process.env.OWNER_PRIVATEKEY
+  const cloneFactoryAddress = process.env.CLONE_FACTORY_ADDRESS
+  const whitelistedAddressesString = process.env.CLONE_FACTORY_WHITELIST_ADDRESSES;
+
+  if (!ownerPrivateKey) throw new Error("OWNER_PRIVATEKEY is not set")
+  if (!cloneFactoryAddress) throw new Error("CLONE_FACTORY_ADDRESS is not set")
+  if (!whitelistedAddressesString) throw new Error("CLONE_FACTORY_WHITELIST_ADDRESSES is not set");
+
+  /** @type {string[]} */
+  let whitelistedAddresses = [];
 
   try {
-    whitelistedAddresses = JSON.parse(process.env.CLONE_FACTORY_WHITELIST_ADDRESSES);
+    whitelistedAddresses = JSON.parse(whitelistedAddressesString);
     if (!Array.isArray(whitelistedAddresses)) {
       throw new Error("Is not a valid array");
     }
@@ -13,24 +26,21 @@ async function main() {
     throw new Error(`Invalid CLONE_FACTORY_WHITELIST_ADDRESSES, should be a JSON array of strings: ${err}`);
   }
 
+
+  /** @type {import("web3").default} */
+  //@ts-ignore
+  const web3 = new Web3(network.config.url)
+  const deployerWallet = web3.eth.accounts.privateKeyToAccount(ownerPrivateKey)
+  web3.eth.accounts.wallet.create(0).add(deployerWallet)
+
   console.log(`Whitelisting ${whitelistedAddresses.length} addresses:`);
   console.log(`${whitelistedAddresses}`);
-  console.log(`CLONEFACTORY address: ${process.env.CLONE_FACTORY_ADDRESS}`);
-  console.log("\n");
-
-  const CloneFactory = await ethers.getContractFactory("CloneFactory");
-  const [account] = await ethers.getSigners();
-  const cloneFactory = CloneFactory.attach(process.env.CLONE_FACTORY_ADDRESS);
-  console.log("Using account:", account.address);
-  console.log("Account balance:", (await account.getBalance()).toString());
+  console.log(`CLONEFACTORY address: ${cloneFactoryAddress}`);
+  console.log(`From address: ${deployerWallet.address}`);
   console.log("\n");
 
   for (const address of whitelistedAddresses) {
-    const addToWhitelist = await cloneFactory
-      .connect(account)
-      .setAddToWhitelist(address);
-    await addToWhitelist.wait();
-
+    await ApproveSeller(address, CloneFactory(web3, cloneFactoryAddress), deployerWallet.address, console.log)
     console.log(`Added to whitelist: ${address}`);
   }
 
