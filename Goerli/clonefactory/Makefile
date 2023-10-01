@@ -28,6 +28,8 @@ update-implementation:
 	yarn hardhat run --network default ./scripts/update-implementation.js
 
 populate-contracts:
+	make compile && \
+	make ./build-js && \
 	yarn hardhat run --network default ./scripts/populate-contracts.js
 
 whitelist-clonefactory:

@@ -332,7 +332,7 @@ deploy-faucet-lmn:
 
 populate-hr-contracts-dev:
   <<: *deploy_hr_contracts_template
-  needs: ["compile-contracts"]
+  needs: ["compile-contracts", "build-contracts-js"]
   environment:
     name: dev
   tags: *tags-dev
@@ -341,7 +341,7 @@ populate-hr-contracts-dev:
 
 populate-hr-contracts-stg:
   <<: *deploy_hr_contracts_template
-  needs: ["compile-contracts"]
+  needs: ["compile-contracts", "build-contracts-js"]
   environment:
     name: stg
   tags: *tags-stg
@@ -350,7 +350,7 @@ populate-hr-contracts-stg:
 
 populate-hr-contracts-lmn:
   <<: *deploy_hr_contracts_template
-  needs: ["compile-contracts"]
+  needs: ["compile-contracts", "build-contracts-js"]
   environment:
     name: lmn
   tags: *tags-lmn
