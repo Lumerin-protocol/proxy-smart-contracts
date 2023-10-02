@@ -37,7 +37,11 @@ const marketplaceConfig = {
           { speed: 275, length: 6, price: 2, count: 1 },
           { speed: 300, length: 24, price: 2, count: 10 },
         ]
-      : [{ speed: 100, length: 6, price: 2, count: 5 }],
+      : [
+        { speed: 100, length: 1, price: 1, count: 3 },
+        { speed: 100, length: .5, price: 1, count: 3 },
+        { speed: 100, length: 2, price: 1, count: 3 }
+      ,],
 };
 //meant for tests only
 module.exports = {
