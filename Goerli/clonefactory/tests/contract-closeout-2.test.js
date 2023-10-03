@@ -43,8 +43,7 @@ describe("Contract closeout", function () {
     await AdvanceBlockTime(web3, Number(length))
 
     // close by seller after expiration without claim (2)
-    const impl = Implementation(web3, hrContractAddr)
-    await impl.methods.setContractCloseOut("2").send({ from: seller, value: fee })
+    await cf.methods.setContractCloseout(hrContractAddr, "2").send({ from: seller, value: fee })
 
     const sellerBalanceAfter = Number(await lumerin.methods.balanceOf(seller).call());
     const deltaSellerBalance = sellerBalanceAfter - sellerBalance;
@@ -52,7 +51,7 @@ describe("Contract closeout", function () {
     expect(deltaSellerBalance).equal(Number(0))
 
     // claim to verify funds are released
-    await impl.methods.setContractCloseOut("1").send({ from: seller, value: fee })
+    await cf.methods.setContractCloseout(hrContractAddr, "1").send({ from: seller, value: fee })
     const sellerBalanceAfterClaim = Number(await lumerin.methods.balanceOf(seller).call());
     const deltaSellerBalanceClaim = sellerBalanceAfterClaim - sellerBalance;
     expect(deltaSellerBalanceClaim).equal(Number(price), "seller should collect 100% of the price")
@@ -65,9 +64,8 @@ describe("Contract closeout", function () {
     await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
     await AdvanceBlockTime(web3, Number(length) / 2)
 
-    const impl = Implementation(web3, hrContractAddr)
     try {
-      await impl.methods.setContractCloseOut("2").send({ from: seller, value: fee })
+      await cf.methods.setContractCloseout(hrContractAddr, "2").send({ from: seller, value: fee })
       expect.fail("should not allow closeout type 2 for incompleted contract")
     } catch (err) {
       expect(err.message).includes("the contract has yet to be carried to term")
@@ -82,7 +80,7 @@ describe("Contract closeout", function () {
     await AdvanceBlockTime(web3, Number(length))
 
     const impl = Implementation(web3, hrContractAddr)
-    await impl.methods.setContractCloseOut("2").send({ from: buyer, value: fee })
+    await cf.methods.setContractCloseout(hrContractAddr, "2").send({ from: buyer, value: fee })
   })
 
   it("should disallow closeout type 2 twice", async function () {
@@ -93,9 +91,9 @@ describe("Contract closeout", function () {
     await AdvanceBlockTime(web3, Number(length))
 
     const impl = Implementation(web3, hrContractAddr)
-    await impl.methods.setContractCloseOut("2").send({ from: buyer, value: fee })
+    await cf.methods.setContractCloseout(hrContractAddr, "2").send({ from: buyer, value: fee })
     try {
-      await impl.methods.setContractCloseOut("2").send({ from: buyer, value: fee })
+      await cf.methods.setContractCloseout(hrContractAddr, "2").send({ from: buyer, value: fee })
       expect.fail("should not allow closeout type 2 twice")
     } catch (err) {
       expect(err.message).includes("the contract is not in the running state")
@@ -109,7 +107,22 @@ describe("Contract closeout", function () {
     await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
     await AdvanceBlockTime(web3, Number(length))
 
-    const impl = Implementation(web3, hrContractAddr)
-    await impl.methods.setContractCloseOut("2").send({ from: seller, value: 0 })
+    await cf.methods.setContractCloseout(hrContractAddr, "2").send({ from: seller, value: 0 })
+  })
+
+  it("should emit contractClosed for type 2", async function () {
+    const receipt = await cf.methods.setCreateNewRentalContract(price, "0", speed, length, cloneFactoryAddress, "123").send({ from: seller, value: fee })
+    const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
+
+    const receipt2 = await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
+    await AdvanceBlockTime(web3, Number(length))
+
+    await cf.methods.setContractCloseout(hrContractAddr, "2").send({ from: seller })
+
+    const events = await cf.getPastEvents("contractClosed", { fromBlock: receipt2.blockNumber, toBlock: "latest" })
+
+    expect(events.length).equal(1)
+    expect(events[0].returnValues._address).equal(hrContractAddr)
+    expect(events[0].returnValues._closeOutType).equal("2")
   })
 })

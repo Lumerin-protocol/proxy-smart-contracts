@@ -215,12 +215,16 @@ contract Implementation is Initializable, Escrow {
         return 0;
     }
 
-    function setContractCloseOut(uint256 closeOutType) public payable {
+    function setContractCloseOut(address closer, uint256 closeOutType) public {
+        require(
+            msg.sender == cloneFactory,
+            "this address is not approved to call this function"
+        );
         if (closeOutType == 0) {
             // this closeoutType is only for the buyer to close early
             // and withdraw their funds
             require(
-                msg.sender == buyer || msg.sender == validator,
+                closer == buyer || closer == validator,
                 "this account is not authorized to trigger an early closeout"
             );
             require(
@@ -241,7 +245,7 @@ contract Implementation is Initializable, Escrow {
             // at any time during the smart contracts lifecycle
 
             require(
-                msg.sender == seller,
+                closer == seller,
                 "this account is not a seller of this contract"
             );
 
@@ -255,9 +259,6 @@ contract Implementation is Initializable, Escrow {
 
             bool sent = withdrawAllFundsSeller(amountToKeepInEscrow);
             require(sent, "Failed to withdraw funds");
-            
-            sent = CloneFactory(cloneFactory).payMarketplaceFee{value:msg.value}();
-            require(sent, "Failed to pay marketplace withdrawal fee");
         } else if (closeOutType == 2) {
             // this closeoutType is only for the seller to closeout after contract ended
             // without claiming funds, keeping them in the escrow
@@ -279,7 +280,7 @@ contract Implementation is Initializable, Escrow {
             // this closeoutType is only for the seller to closeout after contract ended
             // and claim all funds collected in the escrow
             require(
-                msg.sender == seller,
+                closer == seller,
                 "only the seller can closeout AND withdraw after contract term"
             );
             require(
@@ -295,11 +296,8 @@ contract Implementation is Initializable, Escrow {
 
             resetContractVariablesAndApplyFutureTerms();
             emit contractClosed(buyer);
-
-            bool sent = CloneFactory(cloneFactory).payMarketplaceFee{value:msg.value}();
-            require(sent, "Failed to pay marketplace withdrawal fee");
             
-            sent = withdrawAllFundsSeller(0);
+            bool sent = withdrawAllFundsSeller(0);
             require(sent, "Failed to withdraw funds");
         } else {
             revert("you must make a selection from 0 to 3");
