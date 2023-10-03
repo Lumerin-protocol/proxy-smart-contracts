@@ -48,6 +48,17 @@ contract CloneFactory is Initializable {
         _;
     }
 
+    modifier knownContract(address _contractAddress){
+        require(rentalContractsMap[_contractAddress], "unknown contract address");
+        _;
+    }
+
+    modifier authorize(address _contractAddress){
+        Implementation _contract = Implementation(_contractAddress);
+        require(msg.sender == _contract.seller(), "you are not authorized");
+        _;
+    }
+
     function initialize(address _baseImplementation, address _lumerin, address _feeRecipient) public initializer {
         lumerin = Lumerin(_lumerin);
         baseImplementation = _baseImplementation;
@@ -109,9 +120,7 @@ contract CloneFactory is Initializable {
         address _contractAddress,
         string calldata _cipherText,
         uint32 termsVersion
-    ) external payable sufficientFee {
-        // TODO: add a test case so any third-party implementations will be discarded
-        require(rentalContractsMap[_contractAddress], "unknown contract address");
+    ) external payable sufficientFee knownContract(_contractAddress){
         Implementation targetContract = Implementation(_contractAddress);
         require(
             !targetContract.isDeleted(), "cannot purchase deleted contract");
@@ -184,10 +193,7 @@ contract CloneFactory is Initializable {
         feeRecipient.recipient = recipient;
     }
 
-    function setContractDeleted(address _contractAddress, bool _isDeleted) public {
-        require(rentalContractsMap[_contractAddress], "unknown contract address");
-        Implementation _contract = Implementation(_contractAddress);
-        require(msg.sender == _contract.seller() || msg.sender == owner, "you are not authorized");
+    function setContractDeleted(address _contractAddress, bool _isDeleted) public knownContract(_contractAddress) authorize(_contractAddress) {
         Implementation(_contractAddress).setContractDeleted(_isDeleted);
         emit contractDeleteUpdated(_contractAddress, _isDeleted);
     }
@@ -198,11 +204,7 @@ contract CloneFactory is Initializable {
         uint256 _limit,
         uint256 _speed,
         uint256 _length
-    ) external payable sufficientFee {
-        require(rentalContractsMap[_contractAddress], "unknown contract address");
-        Implementation _contract = Implementation(_contractAddress);
-        require(msg.sender == _contract.seller(), "you are not authorized");
-
+    ) external payable sufficientFee knownContract(_contractAddress) authorize(_contractAddress){
         /* ETH seller marketplace listing fee */
         bool sent = payMarketplaceFee();
         require(sent, "Failed to pay marketplace listing fee");
