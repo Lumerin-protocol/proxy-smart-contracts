@@ -45,8 +45,8 @@ contract Implementation is Initializable, Escrow {
         address _buyer;
     }
 
-    event contractPurchased(address indexed _buyer); //make indexed
-    event contractClosed(address indexed _buyer);
+    event contractPurchased(address indexed _buyer);
+    event contractClosed(address indexed _closer);
     event purchaseInfoUpdated(address indexed _address);
     event cipherTextUpdated(string newCipherText);
 
@@ -236,7 +236,7 @@ contract Implementation is Initializable, Escrow {
             bool comp = block.timestamp - startingBlockTimestamp >= terms._length;
             history.push(HistoryEntry(comp, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
             resetContractVariablesAndApplyFutureTerms();
-            emit contractClosed(buyer);
+            emit contractClosed(closer);
             
             bool sent = withdrawFundsBuyer(buyerPayout);
             require(sent, "Failed to withdraw funds");

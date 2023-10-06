@@ -11,3 +11,7 @@ abigen --abi=./abi/CloneFactory.json --pkg=clonefactory --out=./$PTH/clonefactor
 abigen --abi=./abi/Implementation.json --pkg=implementation --out=./$PTH/implementation/implementation.go
 abigen --abi=./abi/Lumerin.json --pkg=lumerintoken --out=./$PTH/lumerintoken/lumerintoken.go
 abigen --abi=./abi/Faucet.json --pkg=faucet --out=./$PTH/faucet/faucet.go
+
+cd $PTH
+go mod init github.com/Lumerin-protocol/contracts-go
+go mod tidy

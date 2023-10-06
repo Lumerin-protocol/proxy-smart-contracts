@@ -2,40 +2,40 @@ require("dotenv").config();
 const { ethers } = require("hardhat");
 
 async function main() {
-  let contractAddress = ""; //process.env.CONTRACT_ADDRESS || "";
-  let cloneFactoryAddress = "";// process.env.CLONE_FACTORY_ADDRESS || "";
+  let contractAddress = process.env.CONTRACT_ADDRESS || "";
+  let cloneFactoryAddress = process.env.CLONE_FACTORY_ADDRESS || "";
+  let fee = ""
 
-  if (cloneFactoryAddress === ""){
-    cloneFactoryAddress = "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
+  if (cloneFactoryAddress === "") {
+    throw new Error("clonefactory address not set")
   }
 
-  const [seller, buyer] = await ethers.getSigners();
-
-
-  if (contractAddress === ""){
-    const CloneFactory = await ethers.getContractFactory("CloneFactory");
-    const cloneFactory = CloneFactory.attach(cloneFactoryAddress);  
-    [contractAddress] = await cloneFactory.getContractList()
-    console.log('contract address', contractAddress)
+  if (contractAddress === "") {
+    throw new Error("contract address not set")
   }
+
+  const [, buyer] = await ethers.getSigners();
+  const CloneFactory = await ethers.getContractFactory("CloneFactory");
+  const cloneFactory = CloneFactory.attach(cloneFactoryAddress);
+
+  console.log('contract address', contractAddress)
+  fee = await cloneFactory.marketplaceFee();
+  console.log(`marketplace fee: ${fee} wei`);
 
 
   console.log(`Closing contract: ${contractAddress}`);
   console.log(`Using buyer address: ${buyer.address}`);
   console.log("\n");
-  
+
   const Implementation = await ethers.getContractFactory("Implementation");
-  const cloneFactory = Implementation.attach(contractAddress);
+  const impl = Implementation.attach(contractAddress);
   console.log("Using account:", buyer.address);
   console.log("Account balance:", (await buyer.getBalance()).toString());
   console.log("\n");
 
-  const fee = await cloneFactory.marketplaceFee();
-  console.log(`marketplace fee: ${fee} wei`);
-
-  const closeout = await cloneFactory
+  const closeout = await impl
     .connect(buyer)
-    .setContractCloseOut(0, {value: fee})
+    .setContractCloseOut(0, { value: fee })
   const receipt = await closeout.wait();
 
   console.log(receipt)

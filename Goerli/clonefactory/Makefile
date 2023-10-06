@@ -7,7 +7,7 @@ test:
 	kill "$$(lsof -t -i:8545)" || true
 	make compile
 	make -B build-js
-	yarn hardhat node --config hardhat-base.config.js & ./node-local-deploy.sh && yarn hardhat test --network localhost tests/*.js --config hardhat-base.config.js
+	yarn hardhat node --config hardhat-base.config.js & ./node-local-deploy.sh && yarn hardhat test --network localhost --config hardhat-base.config.js tests/*.js
 
 compile:
 	yarn hardhat compile --config hardhat-base.config.js
