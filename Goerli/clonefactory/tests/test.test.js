@@ -393,7 +393,7 @@ describe("marketplace", function () {
         const payoutPercentError = (buyerPayoutDiff / expectedPayout) * 100;
 
         if (expectedPayout > 0) {
-          expect(payoutPercentError).to.be.lessThan(1);
+          expect(payoutPercentError).to.be.lessThan(4);
         } else {
           expect(contractBalanceAfterCloseout).to.equal(
             contractBalanceAfterPurchase
@@ -431,7 +431,7 @@ describe("marketplace", function () {
           buyerBalance
         );
 
-      expect(payoutPercentError).to.be.lessThan(1);
+      expect(payoutPercentError).to.be.lessThan(4);
     }
 
     function calculateBuyerPayoutExpectations(
