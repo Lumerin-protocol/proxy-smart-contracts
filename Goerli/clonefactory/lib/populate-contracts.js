@@ -38,9 +38,7 @@ const marketplaceConfig = {
           { speed: 300, length: 24, price: 2, count: 10 },
         ]
       : [
-        { speed: 100, length: 1, price: 1, count: 3 },
-        { speed: 100, length: .5, price: 1, count: 3 },
-        { speed: 100, length: 2, price: 1, count: 3 }
+        { speed: 25, length: 24, price: 1, count: 60 },
       ,],
 };
 //meant for tests only
