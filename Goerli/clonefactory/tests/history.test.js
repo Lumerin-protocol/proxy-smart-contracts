@@ -34,7 +34,7 @@ describe("Contract delete", function () {
   })
 
   it("should create contract and check its history", async function () {
-    const receipt = await cf.methods.setCreateNewRentalContract(price, "0", speed, length, cloneFactoryAddress, "123").send({ from: seller, value: fee })
+    const receipt = await cf.methods.setCreateNewRentalContract(price, "0", speed, length, cloneFactoryAddress, "123", 1).send({ from: seller, value: fee })
     hrContractAddr = receipt.events?.contractCreated.returnValues._address;
     const impl = Implementation(web3, hrContractAddr)
     const data = await impl.methods.getHistory("0", "100").call()

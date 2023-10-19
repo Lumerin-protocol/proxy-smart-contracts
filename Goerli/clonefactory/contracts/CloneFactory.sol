@@ -25,10 +25,10 @@ contract CloneFactory is Initializable {
     mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
     mapping(address => bool) public isContractDead; // keeps track of contracts that are no longer valid
 
-    event contractCreated(address indexed _address, string _pubkey); //emitted whenever a contract is created
-    event clonefactoryContractPurchased(address indexed _address); //emitted whenever a contract is purchased
-    event contractDeleteUpdated(address _address, bool _isDeleted); //emitted whenever a contract is deleted/restored
-    event purchaseInfoUpdated(address indexed _address);
+    event contractCreated(address indexed _address, string _pubkey, uint256 _prid); //emitted whenever a contract is created
+    event clonefactoryContractPurchased(address indexed _address, uint256 _prid); //emitted whenever a contract is purchased
+    event contractDeleteUpdated(address _address, bool _isDeleted, uint256 _prid); //emitted whenever a contract is deleted/restored
+    event purchaseInfoUpdated(address indexed _address, uint256 _prid);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "you are not authorized");
@@ -75,7 +75,8 @@ contract CloneFactory is Initializable {
         uint256 _speed,
         uint256 _length,
         address _validator,
-        string calldata _pubKey
+        string calldata _pubKey,
+        uint256 _prid
     ) external payable onlyInWhitelist sufficientFee returns (address) {
 
         /* ETH seller marketplace listing fee */
@@ -92,14 +93,15 @@ contract CloneFactory is Initializable {
             address(lumerin),
             address(this),
             _validator,
-            _pubKey
+            _pubKey,
+            _prid
         );
 
         BeaconProxy beaconProxy = new BeaconProxy(baseImplementation, data);
         address newContractAddr = address(beaconProxy);
         rentalContracts.push(newContractAddr); //add clone to list of contracts
         rentalContractsMap[newContractAddr] = true;
-        emit contractCreated(newContractAddr, _pubKey); //broadcasts a new contract and the pubkey to use for encryption
+        emit contractCreated(newContractAddr, _pubKey, _prid); //broadcasts a new contract and the pubkey to use for encryption
         return newContractAddr;
     }
 
@@ -150,7 +152,7 @@ contract CloneFactory is Initializable {
             msg.sender
         );
 
-        emit clonefactoryContractPurchased(_contractAddress);
+        emit clonefactoryContractPurchased(_contractAddress, targetContract.prid());
     }
 
     function getContractList() external view returns (address[] memory) {
@@ -184,12 +186,13 @@ contract CloneFactory is Initializable {
         feeRecipient.recipient = recipient;
     }
 
-    function setContractDeleted(address _contractAddress, bool _isDeleted) public {
+    function setContractDeleted(address _contractAddress, bool _isDeleted, uint256 _prid) public {
         require(rentalContractsMap[_contractAddress], "unknown contract address");
         Implementation _contract = Implementation(_contractAddress);
+        require(_prid == _contract.prid(), "wrong ProxyRouter for contract");
         require(msg.sender == _contract.seller() || msg.sender == owner, "you are not authorized");
-        Implementation(_contractAddress).setContractDeleted(_isDeleted);
-        emit contractDeleteUpdated(_contractAddress, _isDeleted);
+        Implementation(_contractAddress).setContractDeleted(_isDeleted, _contract.prid());
+        emit contractDeleteUpdated(_contractAddress, _isDeleted, _prid);
     }
 
     function setUpdateContractInformation(
@@ -197,17 +200,19 @@ contract CloneFactory is Initializable {
         uint256 _price,
         uint256 _limit,
         uint256 _speed,
-        uint256 _length
+        uint256 _length,
+        uint256 _prid
     ) external payable sufficientFee {
         require(rentalContractsMap[_contractAddress], "unknown contract address");
         Implementation _contract = Implementation(_contractAddress);
+        require(_prid == _contract.prid(), "wrong ProxyRouter for contract");
         require(msg.sender == _contract.seller(), "you are not authorized");
 
         /* ETH seller marketplace listing fee */
         bool sent = payMarketplaceFee();
         require(sent, "Failed to pay marketplace listing fee");
 
-        Implementation(_contractAddress).setUpdatePurchaseInformation(_price, _limit, _speed, _length);
-        emit purchaseInfoUpdated(address(this));
+        Implementation(_contractAddress).setUpdatePurchaseInformation(_price, _limit, _speed, _length, _prid);
+        emit purchaseInfoUpdated(address(this), _prid);
     }
 }

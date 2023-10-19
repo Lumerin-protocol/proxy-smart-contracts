@@ -60,7 +60,8 @@ describe("marketplace", function () {
         10,
         contract_length,
         lumerin.options.address,
-        lumerin.options.address //validator placeholder
+        lumerin.options.address,
+        1
       )
       .send({ from: seller.address, value: fee });
 
@@ -79,9 +80,9 @@ describe("marketplace", function () {
           10,
           10,
           contract_length,
-          lumerin.options.address,
           "123",
-          "private key"
+          "private key",
+          1
         )
         .send({ from: buyer.address, value: fee });
     } catch {}

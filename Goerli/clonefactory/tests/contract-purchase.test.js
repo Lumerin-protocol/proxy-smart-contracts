@@ -93,7 +93,8 @@ describe.skip("ContractPurchase", function () {
         10,
         contract_length,
         lumerin.address,
-        "123"
+        "123",
+        1
       );
     await contractCreate.wait();
     let contractsAfter = await cloneFactory.getContractList();
@@ -113,7 +114,8 @@ describe.skip("ContractPurchase", function () {
           10,
           contract_length,
           lumerin.address,
-          "123"
+          "123",
+          1
         );
       await contractCreate.wait();
     } catch {}

@@ -30,7 +30,7 @@ describe("Contract delete", function () {
   })
 
   it("should create contract and check its status", async function () {
-    const receipt = await cf.methods.setCreateNewRentalContract("1", "0", "1", "3600", cloneFactoryAddress, "123").send({ from: seller, value: fee })
+    const receipt = await cf.methods.setCreateNewRentalContract("1", "0", "1", "3600", cloneFactoryAddress, "123", 1).send({ from: seller, value: fee })
     hrContractAddr = receipt.events?.contractCreated.returnValues._address;
     const impl = Implementation(web3, hrContractAddr)
     const data = await impl.methods.getPublicVariables().call()
@@ -40,7 +40,7 @@ describe("Contract delete", function () {
 
   it('should prohibit deletion if caller is not a seller', async function () {
     try {
-      await cf.methods.setContractDeleted(hrContractAddr, true).send({ from: buyer })
+      await cf.methods.setContractDeleted(hrContractAddr, true, 1).send({ from: buyer })
       expect.fail("should throw error")
     } catch (e) {
       expect(e.message).includes("you are not authorized")
@@ -48,7 +48,7 @@ describe("Contract delete", function () {
   })
 
   it("should delete contract and emit event", async function () {
-    await cf.methods.setContractDeleted(hrContractAddr, true).send({ from: seller })
+    await cf.methods.setContractDeleted(hrContractAddr, true, 1).send({ from: seller })
     const impl = Implementation(web3, hrContractAddr)
     const data = await impl.methods.getPublicVariables().call()
 
@@ -65,7 +65,7 @@ describe("Contract delete", function () {
 
   it("should error on second attempt to delete", async function () {
     try {
-      await cf.methods.setContractDeleted(hrContractAddr, true).send({ from: seller })
+      await cf.methods.setContractDeleted(hrContractAddr, true, 1).send({ from: seller })
       expect.fail("should throw error")
     } catch (e) {
       expect(e.message).includes("contract delete state is already set to this value")
@@ -82,7 +82,7 @@ describe("Contract delete", function () {
   })
 
   it("should undelete contract and emit event", async function () {
-    await cf.methods.setContractDeleted(hrContractAddr, false).send({ from: seller })
+    await cf.methods.setContractDeleted(hrContractAddr, false, 1).send({ from: seller })
     const impl = Implementation(web3, hrContractAddr)
     const data = await impl.methods.getPublicVariables().call()
 
@@ -102,7 +102,7 @@ describe("Contract delete", function () {
   })
 
   it("should allow delete contract if contract is purchased", async function () {
-    await cf.methods.setContractDeleted(hrContractAddr, true).send({ from: seller })
+    await cf.methods.setContractDeleted(hrContractAddr, true, 1).send({ from: seller })
     const impl = Implementation(web3, hrContractAddr)
     const data = await impl.methods.getPublicVariables().call()
 
@@ -112,7 +112,7 @@ describe("Contract delete", function () {
   it("should prohibit deletion on the contract instance", async function () {
     const impl = Implementation(web3, hrContractAddr)
     try {
-      await impl.methods.setContractDeleted(true).send({ from: seller })
+      await impl.methods.setContractDeleted(true, 1).send({ from: seller })
       expect.fail("should throw error")
     } catch (e) {
       expect(e.message).includes("this address is not approved to call this function")
@@ -122,7 +122,7 @@ describe("Contract delete", function () {
   it("should allow deletion from clonefactory owner", async function () {
     const impl = Implementation(web3, hrContractAddr)
     try {
-      await impl.methods.setContractDeleted(true).send({ from: owner })
+      await impl.methods.setContractDeleted(true, 1).send({ from: owner })
       expect.fail("should throw error")
     } catch (e) {
       expect(e.message).includes("this address is not approved to call this function")

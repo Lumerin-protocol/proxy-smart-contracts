@@ -21,6 +21,7 @@ contract Implementation is Initializable, Escrow {
     bool public isDeleted; //used to track if the contract is deleted, separate variable to account for the possibility of a contract being deleted when it is still running
     HistoryEntry[] public history;
     Terms public futureTerms;
+    uint256 public prid; // track the seller ProxyRouter ID for this contract
 
     enum ContractState {
         Available,
@@ -43,12 +44,13 @@ contract Implementation is Initializable, Escrow {
         uint256 _speed;
         uint256 _length;
         address _buyer;
+        uint256 _prid;
     }
 
-    event contractPurchased(address indexed _buyer); //make indexed
-    event contractClosed(address indexed _buyer);
-    event purchaseInfoUpdated(address indexed _address);
-    event cipherTextUpdated(string newCipherText);
+    event contractPurchased(address indexed _buyer, uint256 _prid); //make indexed
+    event contractClosed(address indexed _buyer, uint256 _prid);
+    event purchaseInfoUpdated(address indexed _address, uint256 _prid);
+    event cipherTextUpdated(string newCipherText, uint256 _prid);
 
     function initialize(
         uint256 _price,
@@ -59,7 +61,8 @@ contract Implementation is Initializable, Escrow {
         address _lmrAddress,
         address _cloneFactory, //used to restrict purchasing power to only the clonefactory
         address _validator,
-        string calldata _pubKey
+        string calldata _pubKey,
+        uint256 _prid
     ) public initializer {
         terms = Terms(_price, _limit, _speed, _length, 0);
         seller = _seller;
@@ -68,6 +71,7 @@ contract Implementation is Initializable, Escrow {
         pubKey = _pubKey;
         validator = _validator;
         Escrow.initialize(_lmrAddress);
+        prid = _prid;
     }
 
     function getPublicVariables()
@@ -155,7 +159,7 @@ contract Implementation is Initializable, Escrow {
         startingBlockTimestamp = block.timestamp;
         contractState = ContractState.Running;
         createEscrow(seller, buyer, terms._price);
-        emit contractPurchased(msg.sender);
+        emit contractPurchased(msg.sender, prid);
     }
 
     //allows the buyers to update their mining pool information
@@ -172,7 +176,7 @@ contract Implementation is Initializable, Escrow {
             "the contract is not in the running state"
         );
         encryptedPoolData = _newEncryptedPoolData;
-        emit cipherTextUpdated(_newEncryptedPoolData);
+        emit cipherTextUpdated(_newEncryptedPoolData, prid);
     }
 
     //function which can edit the cost, length, and hashrate of a given contract
@@ -180,8 +184,10 @@ contract Implementation is Initializable, Escrow {
         uint256 _price,
         uint256 _limit,
         uint256 _speed,
-        uint256 _length
+        uint256 _length,
+        uint256 _prid
     ) external {
+        require(_prid == prid, "wrong ProxyRouter for contract");
         require(
             msg.sender == cloneFactory,
             "this address is not approved to call this function"
@@ -190,7 +196,7 @@ contract Implementation is Initializable, Escrow {
             futureTerms = Terms(_price, _limit, _speed, _length, terms._version + 1);
         } else {
             terms = Terms(_price, _limit, _speed, _length, terms._version + 1);
-            emit purchaseInfoUpdated(address(this));
+            emit purchaseInfoUpdated(address(this), prid);
         }
     }
 
@@ -202,7 +208,7 @@ contract Implementation is Initializable, Escrow {
         if(futureTerms._length != 0) {
             terms = Terms(futureTerms._price, futureTerms._limit, futureTerms._speed, futureTerms._length, futureTerms._version);
             futureTerms = Terms(0, 0, 0, 0, 0);
-            emit purchaseInfoUpdated(address(this));
+            emit purchaseInfoUpdated(address(this), prid);
         }
     }
 
@@ -230,9 +236,9 @@ contract Implementation is Initializable, Escrow {
 
             uint256 buyerPayout = getBuyerPayout();
             bool comp = block.timestamp - startingBlockTimestamp >= terms._length;
-            history.push(HistoryEntry(comp, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
+            history.push(HistoryEntry(comp, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer, prid));
             resetContractVariablesAndApplyFutureTerms();
-            emit contractClosed(buyer);
+            emit contractClosed(buyer, prid);
             
             bool sent = withdrawFundsBuyer(buyerPayout);
             require(sent, "Failed to withdraw funds");
@@ -270,10 +276,10 @@ contract Implementation is Initializable, Escrow {
                 "the contract is not in the running state"
             );
 
-            history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
+            history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer, prid));
 
             resetContractVariablesAndApplyFutureTerms();
-            emit contractClosed(buyer);
+            emit contractClosed(buyer, prid);
         }
         else if (closeOutType == 3){
             // this closeoutType is only for the seller to closeout after contract ended
@@ -291,10 +297,10 @@ contract Implementation is Initializable, Escrow {
                 "the contract is not in the running state"
             );
 
-            history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
+            history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer, prid));
 
             resetContractVariablesAndApplyFutureTerms();
-            emit contractClosed(buyer);
+            emit contractClosed(buyer, prid);
 
             bool sent = CloneFactory(cloneFactory).payMarketplaceFee{value:msg.value}();
             require(sent, "Failed to pay marketplace withdrawal fee");
@@ -306,7 +312,8 @@ contract Implementation is Initializable, Escrow {
         }
     }
 
-    function setContractDeleted(bool _isDeleted) public {
+    function setContractDeleted(bool _isDeleted, uint256 _prid) public {
+        require(_prid == prid, "wrong ProxyRouter for contract");
         require(
             msg.sender == cloneFactory,
             "this address is not approved to call this function"

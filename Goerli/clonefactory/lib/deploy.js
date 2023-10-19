@@ -172,10 +172,10 @@ async function ApproveSeller(sellerAddr, cloneFactory, from, log = noop) {
  * @param {(...args)=>void} log
  * @returns {Promise<{address: string, txHash: string}>}
  */
-async function CreateContract(priceDecimalLMR, durationSeconds, hrGHS, cloneFactory, fromWallet, marketplaceFee, log = noop) {
+async function CreateContract(priceDecimalLMR, durationSeconds, hrGHS, cloneFactory, fromWallet, marketplaceFee, log = noop, prid = 1) {
   const pubKey = trimRight64Bytes(remove0xPrefix(fromWallet.publicKey));
   const receipt = await cloneFactory.methods
-    .setCreateNewRentalContract(priceDecimalLMR, "0", hrGHS, durationSeconds, fromWallet.address, pubKey)
+    .setCreateNewRentalContract(priceDecimalLMR, "0", hrGHS, durationSeconds, fromWallet.address, pubKey, prid)
     .send({ from: fromWallet.address, gas: GAS_LIMIT, value: marketplaceFee });
   const address = receipt.events?.[0].address || "";
   const txHash = receipt.transactionHash;
