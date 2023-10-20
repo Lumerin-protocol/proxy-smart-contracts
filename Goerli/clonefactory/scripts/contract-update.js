@@ -21,8 +21,6 @@ async function main() {
     console.log('contract address', contractAddress)
   }
 
-
-
   const [seller, buyer] = await ethers.getSigners();
 
   console.log(`Upgrading contract: ${contractAddress}`);

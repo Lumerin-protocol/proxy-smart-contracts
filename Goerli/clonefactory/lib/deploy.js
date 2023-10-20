@@ -1,4 +1,7 @@
 //@ts-check
+/**
+ * @type {import("hardhat/types/runtime").HardhatRuntimeEnvironment}
+ */
 const { upgrades, ethers } = require("hardhat");
 const { Wallet } = require("ethers");
 const { remove0xPrefix, trimRight64Bytes } = require("./utils");

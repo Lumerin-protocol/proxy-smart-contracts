@@ -27,18 +27,16 @@ async function main() {
   console.log(`Using buyer address: ${buyer.address}`);
   console.log("\n");
 
-  const Implementation = await ethers.getContractFactory("Implementation");
-  const impl = Implementation.attach(contractAddress);
   console.log("Using account:", buyer.address);
   console.log("Account balance:", (await buyer.getBalance()).toString());
   console.log("\n");
 
-  const closeout = await impl
-    .connect(buyer)
-    .setContractCloseOut(0, { value: fee })
+  const closeout = await cloneFactory
+    .setContractCloseout(contractAddress, 0, { value: fee })
   const receipt = await closeout.wait();
 
-  console.log(receipt)
+
+  console.log(JSON.stringify({ transaction: closeout, receipt }))
 
   console.log(`Closed: ${contractAddress}, gas used ${receipt.gasUsed.toString()}`);
 }

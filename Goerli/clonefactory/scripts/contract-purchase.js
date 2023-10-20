@@ -27,7 +27,7 @@ async function main() {
     dest = "random string"
   }
   if (lumerinAddress === "") {
-    lumerinAddress = "0x5fbdb2315678afecb367f032d93f642f64180aa3"
+    lumerinAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
   }
 
   console.log(`Sending lumerin`)
@@ -72,7 +72,7 @@ async function main() {
 
   const purchase = await cloneFactory
     .connect(buyer)
-    .setPurchaseRentalContract(contractAddress, encryptedDest.toString('hex'), version, { value: fee.toString() })
+    .setPurchaseRentalContract(contractAddress, encryptedDest.toString('hex'), "0", { value: fee.toString() })
   const receipt = await purchase.wait();
 
   console.log(`Purchased: ${contractAddress}, gas used ${receipt.gasUsed.toString()}`);
