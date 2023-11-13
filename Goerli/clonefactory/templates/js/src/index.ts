@@ -86,9 +86,8 @@ export {
   ImplementationContext,
   LumerinContext,
   FaucetContext,
+  LumerinAbi,
+  FaucetAbi,
+  ImplementationAbi,
+  CloneFactoryAbi
 };
-
-export { abi as LumerinAbi } from "./abi/Lumerin.json";
-export { abi as FaucetAbi } from "./abi/Faucet.json";
-export { abi as ImplementationAbi } from "./abi/Implementation.json";
-export { abi as ClonefactoryAbi } from "./abi/Clonefactory.json";
