@@ -81,13 +81,14 @@ export const EthersLumerin = (ethers: any, address: string): LumerinContext =>
 export const EthersFaucet = (ethers: any, address: string): FaucetContext =>
   ethersFactory(ethers, address, FaucetAbi, FaucetBC);
 
+export const LumerinContract = { abi: LumerinAbi, bytecode: LumerinBC }
+export const FaucetContract = { abi: FaucetAbi, bytecode: FaucetBC }
+export const ImplementationContract = { abi: ImplementationAbi, bytecode: ImplementationBC }
+export const CloneFactoryContract = { abi: CloneFactoryAbi, bytecode: CloneFactoryBC }
+
 export {
   CloneFactoryContext,
   ImplementationContext,
   LumerinContext,
-  FaucetContext,
-  LumerinAbi,
-  FaucetAbi,
-  ImplementationAbi,
-  CloneFactoryAbi
+  FaucetContext
 };
