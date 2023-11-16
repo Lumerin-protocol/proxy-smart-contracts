@@ -74,6 +74,7 @@ contract CloneFactory is Initializable {
         uint256 _limit,
         uint256 _speed,
         uint256 _length,
+        int8 _profitTarget,
         address _validator,
         string calldata _pubKey
     ) external payable onlyInWhitelist sufficientFee returns (address) {
@@ -88,6 +89,7 @@ contract CloneFactory is Initializable {
             _limit,
             _speed,
             _length,
+            _profitTarget,
             msg.sender,
             address(lumerin),
             address(this),
@@ -120,7 +122,7 @@ contract CloneFactory is Initializable {
             "cannot purchase your own contract"
         );
 
-        (uint256 _price,,,, uint32 _version) = targetContract.terms();
+        (uint256 _price,,,,, uint32 _version) = targetContract.terms();
 
         require(
             _version == termsVersion,
@@ -197,7 +199,8 @@ contract CloneFactory is Initializable {
         uint256 _price,
         uint256 _limit,
         uint256 _speed,
-        uint256 _length
+        uint256 _length,
+        int8 _profitTarget
     ) external payable sufficientFee {
         require(rentalContractsMap[_contractAddress], "unknown contract address");
         Implementation _contract = Implementation(_contractAddress);
@@ -207,7 +210,7 @@ contract CloneFactory is Initializable {
         bool sent = payMarketplaceFee();
         require(sent, "Failed to pay marketplace listing fee");
 
-        Implementation(_contractAddress).setUpdatePurchaseInformation(_price, _limit, _speed, _length);
+        Implementation(_contractAddress).setUpdatePurchaseInformation(_price, _limit, _speed, _length, _profitTarget);
         emit purchaseInfoUpdated(address(this));
     }
 }

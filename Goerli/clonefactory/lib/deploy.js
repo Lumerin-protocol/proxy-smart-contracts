@@ -175,7 +175,7 @@ async function ApproveSeller(sellerAddr, cloneFactory, from, log = noop) {
 async function CreateContract(priceDecimalLMR, durationSeconds, hrGHS, cloneFactory, fromWallet, marketplaceFee, log = noop) {
   const pubKey = trimRight64Bytes(remove0xPrefix(fromWallet.publicKey));
   const receipt = await cloneFactory.methods
-    .setCreateNewRentalContract(priceDecimalLMR, "0", hrGHS, durationSeconds, fromWallet.address, pubKey)
+    .setCreateNewRentalContract(priceDecimalLMR, "0", hrGHS, durationSeconds, "0", fromWallet.address, pubKey)
     .send({ from: fromWallet.address, gas: GAS_LIMIT, value: marketplaceFee });
   const address = receipt.events?.[0].address || "";
   const txHash = receipt.transactionHash;
