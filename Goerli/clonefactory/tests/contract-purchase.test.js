@@ -92,6 +92,7 @@ describe.skip("ContractPurchase", function () {
         10,
         10,
         contract_length,
+        0,
         lumerin.address,
         "123"
       );
@@ -112,6 +113,7 @@ describe.skip("ContractPurchase", function () {
           10,
           10,
           contract_length,
+          0,
           lumerin.address,
           "123"
         );

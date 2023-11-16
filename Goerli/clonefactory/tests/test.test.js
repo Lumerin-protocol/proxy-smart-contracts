@@ -59,6 +59,7 @@ describe("marketplace", function () {
         10,
         10,
         contract_length,
+        0,
         lumerin.options.address,
         lumerin.options.address //validator placeholder
       )
@@ -79,6 +80,7 @@ describe("marketplace", function () {
           10,
           10,
           contract_length,
+          0,
           lumerin.options.address,
           "123",
           "private key"
