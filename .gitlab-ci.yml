@@ -4,6 +4,7 @@ stages:
   - build-test
   - release-bindings
   - update-contracts
+  - contract-functions
   - whitelist-clonefactory
   - populate-hr-contracts
   - deploy-contracts
@@ -408,3 +409,38 @@ release-contracts-audit:
     - cp $SSH_KEY_SMART_CONTRACTS ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - cd ./Goerli/clonefactory/ && make update-public-contracts
+
+set-fee-recipient-dev:
+  stage: contract-functions
+  image: $NODE_IMAGE
+  environment: dev
+  tags: *tags-dev
+  before_script:
+    - apt-get -yq update && apt-get -yqq install
+  sctipt:
+  - cd ./Goerli/clonefactory/ && make set-fee-recipient
+
+set-fee-recipient-stg:
+  stage: contract-functions
+  image: $NODE_IMAGE
+  environment: stg
+  tags: *tags-stg
+  before_script:
+    - apt-get -yq update && apt-get -yqq install
+  sctipt:
+  - cd ./Goerli/clonefactory/ && make set-fee-recipient
+
+set-fee-recipient-lmn:
+  stage: contract-functions
+  image: $NODE_IMAGE
+  environment: lmn
+  tags: *tags-lmn
+  before_script:
+    - apt-get -yq update && apt-get -yqq install
+  sctipt:
+  - cd ./Goerli/clonefactory/ && make set-fee-recipient
+
+set-fee-recipient-lmn:
+  stage: contract-functions
+  image: $NODE_IMAGE
+  tags: *tags-stg
