@@ -74,7 +74,7 @@ async function DeployCloneFactory(lumerinAddr, deployerPkey, feeRecipientAddress
  * @param {(...args)=>void} log 
  * @returns {Promise<void>}
  */
-async function UpdateCloneFactory(newCloneFactoryContractName, cloneFactoryAddr, deployerPkey, log = noop) {
+async function UpdateCloneFactory(newCloneFactoryContractName, cloneFactoryAddr, deployerPkey, lumerinAddr, feeRecipientAdd, log = noop) {
   log("CloneFactory update script")
   log()
 
