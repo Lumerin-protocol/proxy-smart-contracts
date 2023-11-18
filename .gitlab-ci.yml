@@ -439,8 +439,3 @@ set-fee-recipient-lmn:
     - apt-get -yq update && apt-get -yqq install
   script:
     - cd ./Goerli/clonefactory/ && make set-fee-recipient
-
-set-fee-recipient-lmn:
-  stage: contract-functions
-  image: $NODE_IMAGE
-  tags: *tags-stg
