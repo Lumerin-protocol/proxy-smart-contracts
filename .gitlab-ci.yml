@@ -417,8 +417,8 @@ set-fee-recipient-dev:
   tags: *tags-dev
   before_script:
     - apt-get -yq update && apt-get -yqq install
-  sctipt:
-  - cd ./Goerli/clonefactory/ && make set-fee-recipient
+  script:
+    - cd ./Goerli/clonefactory/ && make set-fee-recipient
 
 set-fee-recipient-stg:
   stage: contract-functions
@@ -428,7 +428,7 @@ set-fee-recipient-stg:
   before_script:
     - apt-get -yq update && apt-get -yqq install
   sctipt:
-  - cd ./Goerli/clonefactory/ && make set-fee-recipient
+    - cd ./Goerli/clonefactory/ && make set-fee-recipient
 
 set-fee-recipient-lmn:
   stage: contract-functions
@@ -438,7 +438,7 @@ set-fee-recipient-lmn:
   before_script:
     - apt-get -yq update && apt-get -yqq install
   sctipt:
-  - cd ./Goerli/clonefactory/ && make set-fee-recipient
+    - cd ./Goerli/clonefactory/ && make set-fee-recipient
 
 set-fee-recipient-lmn:
   stage: contract-functions
