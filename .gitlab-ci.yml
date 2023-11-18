@@ -427,7 +427,7 @@ set-fee-recipient-stg:
   tags: *tags-stg
   before_script:
     - apt-get -yq update && apt-get -yqq install
-  sctipt:
+  script:
     - cd ./Goerli/clonefactory/ && make set-fee-recipient
 
 set-fee-recipient-lmn:
@@ -437,7 +437,7 @@ set-fee-recipient-lmn:
   tags: *tags-lmn
   before_script:
     - apt-get -yq update && apt-get -yqq install
-  sctipt:
+  script:
     - cd ./Goerli/clonefactory/ && make set-fee-recipient
 
 set-fee-recipient-lmn:
