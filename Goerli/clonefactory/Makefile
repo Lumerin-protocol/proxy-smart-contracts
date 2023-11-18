@@ -32,6 +32,8 @@ populate-contracts:
 
 whitelist-clonefactory:
 	yarn hardhat run --network default ./scripts/whitelist-clonefactory.js
+set-fee-recipient:
+	yarn hardhat run --network default ./scripts/set-feeRecipient.js
 
 build-go:
 	./build-go.sh
