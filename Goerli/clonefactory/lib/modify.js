@@ -33,7 +33,7 @@ async function UpdateCloneFactoryFeeRecipient(
     await upgrades.erc1967.getImplementationAddress(cloneFactoryAddr);
   log("Current CLONEFACTORY implementation:", currentCloneFactoryImpl);
 
-  const cloneFactory = CloneFactory(web3, currentCloneFactoryImpl);
+  const cloneFactory = CloneFactory(web3, cloneFactoryAddr);
 
   return await cloneFactory.methods
     .setMarketplaceFeeRecipient("200000000000000", feeRecipientAdd)

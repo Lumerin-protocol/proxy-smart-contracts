@@ -74,7 +74,7 @@ variables:
     - make deploy-clonefactory
     - export ENV_NAME="CLONE_FACTORY_ADDRESS" ENV_VALUE=$(cat clonefactory-addr.tmp) ENV_ENV=$CI_ENVIRONMENT_SLUG
     - *set-env
-    - export DYNAMIC_ENVIRONMENT_URL="https://goerli.etherscan.io/address/$(cat clonefactory-addr.tmp)"
+    - export DYNAMIC_ENVIRONMENT_URL="https://sepolia.arbiscan.io/address/$(cat clonefactory-addr.tmp)"
     - cd ../..
     - echo "DYNAMIC_ENVIRONMENT_URL=$DYNAMIC_ENVIRONMENT_URL" >> deploy.env
 
