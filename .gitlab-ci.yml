@@ -413,6 +413,7 @@ release-contracts-audit:
 set-fee-recipient-dev:
   stage: contract-functions
   image: $NODE_IMAGE
+  when: manual
   environment: dev
   tags: *tags-dev
   before_script:
@@ -423,6 +424,7 @@ set-fee-recipient-dev:
 set-fee-recipient-stg:
   stage: contract-functions
   image: $NODE_IMAGE
+  when: manual
   environment: stg
   tags: *tags-stg
   before_script:
@@ -433,6 +435,7 @@ set-fee-recipient-stg:
 set-fee-recipient-lmn:
   stage: contract-functions
   image: $NODE_IMAGE
+  when: manual
   environment: lmn
   tags: *tags-lmn
   before_script:
