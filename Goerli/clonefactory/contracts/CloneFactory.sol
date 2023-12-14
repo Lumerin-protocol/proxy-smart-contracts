@@ -201,14 +201,10 @@ contract CloneFactory is Initializable {
         uint256 _speed,
         uint256 _length,
         int8 _profitTarget
-    ) external payable sufficientFee {
+    ) external {
         require(rentalContractsMap[_contractAddress], "unknown contract address");
         Implementation _contract = Implementation(_contractAddress);
         require(msg.sender == _contract.seller(), "you are not authorized");
-
-        /* ETH seller marketplace listing fee */
-        bool sent = payMarketplaceFee();
-        require(sent, "Failed to pay marketplace listing fee");
 
         Implementation(_contractAddress).setUpdatePurchaseInformation(_price, _limit, _speed, _length, _profitTarget);
         emit purchaseInfoUpdated(address(this));

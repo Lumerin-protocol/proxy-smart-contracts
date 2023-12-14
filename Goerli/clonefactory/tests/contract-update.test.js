@@ -51,7 +51,7 @@ describe("Contract terms update", function () {
 
   it('should prohibit updating if caller is not a seller', async function () {
     try {
-      await cf.methods.setUpdateContractInformation(hrContractAddr, newPrice, '1', '1', '1', '0').send({ from: buyer, value: fee })
+      await cf.methods.setUpdateContractInformation(hrContractAddr, newPrice, '1', '1', '1', '0').send({ from: buyer })
       expect.fail("should throw error")
     } catch (e) {
       expect(e.message).includes("you are not authorized")
@@ -59,7 +59,7 @@ describe("Contract terms update", function () {
   })
 
   it("should update contract and emit event without futureTerms update", async function () {
-    const receipt = await cf.methods.setUpdateContractInformation(hrContractAddr, newPrice, '2', '3', '4', '0').send({ from: seller, value: fee })
+    const receipt = await cf.methods.setUpdateContractInformation(hrContractAddr, newPrice, '2', '3', '4', '0').send({ from: seller })
 
     const impl = Implementation(web3, hrContractAddr)
     const futureTerms = await impl.methods.futureTerms().call()
@@ -86,7 +86,7 @@ describe("Contract terms update", function () {
     const price = ToString(2 * 10 ** 8);
     const newPrice = ToString(3 * 10 ** 8);
     await cf.methods.setPurchaseRentalContract(hrContractAddr, '', "1").send({ from: buyer, value: fee });
-    const receipt = await cf.methods.setUpdateContractInformation(hrContractAddr, newPrice, '22', '33', '44', '0').send({ from: seller, value: fee })
+    const receipt = await cf.methods.setUpdateContractInformation(hrContractAddr, newPrice, '22', '33', '44', '0').send({ from: seller })
     const impl = Implementation(web3, hrContractAddr)
     const futureTerms = await impl.methods.futureTerms().call()
     const data = await impl.methods.getPublicVariables().call()
