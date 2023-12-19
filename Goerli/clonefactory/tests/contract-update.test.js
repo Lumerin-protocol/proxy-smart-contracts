@@ -63,7 +63,7 @@ describe("Contract terms update", function () {
 
     const impl = Implementation(web3, hrContractAddr)
     const futureTerms = await impl.methods.futureTerms().call()
-    const data = await impl.methods.getPublicVariables().call()
+    const data = await impl.methods.getPublicVariablesV2().call()
 
     expect(futureTerms._price).equal('0');
     expect(futureTerms._version).equal('0');
@@ -89,7 +89,7 @@ describe("Contract terms update", function () {
     const receipt = await cf.methods.setUpdateContractInformation(hrContractAddr, newPrice, '22', '33', '44', '0').send({ from: seller })
     const impl = Implementation(web3, hrContractAddr)
     const futureTerms = await impl.methods.futureTerms().call()
-    const data = await impl.methods.getPublicVariables().call()
+    const data = await impl.methods.getPublicVariablesV2().call()
 
     expect(futureTerms._price).equal(newPrice);
     expect(futureTerms._limit).equal('22');
@@ -125,7 +125,7 @@ describe("Contract terms update", function () {
     expect(futureTerms._speed).equal('0');
     expect(futureTerms._version).equal('0');
 
-    const data = await impl.methods.getPublicVariables().call()
+    const data = await impl.methods.getPublicVariablesV2().call()
     expect(data._terms._price).equal(newPrice);
     expect(data._terms._limit).equal('22');
     expect(data._terms._speed).equal('33');

@@ -5,7 +5,7 @@ const Web3 = require("web3");
 const { Lumerin, CloneFactory, Implementation } = require("../build-js/dist");
 const { AdvanceBlockTime, LocalTestnetAddresses } = require("./utils");
 
-describe("Contract delete", function () {
+describe("Contract history", function () {
   const {
     lumerinAddress,
     cloneFactoryAddress,
