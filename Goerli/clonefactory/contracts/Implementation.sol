@@ -27,13 +27,14 @@ contract Implementation is Initializable, Escrow {
         Running
     }
 
+
     struct Terms {
         uint256 _price; // cost to purchase contract
-        uint256 _limit; // variable used to aid in the lumerin nodes decision making
+        uint256 _limit; // variable used to aid in the lumerin nodes decision making // Not used anywhere
         uint256 _speed; // th/s of contract
         uint256 _length; // how long the contract will last in seconds
-        int8 _profitTarget;
         uint32 _version;
+        int8 _profitTarget;
     }
 
     struct HistoryEntry {
@@ -43,7 +44,6 @@ contract Implementation is Initializable, Escrow {
         uint256 _price;
         uint256 _speed;
         uint256 _length;
-        int8 _profitTarget;
         address _buyer;
     }
 
@@ -64,7 +64,7 @@ contract Implementation is Initializable, Escrow {
         address _validator,
         string calldata _pubKey
     ) public initializer {
-        terms = Terms(_price, _limit, _speed, _length, _profitTarget, 0);
+        terms = Terms(_price, _limit, _speed, _length, 0, _profitTarget);
         seller = _seller;
         cloneFactory = _cloneFactory;
         contractState = ContractState.Available;
@@ -74,6 +74,43 @@ contract Implementation is Initializable, Escrow {
     }
 
     function getPublicVariables()
+        public
+        view
+        returns (
+            ContractState _state,
+            uint256 _price,
+            uint256 _limit,
+            uint256 _speed,
+            uint256 _length,
+            uint256 _startingBlockTimestamp,
+            address _buyer,
+            address _seller,
+            string memory _encryptedPoolData,
+            bool _isDeleted,
+            uint256 _balance,
+            bool _hasFutureTerms,
+            uint32 _version
+        )
+    {
+        bool hasFutureTerms = futureTerms._length != 0;
+        return (
+            contractState,
+            terms._price,
+            terms._limit,
+            terms._speed,
+            terms._length,
+            startingBlockTimestamp,
+            buyer,
+            seller,
+            encryptedPoolData,
+            isDeleted,
+            lumerin.balanceOf(address(this)),
+            hasFutureTerms,
+            terms._version
+        );
+    }
+
+    function getPublicVariablesV2()
         public
         view
         returns (
@@ -183,9 +220,9 @@ contract Implementation is Initializable, Escrow {
             "this address is not approved to call this function"
         );
         if (contractState == ContractState.Running) {
-            futureTerms = Terms(_price, _limit, _speed, _length, _profitTarget, terms._version + 1);
+            futureTerms = Terms(_price, _limit, _speed, _length, terms._version + 1, _profitTarget);
         } else {
-            terms = Terms(_price, _limit, _speed, _length, _profitTarget, terms._version + 1);
+            terms = Terms(_price, _limit, _speed, _length, terms._version + 1, _profitTarget);
             emit purchaseInfoUpdated(address(this));
         }
     }
@@ -196,7 +233,7 @@ contract Implementation is Initializable, Escrow {
         contractState = ContractState.Available;
 
         if(futureTerms._length != 0) {
-            terms = Terms(futureTerms._price, futureTerms._limit, futureTerms._speed, futureTerms._length, futureTerms._profitTarget, futureTerms._version);
+            terms = Terms(futureTerms._price, futureTerms._limit, futureTerms._speed, futureTerms._length, futureTerms._version, futureTerms._profitTarget);
             futureTerms = Terms(0, 0, 0, 0, 0, 0);
             emit purchaseInfoUpdated(address(this));
         }
@@ -226,7 +263,7 @@ contract Implementation is Initializable, Escrow {
 
             uint256 buyerPayout = getBuyerPayout();
             bool comp = block.timestamp - startingBlockTimestamp >= terms._length;
-            history.push(HistoryEntry(comp, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, terms._profitTarget, buyer));
+            history.push(HistoryEntry(comp, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
             resetContractVariablesAndApplyFutureTerms();
             emit contractClosed(buyer);
             
@@ -266,7 +303,7 @@ contract Implementation is Initializable, Escrow {
                 "the contract is not in the running state"
             );
 
-            history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, terms._profitTarget, buyer));
+            history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
 
             resetContractVariablesAndApplyFutureTerms();
             emit contractClosed(buyer);
@@ -287,7 +324,7 @@ contract Implementation is Initializable, Escrow {
                 "the contract is not in the running state"
             );
 
-            history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, terms._profitTarget, buyer));
+            history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
 
             resetContractVariablesAndApplyFutureTerms();
             emit contractClosed(buyer);

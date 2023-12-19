@@ -13,7 +13,7 @@ import {FeeRecipient} from "./Shared.sol";
 
 //CloneFactory now responsible for minting, purchasing, and tracking contracts
 contract CloneFactory is Initializable {
-    Lumerin lumerin;
+    Lumerin public lumerin;
     address public baseImplementation;
     address public owner;
     bool public noMoreWhitelist;
@@ -122,7 +122,7 @@ contract CloneFactory is Initializable {
             "cannot purchase your own contract"
         );
 
-        (uint256 _price,,,,, uint32 _version) = targetContract.terms();
+        (uint256 _price,,,, uint32 _version,) = targetContract.terms();
 
         require(
             _version == termsVersion,
