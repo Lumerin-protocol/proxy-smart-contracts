@@ -55,6 +55,19 @@ variables:
     --form "environment_scope=$ENV_ENV"'
   - unset ENV_NAME ENV_VALUE ENV_ENV
 
+# Downloads artifacts from previous successful upgradeable smart-contract deploy
+# Required variables:
+# UPGRADE_JOB_NAME - name of the job that upgrades the upgradeable smart-contract
+# DEPLOY_JOB_NAME - name of the job that deploys the upgradeable smart-contract
+.download-smart-contract-artifacts: &download-smart-contract-artifacts
+  - echo "Downloading artifacts from previous successful deploy" 
+  - echo "Downloading artifacts from $UPGRADE_JOB_NAME"
+  - 'curl --fail --location --output artifacts.zip --header "PRIVATE-TOKEN: $GITLAB_TOKEN" "https://gitlab.com/api/v4/projects/$CI_PROJECT_ID/jobs/artifacts/main/download?job=$UPGRADE_JOB_NAME"'
+  - 'if [ ! -f "artifacts.zip" ]; then echo "cannot find update artifacts, trying from $DEPLOY_JOB_NAME" && curl --fail --location --output artifacts.zip --header "PRIVATE-TOKEN: $GITLAB_TOKEN" "https://gitlab.com/api/v4/projects/$CI_PROJECT_ID/jobs/artifacts/main/download?job=$DEPLOY_JOB_NAME"; fi'
+  - 'if [ ! -f "artifacts.zip" ]; then echo "cannot find deploy artifacts, skipping update" && exit 1; fi'
+  - unzip artifacts.zip "Goerli/clonefactory/.openzeppelin" -d . 
+  - echo "artifacts downloaded" 
+
 # Deploys clonefactory to the blockchain using env variables from the corresponding environment
 # Updates the environment url to the etherscan url of the contract
 # TODO: fix hardcoded etherscan url
@@ -64,6 +77,8 @@ variables:
   image: $NODE_IMAGE
   when: manual
   artifacts:
+    paths:
+      - Goerli/clonefactory/.openzeppelin
     reports:
       dotenv: deploy.env
   environment:
@@ -83,6 +98,9 @@ variables:
   needs: ["compile-contracts", "test", "build-contracts-js"]
   image: $NODE_IMAGE
   when: manual
+  artifacts:
+    paths:
+      - Goerli/clonefactory/.openzeppelin
   environment:
     name: dev # The environment.name should be overriden
   script:
@@ -94,9 +112,14 @@ variables:
   needs: ["compile-contracts", "test", "build-contracts-js"]
   image: $NODE_IMAGE
   when: manual
+  artifacts:
+    paths:
+      - Goerli/clonefactory/.openzeppelin
   environment:
     name: dev
   script:
+    - export UPGRADE_JOB_NAME="update-clonefactory-$CI_ENVIRONMENT_SLUG" DEPLOY_JOB_NAME="deploy-clonefactory-$CI_ENVIRONMENT_SLUG"
+    - *download-smart-contract-artifacts
     - cd ./Goerli/clonefactory/
     - make update-clonefactory
 
@@ -105,9 +128,14 @@ variables:
   needs: ["compile-contracts", "test", "build-contracts-js"]
   image: $NODE_IMAGE
   when: manual
+  artifacts:
+    paths:
+      - Goerli/clonefactory/.openzeppelin
   environment:
     name: dev
   script:
+    - export UPGRADE_JOB_NAME="update-implementation-$CI_ENVIRONMENT_SLUG" DEPLOY_JOB_NAME="deploy-clonefactory-$CI_ENVIRONMENT_SLUG"
+    - *download-smart-contract-artifacts
     - cd ./Goerli/clonefactory/
     - make update-implementation
 
@@ -139,7 +167,7 @@ variables:
   needs: ["compile-contracts", "test", "build-contracts-js"]
   image: $NODE_IMAGE
   when: manual
-  script:
+  script: 
     - cd ./Goerli/clonefactory/
     - make deploy-lumerin
     - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp)
@@ -191,10 +219,10 @@ test:
   allow_failure: false
   needs: ["build-contracts-js", "compile-contracts"]
   only:
-    - branches
+    - branches    
   script:
     - cd ./Goerli/clonefactory/ && yarn install
-    - make test
+    - BRANCH_TO_TEST_AGAINST=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME make test
 
 deploy-lumerintoken-dev:
   <<: *deploy_lumerintoken_dev_stg

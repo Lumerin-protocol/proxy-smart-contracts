@@ -27,12 +27,14 @@ contract Implementation is Initializable, Escrow {
         Running
     }
 
+
     struct Terms {
         uint256 _price; // cost to purchase contract
-        uint256 _limit; // variable used to aid in the lumerin nodes decision making
+        uint256 _limit; // variable used to aid in the lumerin nodes decision making // Not used anywhere
         uint256 _speed; // th/s of contract
         uint256 _length; // how long the contract will last in seconds
         uint32 _version;
+        int8 _profitTarget;
     }
 
     struct HistoryEntry {
@@ -55,13 +57,14 @@ contract Implementation is Initializable, Escrow {
         uint256 _limit,
         uint256 _speed,
         uint256 _length,
+        int8 _profitTarget,
         address _seller,
         address _lmrAddress,
         address _cloneFactory, //used to restrict purchasing power to only the clonefactory
         address _validator,
         string calldata _pubKey
     ) public initializer {
-        terms = Terms(_price, _limit, _speed, _length, 0);
+        terms = Terms(_price, _limit, _speed, _length, 0, _profitTarget);
         seller = _seller;
         cloneFactory = _cloneFactory;
         contractState = ContractState.Available;
@@ -104,6 +107,35 @@ contract Implementation is Initializable, Escrow {
             lumerin.balanceOf(address(this)),
             hasFutureTerms,
             terms._version
+        );
+    }
+
+    function getPublicVariablesV2()
+        public
+        view
+        returns (
+            ContractState _state,
+            Terms memory _terms,
+            uint256 _startingBlockTimestamp,
+            address _buyer,
+            address _seller,
+            string memory _encryptedPoolData,
+            bool _isDeleted,
+            uint256 _balance,
+            bool _hasFutureTerms
+        )
+    {
+        bool hasFutureTerms = futureTerms._length != 0;
+        return (
+            contractState,
+            terms,
+            startingBlockTimestamp,
+            buyer,
+            seller,
+            encryptedPoolData,
+            isDeleted,
+            lumerin.balanceOf(address(this)),
+            hasFutureTerms
         );
     }
 
@@ -180,16 +212,17 @@ contract Implementation is Initializable, Escrow {
         uint256 _price,
         uint256 _limit,
         uint256 _speed,
-        uint256 _length
+        uint256 _length,
+        int8 _profitTarget
     ) external {
         require(
             msg.sender == cloneFactory,
             "this address is not approved to call this function"
         );
         if (contractState == ContractState.Running) {
-            futureTerms = Terms(_price, _limit, _speed, _length, terms._version + 1);
+            futureTerms = Terms(_price, _limit, _speed, _length, terms._version + 1, _profitTarget);
         } else {
-            terms = Terms(_price, _limit, _speed, _length, terms._version + 1);
+            terms = Terms(_price, _limit, _speed, _length, terms._version + 1, _profitTarget);
             emit purchaseInfoUpdated(address(this));
         }
     }
@@ -200,8 +233,8 @@ contract Implementation is Initializable, Escrow {
         contractState = ContractState.Available;
 
         if(futureTerms._length != 0) {
-            terms = Terms(futureTerms._price, futureTerms._limit, futureTerms._speed, futureTerms._length, futureTerms._version);
-            futureTerms = Terms(0, 0, 0, 0, 0);
+            terms = Terms(futureTerms._price, futureTerms._limit, futureTerms._speed, futureTerms._length, futureTerms._version, futureTerms._profitTarget);
+            futureTerms = Terms(0, 0, 0, 0, 0, 0);
             emit purchaseInfoUpdated(address(this));
         }
     }
