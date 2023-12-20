@@ -13,14 +13,13 @@ import {FeeRecipient} from "./Shared.sol";
 
 //CloneFactory now responsible for minting, purchasing, and tracking contracts
 contract CloneFactory is Initializable {
-    Lumerin lumerin;
+    Lumerin public lumerin;
     address public baseImplementation;
     address public owner;
     bool public noMoreWhitelist;
     address[] public rentalContracts; //dynamically allocated list of rental contracts
     mapping(address => bool) rentalContractsMap; //mapping of rental contracts to verify cheaply if implementation was created by this clonefactory
     FeeRecipient feeRecipient;
-
 
     mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
     mapping(address => bool) public isContractDead; // keeps track of contracts that are no longer valid
@@ -29,6 +28,7 @@ contract CloneFactory is Initializable {
     event clonefactoryContractPurchased(address indexed _address); //emitted whenever a contract is purchased
     event contractDeleteUpdated(address _address, bool _isDeleted); //emitted whenever a contract is deleted/restored
     event purchaseInfoUpdated(address indexed _address);
+
 
     modifier onlyOwner() {
         require(msg.sender == owner, "you are not authorized");
@@ -74,12 +74,33 @@ contract CloneFactory is Initializable {
         uint256 _limit,
         uint256 _speed,
         uint256 _length,
-        int8 _profitTarget,
         address _validator,
         string calldata _pubKey
     ) external payable onlyInWhitelist sufficientFee returns (address) {
+        return createContract(_price, _limit, _speed, _length, 0, _validator, _pubKey);
+    }
 
-        /* ETH seller marketplace listing fee */
+    function setCreateNewRentalContractV2(
+        uint256 _price,
+        uint256 _limit,
+        uint256 _speed,
+        uint256 _length,
+        int8 _profitTarget,
+        address _validator,
+        string calldata _pubKey
+    ) public payable onlyInWhitelist sufficientFee returns (address) {
+        return createContract(_price, _limit, _speed, _length, _profitTarget, _validator, _pubKey);
+    }
+
+    function createContract(
+        uint256 _price,
+        uint256 _limit,
+        uint256 _speed,
+        uint256 _length,
+        int8 _profitTarget,
+        address _validator,
+        string calldata _pubKey
+    ) internal returns (address){
         bool sent = payMarketplaceFee();
         require(sent, "Failed to pay marketplace listing fee");
 
@@ -99,9 +120,9 @@ contract CloneFactory is Initializable {
 
         BeaconProxy beaconProxy = new BeaconProxy(baseImplementation, data);
         address newContractAddr = address(beaconProxy);
-        rentalContracts.push(newContractAddr); //add clone to list of contracts
+        rentalContracts.push(newContractAddr);
         rentalContractsMap[newContractAddr] = true;
-        emit contractCreated(newContractAddr, _pubKey); //broadcasts a new contract and the pubkey to use for encryption
+        emit contractCreated(newContractAddr, _pubKey);
         return newContractAddr;
     }
 
@@ -122,7 +143,7 @@ contract CloneFactory is Initializable {
             "cannot purchase your own contract"
         );
 
-        (uint256 _price,,,,, uint32 _version) = targetContract.terms();
+        (uint256 _price,,,, uint32 _version,) = targetContract.terms();
 
         require(
             _version == termsVersion,
