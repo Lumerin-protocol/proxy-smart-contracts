@@ -7,10 +7,10 @@ test:
 	kill "$$(lsof -t -i:8545)" || true
 	make compile
 	make -B build-js 
-# regular test cases
 	yarn hardhat node --config hardhat-base.config.js & ./node-local-deploy.sh && yarn hardhat test --network localhost tests/*.js --config hardhat-base.config.js
 	kill "$$(lsof -t -i:8545)" || true
-# contract upgrade test cases
+
+test-upgrade:
 	yarn hardhat --network localhost --config hardhat-base.config.js test tests/upgrades/*.js 
 
 compile:

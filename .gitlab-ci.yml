@@ -222,7 +222,10 @@ test:
     - branches    
   script:
     - cd ./Goerli/clonefactory/ && yarn install
-    - BRANCH_TO_TEST_AGAINST=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME make test
+    - make test
+    - if [ ! -z "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" ]; then 
+        BRANCH_TO_TEST_AGAINST=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME make test-upgrade; 
+      fi
 
 deploy-lumerintoken-dev:
   <<: *deploy_lumerintoken_dev_stg
