@@ -140,7 +140,7 @@ async function UpdateImplementation(newImplementationContractName, cloneFactoryA
   log("New beacon proxy logic:", newLogicAddr)
 
   if (oldLogicAddr == newLogicAddr) {
-    log("Warning. Implementation proxy logic didn't change, cause it's likely the same implementation.");
+    log("Warning. Implementation proxy logic address didn't change, because it may be the same implementation. Please test manually.");
   } else {
     log("Implementation proxy logic changed.")
     log("New proxy logic address:", newLogicAddr)
