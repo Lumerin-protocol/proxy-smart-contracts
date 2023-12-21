@@ -17,7 +17,7 @@ async function main() {
   if (!feeRecipientAddress) throw new Error("FEE_RECIPIENT_ADDRESS is not set")
   if (!cloneFactoryAddr) throw new Error("CLONE_FACTORY_ADDRESS is not set")
 
-  await UpdateCloneFactory("CloneFactory", cloneFactoryAddr, privateKey, lumerinAddr, feeRecipientAddress, console.log)
+  await UpdateCloneFactory("CloneFactory", cloneFactoryAddr, privateKey, console.log)
   fs.writeFileSync("clonefactory-addr.tmp", cloneFactoryAddr);
 }
 main()
