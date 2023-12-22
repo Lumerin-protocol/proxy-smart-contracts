@@ -23,6 +23,8 @@ contract CloneFactory is Initializable {
 
     mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
     mapping(address => bool) public isContractDead; // keeps track of contracts that are no longer valid
+    
+    uint8 constant public version = 1; // version of the smart contract
 
     event contractCreated(address indexed _address, string _pubkey); //emitted whenever a contract is created
     event clonefactoryContractPurchased(address indexed _address); //emitted whenever a contract is purchased
