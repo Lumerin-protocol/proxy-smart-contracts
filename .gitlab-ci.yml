@@ -232,9 +232,20 @@ test:
   script:
     - cd ./Goerli/clonefactory/ && yarn install
     - make test
-    - if [ ! -z "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" ]; then 
-        BRANCH_TO_TEST_AGAINST=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME make test-upgrade; 
-      fi
+
+test-upgrade:
+  environment: test
+  stage: test
+  image: $NODE_IMAGE
+  tags: *tags-dev
+  allow_failure: false
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - cd ./Goerli/clonefactory/
+    - yarn install
+    - make build-js
+    - BRANCH_TO_TEST_AGAINST=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME make test-upgrade
 
 deploy-lumerintoken-dev:
   <<: *deploy_lumerintoken_dev_stg
