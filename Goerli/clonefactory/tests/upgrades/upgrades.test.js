@@ -85,25 +85,34 @@ describe("Contract updates test", () => {
       // first purchase
       await lumerin.methods.increaseAllowance(cloneFactoryAddr, _price).send({ from: buyer.address })
       await cf.methods.setPurchaseRentalContract(address, cipher, 0).send({ from: buyer.address, value: markerplaceFee })
+      console.log('1st purchase done')
       await AdvanceBlockTime(web3, hoursToSeconds(1))
 
       // closeout to generate history entry
       await impl.methods.setContractCloseOut("0").send({ from: buyer.address })
+      console.log('1st closeout done')
       await AdvanceBlockTime(web3, 30)
 
       // second purchase
       await lumerin.methods.increaseAllowance(cloneFactoryAddr, _price).send({ from: buyer.address })
       await cf.methods.setPurchaseRentalContract(address, cipher, 0).send({ from: buyer.address, value: markerplaceFee })
+      console.log('2nd purchase done')
 
       // update old terms to generate future terms
       await AdvanceBlockTime(web3, 30)
+      console.log('updating to', String(Number(_price) + 1),
+        String(Number(_limit) + 1),
+        String(Number(_speed) + 1),
+        String(Number(_length) + 1))
       await cf.methods.setUpdateContractInformation(
         address,
         String(Number(_price) + 1),
-        String(Number(_limit + 1)),
-        String(Number(_speed + 1)),
-        String(Number(_length + 1))
-      ).send({ from: owner.address, value: markerplaceFee })
+        String(Number(_limit) + 1),
+        String(Number(_speed) + 1),
+        String(Number(_length) + 1),
+        "10",
+      ).send({ from: owner.address })
+      console.log('update done')
 
       const terms = await impl.methods.getPublicVariables().call();
       const futureTerms = await impl.methods.futureTerms().call();
