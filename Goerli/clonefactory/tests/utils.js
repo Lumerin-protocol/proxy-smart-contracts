@@ -104,24 +104,35 @@ function shellLog(cmd, logger = () => { }) {
 
 /**
  * Executes shell command in background and returns promise that resolves when process exits
- * @param {string} command 
- * @param  {...string} args
+ * @param {string[]} command 
+ * @param {(s: string)=>void} [logger]
  * @returns {ShellBackground} 
  */
-function shellBackground(command, ...args) {
-  const d = ChildProcess.spawn("sh", ["-c", [command, ...args].join(" ")])
+function shellBackground(command, logger = () => { }) {
+  const d = ChildProcess.spawn("sh", ["-c", command.join(" ")])
 
   const donePromise = new Promise((resolve, reject) => {
+    d.stdout.on("data", (data) => {
+      logger(data.toString())
+    })
+    d.stderr.on("data", (data) => {
+      logger(data.toString())
+    })
+    d.on("error", (err) => {
+      logger(err.toString())
+    })
     d.on("close", (code) => {
       if (code === 0) {
         resolve({ stdout: d.stdout.toString(), stderr: d.stderr.toString() })
       } else {
+        logger(`Process exited with code ${code}`)
         reject(new Error(`Process exited with code ${code}`))
       }
     })
   })
 
   const stop = () => {
+    logger(`Process stopped`)
     d.kill()
   }
 

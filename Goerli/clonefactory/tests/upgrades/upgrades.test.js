@@ -34,7 +34,7 @@ describe("Contract updates test", () => {
 
   before(async () => {
     // starts local node in background
-    localNode = shellBackground("yarn hardhat node")
+    localNode = shellBackground(["yarn hardhat node"], console.log)
 
     const remoteUrl = process.env.REMOTE_URL || shell("git", "config", "--get", "remote.origin.url");
     console.log(`Testing against branch ${branchToTestAgainst} of ${remoteUrl}`);
