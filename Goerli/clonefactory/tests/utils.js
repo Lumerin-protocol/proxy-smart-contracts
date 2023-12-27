@@ -129,11 +129,19 @@ function shellBackground(command, logger = () => { }) {
         reject(new Error(`Process exited with code ${code}`))
       }
     })
+    d.on("exit", (code) => {
+      if (code === 0) {
+        resolve({ stdout: d.stdout.toString(), stderr: d.stderr.toString() })
+      } else {
+        logger(`Process exited with code ${code}`)
+        reject(new Error(`Process exited with code ${code}`))
+      }
+    })
   })
 
   const stop = () => {
-    logger(`Process stopped`)
-    d.kill()
+    const result = d.kill('SIGKILL')
+    logger(`Send sigkill signal to process. Result: ${result}`)
   }
 
   return { stop, donePromise }
