@@ -132,8 +132,8 @@ function shellBackground(command, logger = () => { }) {
   })
 
   const stop = () => {
-    logger(`Process stopped`)
-    d.kill()
+    const result = d.kill('SIGKILL')
+    logger(`Send sigkill signal to process. Result: ${result}`)
   }
 
   return { stop, donePromise }
