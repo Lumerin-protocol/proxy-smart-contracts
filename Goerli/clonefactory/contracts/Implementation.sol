@@ -22,8 +22,6 @@ contract Implementation is Initializable, Escrow {
     HistoryEntry[] public history;
     Terms public futureTerms;
     
-    uint8 constant public version = 1; // version of the smart contract
-
     enum ContractState {
         Available,
         Running
