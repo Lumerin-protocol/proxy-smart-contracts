@@ -21,7 +21,7 @@ contract Implementation is Initializable, Escrow {
     bool public isDeleted; //used to track if the contract is deleted, separate variable to account for the possibility of a contract being deleted when it is still running
     HistoryEntry[] public history;
     Terms public futureTerms;
-
+    
     enum ContractState {
         Available,
         Running

@@ -23,12 +23,11 @@ contract CloneFactory is Initializable {
 
     mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
     mapping(address => bool) public isContractDead; // keeps track of contracts that are no longer valid
-
+    
     event contractCreated(address indexed _address, string _pubkey); //emitted whenever a contract is created
     event clonefactoryContractPurchased(address indexed _address); //emitted whenever a contract is purchased
     event contractDeleteUpdated(address _address, bool _isDeleted); //emitted whenever a contract is deleted/restored
     event purchaseInfoUpdated(address indexed _address);
-
 
     modifier onlyOwner() {
         require(msg.sender == owner, "you are not authorized");
@@ -220,9 +219,30 @@ contract CloneFactory is Initializable {
         uint256 _price,
         uint256 _limit,
         uint256 _speed,
+        uint256 _length
+    ) external payable {
+        updateContract(_contractAddress, _price, _limit, _speed, _length, 0);
+    }
+
+    function setUpdateContractInformationV2(
+        address _contractAddress,      
+        uint256 _price,
+        uint256 _limit,
+        uint256 _speed,
         uint256 _length,
         int8 _profitTarget
     ) external {
+        updateContract(_contractAddress, _price, _limit, _speed, _length, _profitTarget);
+    }
+
+    function updateContract(
+        address _contractAddress,      
+        uint256 _price,
+        uint256 _limit,
+        uint256 _speed,
+        uint256 _length,
+        int8 _profitTarget
+    ) internal {
         require(rentalContractsMap[_contractAddress], "unknown contract address");
         Implementation _contract = Implementation(_contractAddress);
         require(msg.sender == _contract.seller(), "you are not authorized");

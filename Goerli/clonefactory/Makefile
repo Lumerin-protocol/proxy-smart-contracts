@@ -11,7 +11,7 @@ test:
 	kill "$$(lsof -t -i:8545)" || true
 
 test-upgrade:
-	yarn hardhat --network localhost --config hardhat-base.config.js test tests/upgrades/*.js 
+	yarn hardhat --network localhost --config hardhat-base.config.js test --bail tests/upgrades/*.js 
 
 compile:
 	yarn hardhat compile --config hardhat-base.config.js
