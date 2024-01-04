@@ -69,8 +69,7 @@ variables:
       echo "cannot find update artifacts, trying from $DEPLOY_JOB_NAME"
       curl --fail --location --output artifacts.zip --header "PRIVATE-TOKEN: $GITLAB_TOKEN" "https://gitlab.com/api/v4/projects/$CI_PROJECT_ID/jobs/artifacts/main/download?job=$DEPLOY_JOB_NAME"
       if [ $? -ne 0 ]; then
-        echo "cannot find deploy artifacts, skipping update"
-        exit 0 
+        echo "cannot find deploy artifacts, using artifacts from source control"
       fi
     fi
     set -e
