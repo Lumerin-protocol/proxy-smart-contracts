@@ -11,22 +11,22 @@ contract Implementation is Initializable, Escrow {
     ContractState public contractState;
     Terms public terms;
 
-    uint256 public startingBlockTimestamp; //the timestamp of the block when the contract was purchased
-    address public buyer; //address of the current purchaser of the contract
-    address public seller; //address of the seller of the contract
+    uint256 public startingBlockTimestamp; // the timestamp of the block when the contract was purchased
+    address public buyer; // address of the current purchaser of the contract
+    address public seller; // address of the seller of the contract
     address public cloneFactory;
-    address validator;
-    string public encryptedPoolData; //encrypted data for pool target info
-    string public pubKey; //encrypted data for pool target info
-    bool public isDeleted; //used to track if the contract is deleted, separate variable to account for the possibility of a contract being deleted when it is still running
+    address public validator; // address of the validator, can close out contract early, if empty - no validator (buyer node)
+    string public encryptedValidatorURL; // if using own validator (buyer-node) this will be the encrypted buyer address. Encrypted with the seller's public key
+    string public pubKey; // encrypted data for pool target info
+    bool public isDeleted; // used to track if the contract is deleted, separate variable to account for the possibility of a contract being deleted when it is still running
     HistoryEntry[] public history;
     Terms public futureTerms;
-    
+    string public encryptedDestURL; // where to redirect the hashrate after validation (for both third-party validator and buyer-node) If empty, then the hashrate will be redirected to the default pool of the buyer node
+
     enum ContractState {
         Available,
         Running
     }
-
 
     struct Terms {
         uint256 _price; // cost to purchase contract
@@ -102,7 +102,7 @@ contract Implementation is Initializable, Escrow {
             startingBlockTimestamp,
             buyer,
             seller,
-            encryptedPoolData,
+            encryptedValidatorURL,
             isDeleted,
             lumerin.balanceOf(address(this)),
             hasFutureTerms,
@@ -132,7 +132,7 @@ contract Implementation is Initializable, Escrow {
             startingBlockTimestamp,
             buyer,
             seller,
-            encryptedPoolData,
+            encryptedValidatorURL,
             isDeleted,
             lumerin.balanceOf(address(this)),
             hasFutureTerms
@@ -171,8 +171,10 @@ contract Implementation is Initializable, Escrow {
 
     //function that the clone factory calls to purchase the contract
     function setPurchaseContract(
-        string calldata _encryptedPoolData,
-        address _buyer
+        string calldata _encryptedValidatorURL,
+        string calldata _encryptedDestURL,
+        address _buyer,
+        address _validator
     ) public {
         require(
             msg.sender == cloneFactory,
@@ -182,8 +184,10 @@ contract Implementation is Initializable, Escrow {
             contractState == ContractState.Available,
             "contract is not in an available state"
         );
-        encryptedPoolData = _encryptedPoolData;
+        encryptedValidatorURL = _encryptedValidatorURL;
+        encryptedDestURL = _encryptedDestURL;
         buyer = _buyer;
+        validator = _validator;
         startingBlockTimestamp = block.timestamp;
         contractState = ContractState.Running;
         createEscrow(seller, buyer, terms._price);
@@ -203,7 +207,7 @@ contract Implementation is Initializable, Escrow {
             contractState == ContractState.Running,
             "the contract is not in the running state"
         );
-        encryptedPoolData = _newEncryptedPoolData;
+        encryptedValidatorURL = _newEncryptedPoolData;
         emit cipherTextUpdated(_newEncryptedPoolData);
     }
 
@@ -229,7 +233,7 @@ contract Implementation is Initializable, Escrow {
 
     function resetContractVariablesAndApplyFutureTerms() internal {
         buyer = address(0);
-        encryptedPoolData = "";
+        encryptedValidatorURL = "";
         contractState = ContractState.Available;
 
         if(futureTerms._length != 0) {
