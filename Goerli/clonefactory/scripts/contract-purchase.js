@@ -1,8 +1,7 @@
 //@ts-check
 require("dotenv").config();
-/**
- * @type {import("hardhat/types/runtime").HardhatRuntimeEnvironment}
- */
+/** @type {import("hardhat/types/runtime").HardhatRuntimeEnvironment} */
+// @ts-ignore
 const { ethers } = require("hardhat");
 const { encrypt } = require('ecies-geth')
 const { add65BytesPrefix } = require("../lib/utils");
