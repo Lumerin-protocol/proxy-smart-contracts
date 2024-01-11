@@ -110,7 +110,6 @@ describe("Contract updates test", () => {
         String(Number(_limit) + 1),
         String(Number(_speed) + 1),
         String(Number(_length) + 1),
-        "10",
       ).send({ from: owner.address })
       console.log('update done')
 
