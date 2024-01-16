@@ -51,6 +51,7 @@ contract Implementation is Initializable, Escrow {
     event contractClosed(address indexed _buyer);
     event purchaseInfoUpdated(address indexed _address);
     event cipherTextUpdated(string newCipherText);
+    event destinationUpdated(string newValidatorURL, string newDestURL);
 
     function initialize(
         uint256 _price,
@@ -194,11 +195,11 @@ contract Implementation is Initializable, Escrow {
         emit contractPurchased(msg.sender);
     }
 
-    //allows the buyers to update their mining pool information
-    //during the lifecycle of the contract
-    function setUpdateMiningInformation(string calldata _newEncryptedPoolData)
-        external
-    {
+    // DEPRECATED. use setDestination instead. Allows the buyers to update their mining pool information
+    // during the lifecycle of the contract
+    function setUpdateMiningInformation(
+        string calldata _newEncryptedPoolData
+    ) external {
         require(
             msg.sender == buyer,
             "this account is not authorized to update the ciphertext information"
@@ -209,6 +210,26 @@ contract Implementation is Initializable, Escrow {
         );
         encryptedValidatorURL = _newEncryptedPoolData;
         emit cipherTextUpdated(_newEncryptedPoolData);
+    }
+
+    // allows the buyer to update the mining destination in the middle of the contract
+    // this is V2 of the function setUpdateMiningInformation
+    function setDestination(
+        string calldata _encryptedValidatorURL,
+        string calldata _encryptedDestURL
+    ) external {
+        require(
+            msg.sender == buyer,
+            "this account is not authorized to update the ciphertext information"
+        );
+        require(
+            contractState == ContractState.Running,
+            "the contract is not in the running state"
+        );
+        encryptedDestURL = _encryptedDestURL;
+        encryptedValidatorURL = _encryptedValidatorURL;
+        emit cipherTextUpdated(_encryptedValidatorURL); // DEPRECATED, will be removed in future versions
+        emit destinationUpdated(_encryptedValidatorURL, _encryptedDestURL);
     }
 
     //function which can edit the cost, length, and hashrate of a given contract
@@ -234,6 +255,7 @@ contract Implementation is Initializable, Escrow {
     function resetContractVariablesAndApplyFutureTerms() internal {
         buyer = address(0);
         encryptedValidatorURL = "";
+        encryptedDestURL = "";
         contractState = ContractState.Available;
 
         if(futureTerms._length != 0) {
