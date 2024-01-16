@@ -88,7 +88,7 @@ async function UpdateCloneFactory(newCloneFactoryContractName, cloneFactoryAddr,
   const currentCloneFactoryImpl = await upgrades.erc1967.getImplementationAddress(cloneFactoryAddr)
   log("Current CLONEFACTORY implementation:", currentCloneFactoryImpl);
 
-  const CloneFactory = await ethers.getContractFactory(newCloneFactoryContractName, deployer);
+  const CloneFactory = await ethers.getContractFactory(newCloneFactoryContractName);
   // await upgrades.forceImport(cloneFactoryAddr, CloneFactory)
   const cloneFactory = await upgrades.upgradeProxy(cloneFactoryAddr, CloneFactory, { unsafeAllow: ['constructor'] });
   await cloneFactory.deployed();
@@ -134,12 +134,13 @@ async function UpdateImplementation(newImplementationContractName, cloneFactoryA
   log("Old beacon proxy logic:", oldLogicAddr)
   log();
 
-  const newImplementation = await upgrades.upgradeBeacon(baseImplementationAddr, Implementation, { unsafeAllow: ['constructor'] });
+  // IMPORTANT: remove unsafeSkipStorageCheck and struct-definition for future upgrades
+  const newImplementation = await upgrades.upgradeBeacon(baseImplementationAddr, Implementation, { unsafeAllow: ['constructor'], unsafeSkipStorageCheck: true });
   const newLogicAddr = await upgrades.beacon.getImplementationAddress(newImplementation.address);
   log("New beacon proxy logic:", newLogicAddr)
 
   if (oldLogicAddr == newLogicAddr) {
-    log("Warning. Implementation proxy logic didn't change, cause it's likely the same implementation.");
+    log("Warning. Implementation proxy logic address didn't change, because it may be the same implementation. Please test manually.");
   } else {
     log("Implementation proxy logic changed.")
     log("New proxy logic address:", newLogicAddr)
@@ -175,7 +176,7 @@ async function ApproveSeller(sellerAddr, cloneFactory, from, log = noop) {
 async function CreateContract(priceDecimalLMR, durationSeconds, hrGHS, cloneFactory, fromWallet, marketplaceFee, log = noop) {
   const pubKey = trimRight64Bytes(remove0xPrefix(fromWallet.publicKey));
   const receipt = await cloneFactory.methods
-    .setCreateNewRentalContract(priceDecimalLMR, "0", hrGHS, durationSeconds, fromWallet.address, pubKey)
+    .setCreateNewRentalContractV2(priceDecimalLMR, "0", hrGHS, durationSeconds, "0", fromWallet.address, pubKey)
     .send({ from: fromWallet.address, gas: GAS_LIMIT, value: marketplaceFee });
   const address = receipt.events?.[0].address || "";
   const txHash = receipt.transactionHash;

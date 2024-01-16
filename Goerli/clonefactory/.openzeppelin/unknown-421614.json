@@ -1,0 +1,918 @@
+{
+  "manifestVersion": "3.2",
+  "admin": {
+    "address": "0x91C47e1b1Afd00530690027FcD1FAbdF78C9e175"
+  },
+  "proxies": [
+    {
+      "address": "0x15437978300786aDe37f61e02Be1C061e51353D3",
+      "kind": "transparent"
+    }
+  ],
+  "impls": {
+    "bf5f693dd44e3f2eefbcc886413763d60fd2d67331a6b348b82286190d91536e": {
+      "address": "0x918e4DB0acbe8B5E2341432841D3BF446607d1E4",
+      "layout": {
+        "solcVersion": "0.8.18",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:63",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:68"
+          },
+          {
+            "label": "_status",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_uint256",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol:38"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol:88"
+          },
+          {
+            "label": "escrow_purchaser",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_address",
+            "contract": "Escrow",
+            "src": "contracts/Escrow.sol:12"
+          },
+          {
+            "label": "escrow_seller",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_address",
+            "contract": "Escrow",
+            "src": "contracts/Escrow.sol:13"
+          },
+          {
+            "label": "contractTotal",
+            "offset": 0,
+            "slot": "53",
+            "type": "t_uint256",
+            "contract": "Escrow",
+            "src": "contracts/Escrow.sol:14"
+          },
+          {
+            "label": "lumerin",
+            "offset": 0,
+            "slot": "54",
+            "type": "t_contract(Lumerin)4490",
+            "contract": "Escrow",
+            "src": "contracts/Escrow.sol:16"
+          },
+          {
+            "label": "contractState",
+            "offset": 20,
+            "slot": "54",
+            "type": "t_enum(ContractState)3563",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:11"
+          },
+          {
+            "label": "terms",
+            "offset": 0,
+            "slot": "55",
+            "type": "t_struct(Terms)3574_storage",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:12"
+          },
+          {
+            "label": "startingBlockTimestamp",
+            "offset": 0,
+            "slot": "60",
+            "type": "t_uint256",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:14"
+          },
+          {
+            "label": "buyer",
+            "offset": 0,
+            "slot": "61",
+            "type": "t_address",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:15"
+          },
+          {
+            "label": "seller",
+            "offset": 0,
+            "slot": "62",
+            "type": "t_address",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:16"
+          },
+          {
+            "label": "cloneFactory",
+            "offset": 0,
+            "slot": "63",
+            "type": "t_address",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:17"
+          },
+          {
+            "label": "validator",
+            "offset": 0,
+            "slot": "64",
+            "type": "t_address",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:18"
+          },
+          {
+            "label": "encryptedPoolData",
+            "offset": 0,
+            "slot": "65",
+            "type": "t_string_storage",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:19"
+          },
+          {
+            "label": "pubKey",
+            "offset": 0,
+            "slot": "66",
+            "type": "t_string_storage",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:20"
+          },
+          {
+            "label": "isDeleted",
+            "offset": 0,
+            "slot": "67",
+            "type": "t_bool",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:21"
+          },
+          {
+            "label": "history",
+            "offset": 0,
+            "slot": "68",
+            "type": "t_array(t_struct(HistoryEntry)3589_storage)dyn_storage",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:22"
+          },
+          {
+            "label": "futureTerms",
+            "offset": 0,
+            "slot": "69",
+            "type": "t_struct(Terms)3574_storage",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:23"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_struct(HistoryEntry)3589_storage)dyn_storage": {
+            "label": "struct Implementation.HistoryEntry[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_contract(Lumerin)4490": {
+            "label": "contract Lumerin",
+            "numberOfBytes": "20"
+          },
+          "t_enum(ContractState)3563": {
+            "label": "enum Implementation.ContractState",
+            "members": [
+              "Available",
+              "Running"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(HistoryEntry)3589_storage": {
+            "label": "struct Implementation.HistoryEntry",
+            "members": [
+              {
+                "label": "_goodCloseout",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_purchaseTime",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "_endTime",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "_price",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "_speed",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "_length",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "_buyer",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "6"
+              }
+            ],
+            "numberOfBytes": "224"
+          },
+          "t_struct(Terms)3574_storage": {
+            "label": "struct Implementation.Terms",
+            "members": [
+              {
+                "label": "_price",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_limit",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "_speed",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "_length",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "_version",
+                "type": "t_uint32",
+                "offset": 0,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint32": {
+            "label": "uint32",
+            "numberOfBytes": "4"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {}
+      }
+    },
+    "fef061465f0aa5d4ac678958ae00da22b2746fce72d282f10ea9666d52006436": {
+      "address": "0x7Db8256dB0012Fc3094f21e23d895063d398f545",
+      "txHash": "0x55d573aca705f1331264211219ceb98a4f3b7213e4af89560d19b0917fcb293d",
+      "layout": {
+        "solcVersion": "0.8.18",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:63",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:68"
+          },
+          {
+            "label": "_status",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_uint256",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol:38"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol:88"
+          },
+          {
+            "label": "escrow_purchaser",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_address",
+            "contract": "Escrow",
+            "src": "contracts/Escrow.sol:12"
+          },
+          {
+            "label": "escrow_seller",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_address",
+            "contract": "Escrow",
+            "src": "contracts/Escrow.sol:13"
+          },
+          {
+            "label": "contractTotal",
+            "offset": 0,
+            "slot": "53",
+            "type": "t_uint256",
+            "contract": "Escrow",
+            "src": "contracts/Escrow.sol:14"
+          },
+          {
+            "label": "lumerin",
+            "offset": 0,
+            "slot": "54",
+            "type": "t_contract(Lumerin)4276",
+            "contract": "Escrow",
+            "src": "contracts/Escrow.sol:16"
+          },
+          {
+            "label": "contractState",
+            "offset": 20,
+            "slot": "54",
+            "type": "t_enum(ContractState)3289",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:11"
+          },
+          {
+            "label": "terms",
+            "offset": 0,
+            "slot": "55",
+            "type": "t_struct(Terms)3302_storage",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:12"
+          },
+          {
+            "label": "startingBlockTimestamp",
+            "offset": 0,
+            "slot": "60",
+            "type": "t_uint256",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:14"
+          },
+          {
+            "label": "buyer",
+            "offset": 0,
+            "slot": "61",
+            "type": "t_address",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:15"
+          },
+          {
+            "label": "seller",
+            "offset": 0,
+            "slot": "62",
+            "type": "t_address",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:16"
+          },
+          {
+            "label": "cloneFactory",
+            "offset": 0,
+            "slot": "63",
+            "type": "t_address",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:17"
+          },
+          {
+            "label": "validator",
+            "offset": 0,
+            "slot": "64",
+            "type": "t_address",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:18"
+          },
+          {
+            "label": "encryptedPoolData",
+            "offset": 0,
+            "slot": "65",
+            "type": "t_string_storage",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:19"
+          },
+          {
+            "label": "pubKey",
+            "offset": 0,
+            "slot": "66",
+            "type": "t_string_storage",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:20"
+          },
+          {
+            "label": "isDeleted",
+            "offset": 0,
+            "slot": "67",
+            "type": "t_bool",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:21"
+          },
+          {
+            "label": "history",
+            "offset": 0,
+            "slot": "68",
+            "type": "t_array(t_struct(HistoryEntry)3317_storage)dyn_storage",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:22"
+          },
+          {
+            "label": "futureTerms",
+            "offset": 0,
+            "slot": "69",
+            "type": "t_struct(Terms)3302_storage",
+            "contract": "Implementation",
+            "src": "contracts/Implementation.sol:23"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_struct(HistoryEntry)3317_storage)dyn_storage": {
+            "label": "struct Implementation.HistoryEntry[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_contract(Lumerin)4276": {
+            "label": "contract Lumerin",
+            "numberOfBytes": "20"
+          },
+          "t_enum(ContractState)3289": {
+            "label": "enum Implementation.ContractState",
+            "members": [
+              "Available",
+              "Running"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_int8": {
+            "label": "int8",
+            "numberOfBytes": "1"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(HistoryEntry)3317_storage": {
+            "label": "struct Implementation.HistoryEntry",
+            "members": [
+              {
+                "label": "_goodCloseout",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_purchaseTime",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "_endTime",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "_price",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "_speed",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "_length",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "_buyer",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "6"
+              }
+            ],
+            "numberOfBytes": "224"
+          },
+          "t_struct(Terms)3302_storage": {
+            "label": "struct Implementation.Terms",
+            "members": [
+              {
+                "label": "_price",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_limit",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "_speed",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "_length",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "_version",
+                "type": "t_uint32",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "_profitTarget",
+                "type": "t_int8",
+                "offset": 4,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint32": {
+            "label": "uint32",
+            "numberOfBytes": "4"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {}
+      }
+    },
+    "cb2c816aa74bb36bfb1129a479ec63042cdeec9024f789878a05afa4e63065a0": {
+      "address": "0x3a1f8EDc23C6003C7dCAb59b406cE11740CED83a",
+      "layout": {
+        "solcVersion": "0.8.18",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:63",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:68"
+          },
+          {
+            "label": "lumerin",
+            "offset": 2,
+            "slot": "0",
+            "type": "t_contract(Lumerin)4490",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:16"
+          },
+          {
+            "label": "baseImplementation",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_address",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:17"
+          },
+          {
+            "label": "owner",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_address",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:18"
+          },
+          {
+            "label": "noMoreWhitelist",
+            "offset": 20,
+            "slot": "2",
+            "type": "t_bool",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:19"
+          },
+          {
+            "label": "rentalContracts",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_array(t_address)dyn_storage",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:20"
+          },
+          {
+            "label": "rentalContractsMap",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:21"
+          },
+          {
+            "label": "feeRecipient",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_struct(FeeRecipient)4497_storage",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:22"
+          },
+          {
+            "label": "whitelist",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:25"
+          },
+          {
+            "label": "isContractDead",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:26"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_address)dyn_storage": {
+            "label": "address[]",
+            "numberOfBytes": "32"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_contract(Lumerin)4490": {
+            "label": "contract Lumerin",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(FeeRecipient)4497_storage": {
+            "label": "struct FeeRecipient",
+            "members": [
+              {
+                "label": "fee",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "recipient",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {}
+      }
+    },
+    "d36d37f525a2aac08555b2e400bc30d2588eb01770e7d1122a47c3d3a19c3b9b": {
+      "address": "0x1846aF9319fF90F7D8124F13c93b5a0332FA622D",
+      "txHash": "0x2be4bfdb5729fe71e9870da8639ac116f3f10cd9628b248df1200bc2a89785b2",
+      "layout": {
+        "solcVersion": "0.8.18",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:63",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:68"
+          },
+          {
+            "label": "lumerin",
+            "offset": 2,
+            "slot": "0",
+            "type": "t_contract(Lumerin)4606",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:16"
+          },
+          {
+            "label": "baseImplementation",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_address",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:17"
+          },
+          {
+            "label": "owner",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_address",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:18"
+          },
+          {
+            "label": "noMoreWhitelist",
+            "offset": 20,
+            "slot": "2",
+            "type": "t_bool",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:19"
+          },
+          {
+            "label": "rentalContracts",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_array(t_address)dyn_storage",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:20"
+          },
+          {
+            "label": "rentalContractsMap",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:21"
+          },
+          {
+            "label": "feeRecipient",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_struct(FeeRecipient)4613_storage",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:22"
+          },
+          {
+            "label": "whitelist",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:24"
+          },
+          {
+            "label": "isContractDead",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:25"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_address)dyn_storage": {
+            "label": "address[]",
+            "numberOfBytes": "32"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_contract(Lumerin)4606": {
+            "label": "contract Lumerin",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(FeeRecipient)4613_storage": {
+            "label": "struct FeeRecipient",
+            "members": [
+              {
+                "label": "fee",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "recipient",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {}
+      }
+    }
+  }
+}
