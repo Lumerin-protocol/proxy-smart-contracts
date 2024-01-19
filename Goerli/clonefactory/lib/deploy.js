@@ -89,7 +89,7 @@ async function UpdateCloneFactory(newCloneFactoryContractName, cloneFactoryAddr,
   log("Current CLONEFACTORY implementation:", currentCloneFactoryImpl);
 
   const CloneFactory = await ethers.getContractFactory(newCloneFactoryContractName);
-  const cloneFactory = await tryUpgradeCloneFactoryWithForceImport(cloneFactoryAddr, CloneFactory, { unsafeAllow: ['constructor'] }, log);
+  const cloneFactory = await upgrades.upgradeProxy(cloneFactoryAddr, CloneFactory, { unsafeAllow: ['constructor'] }, log);
 
   const receipt = await ethers.provider.getTransactionReceipt(cloneFactory.deployTransaction.hash);
   const newCloneFactoryImpl = await upgrades.erc1967.getImplementationAddress(cloneFactoryAddr)
@@ -100,30 +100,6 @@ async function UpdateCloneFactory(newCloneFactoryContractName, cloneFactoryAddr,
     log("Warning: CLONEFACTORY implementation didn't change, cause it's likely the same implementation");
   } else {
     log("CLONEFACTORY implementation updated")
-  }
-}
-
-/**
- * @param {string} cloneFactoryAddr 
- * @param {any} CloneFactory 
- * @param {any} options 
- * @param {(...args)=>void} log 
- * @returns {Promise<any>}
- */
-async function tryUpgradeCloneFactoryWithForceImport(cloneFactoryAddr, CloneFactory, options, log = noop) {
-  try {
-    return await upgrades.upgradeProxy(cloneFactoryAddr, CloneFactory, options);
-  } catch (e) {
-    if (e.message && e.message.includes("is not registered")) {
-      log("Deployment was not registered. Forcing import...")
-      await upgrades.forceImport(cloneFactoryAddr, CloneFactory)
-      log("Force import done")
-
-      return await upgrades.upgradeProxy(cloneFactoryAddr, CloneFactory, options);
-    }
-
-    log("Error:", e.message)
-    throw e;
   }
 }
 
@@ -157,7 +133,7 @@ async function UpdateImplementation(newImplementationContractName, cloneFactoryA
   log();
 
   // IMPORTANT: remove unsafeSkipStorageCheck and struct-definition for future upgrades
-  const newImplementation = await tryUpgradeImplementationWithForceImport(baseImplementationAddr, Implementation, { unsafeAllow: ['constructor'], unsafeSkipStorageCheck: true }, log);
+  const newImplementation = await upgrades.upgradeBeacon(baseImplementationAddr, Implementation, { unsafeAllow: ['constructor'], unsafeSkipStorageCheck: true }, log);
   const newLogicAddr = await upgrades.beacon.getImplementationAddress(newImplementation.address);
   log("New beacon proxy logic:", newLogicAddr)
 
@@ -171,30 +147,6 @@ async function UpdateImplementation(newImplementationContractName, cloneFactoryA
   log();
 
   log("SUCCESS. Base implementation contract updated.");
-}
-
-/**
- * @param {string} baseImplementationAddr 
- * @param {any} Implementation 
- * @param {any} options 
- * @param {(...args)=>void} log 
- * @returns {Promise<any>} newLogicAddr
- */
-async function tryUpgradeImplementationWithForceImport(baseImplementationAddr, Implementation, options, log = noop) {
-  try {
-    return await upgrades.upgradeBeacon(baseImplementationAddr, Implementation, options);
-  } catch (e) {
-    if (e.message && e.message.includes("is not registered")) {
-      log("Deployment was not registered. Forcing import...")
-      await upgrades.forceImport(baseImplementationAddr, Implementation)
-      log("Force import done")
-
-      return await upgrades.upgradeBeacon(baseImplementationAddr, Implementation, options);
-    }
-
-    log("Error:", e.message)
-    throw e;
-  }
 }
 
 /**
