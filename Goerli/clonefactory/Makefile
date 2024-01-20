@@ -6,8 +6,12 @@ clean:
 test:
 	kill "$$(lsof -t -i:8545)" || true
 	make compile
-	make -B build-js
+	make -B build-js 
 	yarn hardhat node --config hardhat-base.config.js & ./node-local-deploy.sh && yarn hardhat test --network localhost --config hardhat-base.config.js tests/*.js
+	kill "$$(lsof -t -i:8545)" || true
+
+test-upgrade:
+	yarn hardhat --network localhost --config hardhat-base.config.js test --bail tests/upgrades/*.js 
 
 compile:
 	yarn hardhat compile --config hardhat-base.config.js
@@ -32,6 +36,9 @@ populate-contracts:
 
 whitelist-clonefactory:
 	yarn hardhat run --network default ./scripts/whitelist-clonefactory.js
+
+set-fee-recipient:
+	yarn hardhat run --network default ./scripts/set-feeRecipient.js
 
 build-go:
 	./build-go.sh

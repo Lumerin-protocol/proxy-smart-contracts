@@ -91,10 +91,8 @@ async function UpdateCloneFactory(newCloneFactoryContractName, cloneFactoryAddr,
   const currentCloneFactoryImpl = await upgrades.erc1967.getImplementationAddress(cloneFactoryAddr)
   log("Current CLONEFACTORY implementation:", currentCloneFactoryImpl);
 
-  const CloneFactory = await ethers.getContractFactory(newCloneFactoryContractName, deployer);
-  // await upgrades.forceImport(cloneFactoryAddr, CloneFactory)
-  const cloneFactory = await upgrades.upgradeProxy(cloneFactoryAddr, CloneFactory, { unsafeAllow: ['constructor'] });
-  await cloneFactory.deployed();
+  const CloneFactory = await ethers.getContractFactory(newCloneFactoryContractName);
+  const cloneFactory = await tryUpgradeCloneFactoryWithForceImport(cloneFactoryAddr, CloneFactory, { unsafeAllow: ['constructor'] }, log);
 
   const receipt = await ethers.provider.getTransactionReceipt(cloneFactory.deployTransaction.hash);
   const newCloneFactoryImpl = await upgrades.erc1967.getImplementationAddress(cloneFactoryAddr)
@@ -105,6 +103,30 @@ async function UpdateCloneFactory(newCloneFactoryContractName, cloneFactoryAddr,
     log("Warning: CLONEFACTORY implementation didn't change, cause it's likely the same implementation");
   } else {
     log("CLONEFACTORY implementation updated")
+  }
+}
+
+/**
+ * @param {string} cloneFactoryAddr 
+ * @param {any} CloneFactory 
+ * @param {any} options 
+ * @param {(...args)=>void} log 
+ * @returns {Promise<any>}
+ */
+async function tryUpgradeCloneFactoryWithForceImport(cloneFactoryAddr, CloneFactory, options, log = noop) {
+  try {
+    return await upgrades.upgradeProxy(cloneFactoryAddr, CloneFactory, options);
+  } catch (e) {
+    if (e.message && e.message.includes("is not registered")) {
+      log("Deployment was not registered. Forcing import...")
+      await upgrades.forceImport(cloneFactoryAddr, CloneFactory)
+      log("Force import done")
+
+      return await upgrades.upgradeProxy(cloneFactoryAddr, CloneFactory, options);
+    }
+
+    log("Error:", e.message)
+    throw e;
   }
 }
 
@@ -137,12 +159,14 @@ async function UpdateImplementation(newImplementationContractName, cloneFactoryA
   log("Old beacon proxy logic:", oldLogicAddr)
   log();
 
-  const newImplementation = await upgrades.upgradeBeacon(baseImplementationAddr, Implementation, { unsafeAllow: ['constructor'] });
+  // IMPORTANT: remove unsafeSkipStorageCheck and struct-definition for future upgrades
+  const newImplementation = await tryUpgradeImplementationWithForceImport(baseImplementationAddr, Implementation, { unsafeAllow: ['constructor'], unsafeSkipStorageCheck: true }, log);
   const newLogicAddr = await upgrades.beacon.getImplementationAddress(newImplementation.address);
   log("New beacon proxy logic:", newLogicAddr)
 
+
   if (oldLogicAddr == newLogicAddr) {
-    log("Warning. Implementation proxy logic didn't change, cause it's likely the same implementation.");
+    log("Warning. Implementation proxy logic address didn't change, because it may be the same implementation. Please test manually.");
   } else {
     log("Implementation proxy logic changed.")
     log("New proxy logic address:", newLogicAddr)
@@ -150,6 +174,30 @@ async function UpdateImplementation(newImplementationContractName, cloneFactoryA
   log();
 
   log("SUCCESS. Base implementation contract updated.");
+}
+
+/**
+ * @param {string} baseImplementationAddr 
+ * @param {any} Implementation 
+ * @param {any} options 
+ * @param {(...args)=>void} log 
+ * @returns {Promise<any>} newLogicAddr
+ */
+async function tryUpgradeImplementationWithForceImport(baseImplementationAddr, Implementation, options, log = noop) {
+  try {
+    return await upgrades.upgradeBeacon(baseImplementationAddr, Implementation, options);
+  } catch (e) {
+    if (e.message && e.message.includes("is not registered")) {
+      log("Deployment was not registered. Forcing import...")
+      await upgrades.forceImport(baseImplementationAddr, Implementation)
+      log("Force import done")
+
+      return await upgrades.upgradeBeacon(baseImplementationAddr, Implementation, options);
+    }
+
+    log("Error:", e.message)
+    throw e;
+  }
 }
 
 /**
@@ -178,7 +226,7 @@ async function ApproveSeller(sellerAddr, cloneFactory, from, log = noop) {
 async function CreateContract(priceDecimalLMR, durationSeconds, hrGHS, cloneFactory, fromWallet, marketplaceFee, log = noop) {
   const pubKey = trimRight64Bytes(remove0xPrefix(fromWallet.publicKey));
   const receipt = await cloneFactory.methods
-    .setCreateNewRentalContract(priceDecimalLMR, "0", hrGHS, durationSeconds, fromWallet.address, pubKey)
+    .setCreateNewRentalContractV2(priceDecimalLMR, "0", hrGHS, durationSeconds, "0", fromWallet.address, pubKey)
     .send({ from: fromWallet.address, gas: GAS_LIMIT, value: marketplaceFee });
   const address = receipt.events?.[0].address || "";
   const txHash = receipt.transactionHash;

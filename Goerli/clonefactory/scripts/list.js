@@ -1,11 +1,8 @@
 //@ts-check
 require("dotenv").config();
-const { network, ethers } = require("hardhat");
+const { network } = require("hardhat");
 const Web3 = require("web3");
-const { Wallet } = require("ethers");
 const { CloneFactory, Implementation } = require("../build-js/dist");
-const { CreateContract } = require("../lib/deploy");
-const { buildContractsList } = require("../lib/populate-contracts");
 
 const main = async function () {
 
@@ -16,7 +13,6 @@ const main = async function () {
   const cf = CloneFactory(web3, process.env.CLONE_FACTORY_ADDRESS)
 
   const contracts = await cf.methods.getContractList().call()
-
 
   for (const c of contracts) {
     const impl = Implementation(web3, c)

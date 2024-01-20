@@ -4,9 +4,6 @@ require("dotenv").config();
  * @type {import("hardhat/types/runtime").HardhatRuntimeEnvironment}
  */
 const { ethers } = require("hardhat");
-const { encrypt } = require('ecies-geth')
-const { add65BytesPrefix } = require("../lib/utils");
-// const { Lumerin } = require('../build-js/dist/index.js')
 
 async function main() {
   let lumerinAddress = process.env.LUMERIN_ADDRESS || "";
@@ -20,8 +17,6 @@ async function main() {
   console.log(`Sending lumerin`)
   console.log(`Using Lumerin address: ${lumerinAddress}`);
   const [seller, buyer] = await ethers.getSigners();
-
-
 
   const lumerin = await ethers.getContractAt("Lumerin", lumerinAddress);
 

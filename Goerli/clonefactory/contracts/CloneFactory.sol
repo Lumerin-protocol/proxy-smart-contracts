@@ -13,7 +13,7 @@ import {FeeRecipient} from "./Shared.sol";
 
 //CloneFactory now responsible for minting, purchasing, and tracking contracts
 contract CloneFactory is Initializable {
-    Lumerin lumerin;
+    Lumerin public lumerin;
     address public baseImplementation;
     address public owner;
     bool public noMoreWhitelist;
@@ -23,10 +23,12 @@ contract CloneFactory is Initializable {
 
     mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
     mapping(address => bool) public isContractDead; // keeps track of contracts that are no longer valid
-
+    
     event contractCreated(address indexed _address, string _pubkey); //emitted whenever a contract is created
-    event clonefactoryContractPurchased(address indexed _address, address indexed _buyer); //emitted whenever a contract is purchased
-    event contractDeleteUpdated(address indexed _address, bool _isDeleted); //emitted whenever a contract is deleted/restored
+    event clonefactoryContractPurchased(address indexed _address); // deprecated
+    event contractPurchased(address indexed _address, address indexed _buyer); //emitted whenever a contract is purchased
+    event contractDeleteUpdated(address _address, bool _isDeleted); // deprecated
+    event contractDeletedOrRestored(address indexed _address, bool _isDeleted); // emitted whenever a contract is deleted/restored
     event purchaseInfoUpdated(address indexed _address);
     event contractClosed(address indexed _address, uint256 _closeOutType);
 
@@ -53,7 +55,7 @@ contract CloneFactory is Initializable {
         _;
     }
 
-    modifier authorize(address _contractAddress){
+    modifier onlySeller(address _contractAddress){
         Implementation _contract = Implementation(_contractAddress);
         require(msg.sender == _contract.seller(), "you are not authorized");
         _;
@@ -87,6 +89,30 @@ contract CloneFactory is Initializable {
         address _validator,
         string calldata _pubKey
     ) external payable onlyInWhitelist sufficientFee returns (address) {
+        return createContract(_price, _limit, _speed, _length, 0, _validator, _pubKey);
+    }
+
+    function setCreateNewRentalContractV2(
+        uint256 _price,
+        uint256 _limit,
+        uint256 _speed,
+        uint256 _length,
+        int8 _profitTarget,
+        address _validator,
+        string calldata _pubKey
+    ) public payable onlyInWhitelist sufficientFee returns (address) {
+        return createContract(_price, _limit, _speed, _length, _profitTarget, _validator, _pubKey);
+    }
+
+    function createContract(
+        uint256 _price,
+        uint256 _limit,
+        uint256 _speed,
+        uint256 _length,
+        int8 _profitTarget,
+        address _validator,
+        string calldata _pubKey
+    ) internal returns (address){
         bool sent = payMarketplaceFee();
         require(sent, "Failed to pay marketplace listing fee");
 
@@ -96,6 +122,7 @@ contract CloneFactory is Initializable {
             _limit,
             _speed,
             _length,
+            _profitTarget,
             msg.sender,
             address(lumerin),
             address(this),
@@ -105,9 +132,9 @@ contract CloneFactory is Initializable {
 
         BeaconProxy beaconProxy = new BeaconProxy(baseImplementation, data);
         address newContractAddr = address(beaconProxy);
-        rentalContracts.push(newContractAddr); //add clone to list of contracts
+        rentalContracts.push(newContractAddr);
         rentalContractsMap[newContractAddr] = true;
-        emit contractCreated(newContractAddr, _pubKey); //broadcasts a new contract and the pubkey to use for encryption
+        emit contractCreated(newContractAddr, _pubKey);
         return newContractAddr;
     }
 
@@ -117,7 +144,7 @@ contract CloneFactory is Initializable {
         address _contractAddress,
         string calldata _cipherText,
         uint32 termsVersion
-    ) external payable sufficientFee knownContract(_contractAddress){
+    ) external payable sufficientFee knownContract(_contractAddress) {
         Implementation targetContract = Implementation(_contractAddress);
         require(
             !targetContract.isDeleted(), "cannot purchase deleted contract");
@@ -126,7 +153,7 @@ contract CloneFactory is Initializable {
             "cannot purchase your own contract"
         );
 
-        (uint256 _price,,,, uint32 _version) = targetContract.terms();
+        (uint256 _price,,,, uint32 _version,) = targetContract.terms();
 
         require(
             _version == termsVersion,
@@ -156,7 +183,8 @@ contract CloneFactory is Initializable {
             msg.sender
         );
 
-        emit clonefactoryContractPurchased(_contractAddress, msg.sender);
+        emit clonefactoryContractPurchased(_contractAddress); // TODO: remove in next version
+        emit contractPurchased(_contractAddress, msg.sender);
     }
 
     function getContractList() external view returns (address[] memory) {
@@ -190,9 +218,10 @@ contract CloneFactory is Initializable {
         feeRecipient.recipient = recipient;
     }
 
-    function setContractDeleted(address _contractAddress, bool _isDeleted) public knownContract(_contractAddress) authorize(_contractAddress) {
+    function setContractDeleted(address _contractAddress, bool _isDeleted) public knownContract(_contractAddress) onlySeller(_contractAddress) {
         Implementation(_contractAddress).setContractDeleted(_isDeleted);
-        emit contractDeleteUpdated(_contractAddress, _isDeleted);
+        emit contractDeleteUpdated(_contractAddress, _isDeleted); // TODO: remove in next version
+        emit contractDeletedOrRestored(_contractAddress, _isDeleted);
     }
 
     function setUpdateContractInformation(
@@ -201,11 +230,30 @@ contract CloneFactory is Initializable {
         uint256 _limit,
         uint256 _speed,
         uint256 _length
-    ) external payable sufficientFee knownContract(_contractAddress) authorize(_contractAddress){
-        bool sent = payMarketplaceFee();
-        require(sent, "Failed to pay marketplace listing fee");
+    ) external payable knownContract(_contractAddress) onlySeller(_contractAddress) {
+        updateContract(_contractAddress, _price, _limit, _speed, _length, 0);
+    }
 
-        Implementation(_contractAddress).setUpdatePurchaseInformation(_price, _limit, _speed, _length);
+    function setUpdateContractInformationV2(
+        address _contractAddress,      
+        uint256 _price,
+        uint256 _limit,
+        uint256 _speed,
+        uint256 _length,
+        int8 _profitTarget
+    ) external knownContract(_contractAddress) onlySeller(_contractAddress) {
+        updateContract(_contractAddress, _price, _limit, _speed, _length, _profitTarget);
+    }
+
+    function updateContract(
+        address _contractAddress,      
+        uint256 _price,
+        uint256 _limit,
+        uint256 _speed,
+        uint256 _length,
+        int8 _profitTarget
+    ) internal {
+        Implementation(_contractAddress).setUpdatePurchaseInformation(_price, _limit, _speed, _length, _profitTarget);
         emit purchaseInfoUpdated(_contractAddress);
     }
 
@@ -214,7 +262,7 @@ contract CloneFactory is Initializable {
             require(msg.value >= feeRecipient.fee, "Insufficient ETH provided for marketplace fee");
         }
         
-        Implementation(_contractAddress).setContractCloseOut(msg.sender, _closeOutType);
+        Implementation(_contractAddress).setContractCloseOutV2(msg.sender, _closeOutType);
         if (_closeOutType != 1) {
             emit contractClosed(_contractAddress, _closeOutType);
         }

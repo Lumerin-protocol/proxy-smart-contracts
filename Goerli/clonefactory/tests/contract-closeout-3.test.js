@@ -34,7 +34,7 @@ describe("Contract closeout", function () {
 
 
   it("should verify closeout type 3 for 100% completion", async function () {
-    const receipt = await cf.methods.setCreateNewRentalContract(price, "0", speed, length, cloneFactoryAddress, "123").send({ from: seller, value: fee })
+    const receipt = await cf.methods.setCreateNewRentalContractV2(price, "0", speed, length, "0", cloneFactoryAddress, "123").send({ from: seller, value: fee })
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
     await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
@@ -51,7 +51,7 @@ describe("Contract closeout", function () {
   })
 
   it("should disallow closeout type 3 for incompleted contract", async function () {
-    const receipt = await cf.methods.setCreateNewRentalContract(price, "3", speed, length, cloneFactoryAddress, "123").send({ from: seller, value: fee })
+    const receipt = await cf.methods.setCreateNewRentalContractV2(price, "3", speed, length, "0", cloneFactoryAddress, "123").send({ from: seller, value: fee })
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
     await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
@@ -70,7 +70,7 @@ describe("Contract closeout", function () {
   })
 
   it("should disallow closeout type 3 for buyer", async function () {
-    const receipt = await cf.methods.setCreateNewRentalContract(price, "3", speed, length, cloneFactoryAddress, "123").send({ from: seller, value: fee })
+    const receipt = await cf.methods.setCreateNewRentalContractV2(price, "3", speed, length, "0", cloneFactoryAddress, "123").send({ from: seller, value: fee })
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
     await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
@@ -87,7 +87,7 @@ describe("Contract closeout", function () {
   })
 
   it("should disallow closeout type 3 twice", async function () {
-    const receipt = await cf.methods.setCreateNewRentalContract(price, "3", speed, length, cloneFactoryAddress, "123").send({ from: seller, value: fee })
+    const receipt = await cf.methods.setCreateNewRentalContractV2(price, "3", speed, length, "0", cloneFactoryAddress, "123").send({ from: seller, value: fee })
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
     await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
@@ -105,7 +105,7 @@ describe("Contract closeout", function () {
   })
 
   it("should reqiure fee for closeout type 3", async function () {
-    const receipt = await cf.methods.setCreateNewRentalContract(price, "3", speed, length, cloneFactoryAddress, "123").send({ from: seller, value: fee })
+    const receipt = await cf.methods.setCreateNewRentalContractV2(price, "3", speed, length, "0", cloneFactoryAddress, "123").send({ from: seller, value: fee })
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
     await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
@@ -120,7 +120,7 @@ describe("Contract closeout", function () {
   })
 
   it("should emit contractClosed for type 3", async function () {
-    const receipt = await cf.methods.setCreateNewRentalContract(price, "0", speed, length, cloneFactoryAddress, "123").send({ from: seller, value: fee })
+    const receipt = await cf.methods.setCreateNewRentalContractV2(price, "0", speed, length, "0", cloneFactoryAddress, "123").send({ from: seller, value: fee })
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
     const receipt2 = await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })

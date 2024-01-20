@@ -33,7 +33,7 @@ describe("Contract closeout", function () {
   })
 
   it("should reqiure fee for closeout type 1", async function () {
-    const receipt = await cf.methods.setCreateNewRentalContract(price, "3", speed, length, cloneFactoryAddress, "123").send({ from: seller, value: fee })
+    const receipt = await cf.methods.setCreateNewRentalContractV2(price, "3", speed, length, "0", cloneFactoryAddress, "123").send({ from: seller, value: fee })
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
     await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
@@ -48,7 +48,7 @@ describe("Contract closeout", function () {
   })
 
   it("should not emit contractClosed for type 1", async function () {
-    const receipt = await cf.methods.setCreateNewRentalContract(price, "0", speed, length, cloneFactoryAddress, "123").send({ from: seller, value: fee })
+    const receipt = await cf.methods.setCreateNewRentalContractV2(price, "0", speed, length, "0", cloneFactoryAddress, "123").send({ from: seller, value: fee })
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
     const receipt2 = await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
@@ -58,5 +58,4 @@ describe("Contract closeout", function () {
     const events = await cf.getPastEvents("contractClosed", { fromBlock: receipt2.blockNumber, toBlock: "latest" })
     expect(events.length).equal(0)
   })
-
 });

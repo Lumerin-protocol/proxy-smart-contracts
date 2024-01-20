@@ -21,18 +21,20 @@ contract Implementation is Initializable, Escrow {
     bool public isDeleted; //used to track if the contract is deleted, separate variable to account for the possibility of a contract being deleted when it is still running
     HistoryEntry[] public history;
     Terms public futureTerms;
-
+    
     enum ContractState {
         Available,
         Running
     }
 
+
     struct Terms {
         uint256 _price; // cost to purchase contract
-        uint256 _limit; // variable used to aid in the lumerin nodes decision making
+        uint256 _limit; // variable used to aid in the lumerin nodes decision making // Not used anywhere
         uint256 _speed; // th/s of contract
         uint256 _length; // how long the contract will last in seconds
         uint32 _version;
+        int8 _profitTarget;
     }
 
     struct HistoryEntry {
@@ -45,7 +47,7 @@ contract Implementation is Initializable, Escrow {
         address _buyer;
     }
 
-    event contractPurchased(address indexed _buyer);
+    event contractPurchased(address indexed _buyer); //make indexed
     event contractClosed(address indexed _closer);
     event purchaseInfoUpdated(address indexed _address);
     event cipherTextUpdated(string newCipherText);
@@ -55,13 +57,14 @@ contract Implementation is Initializable, Escrow {
         uint256 _limit,
         uint256 _speed,
         uint256 _length,
+        int8 _profitTarget,
         address _seller,
         address _lmrAddress,
         address _cloneFactory, //used to restrict purchasing power to only the clonefactory
         address _validator,
         string calldata _pubKey
     ) public initializer {
-        terms = Terms(_price, _limit, _speed, _length, 0);
+        terms = Terms(_price, _limit, _speed, _length, 0, _profitTarget);
         seller = _seller;
         cloneFactory = _cloneFactory;
         contractState = ContractState.Available;
@@ -104,6 +107,35 @@ contract Implementation is Initializable, Escrow {
             lumerin.balanceOf(address(this)),
             hasFutureTerms,
             terms._version
+        );
+    }
+
+    function getPublicVariablesV2()
+        public
+        view
+        returns (
+            ContractState _state,
+            Terms memory _terms,
+            uint256 _startingBlockTimestamp,
+            address _buyer,
+            address _seller,
+            string memory _encryptedPoolData,
+            bool _isDeleted,
+            uint256 _balance,
+            bool _hasFutureTerms
+        )
+    {
+        bool hasFutureTerms = futureTerms._length != 0;
+        return (
+            contractState,
+            terms,
+            startingBlockTimestamp,
+            buyer,
+            seller,
+            encryptedPoolData,
+            isDeleted,
+            lumerin.balanceOf(address(this)),
+            hasFutureTerms
         );
     }
 
@@ -180,16 +212,17 @@ contract Implementation is Initializable, Escrow {
         uint256 _price,
         uint256 _limit,
         uint256 _speed,
-        uint256 _length
+        uint256 _length,
+        int8 _profitTarget
     ) external {
         require(
             msg.sender == cloneFactory,
             "this address is not approved to call this function"
         );
         if (contractState == ContractState.Running) {
-            futureTerms = Terms(_price, _limit, _speed, _length, terms._version + 1);
+            futureTerms = Terms(_price, _limit, _speed, _length, terms._version + 1, _profitTarget);
         } else {
-            terms = Terms(_price, _limit, _speed, _length, terms._version + 1);
+            terms = Terms(_price, _limit, _speed, _length, terms._version + 1, _profitTarget);
             emit purchaseInfoUpdated(address(this));
         }
     }
@@ -200,8 +233,8 @@ contract Implementation is Initializable, Escrow {
         contractState = ContractState.Available;
 
         if(futureTerms._length != 0) {
-            terms = Terms(futureTerms._price, futureTerms._limit, futureTerms._speed, futureTerms._length, futureTerms._version);
-            futureTerms = Terms(0, 0, 0, 0, 0);
+            terms = Terms(futureTerms._price, futureTerms._limit, futureTerms._speed, futureTerms._length, futureTerms._version, futureTerms._profitTarget);
+            futureTerms = Terms(0, 0, 0, 0, 0, 0);
             emit purchaseInfoUpdated(address(this));
         }
     }
@@ -222,6 +255,91 @@ contract Implementation is Initializable, Escrow {
         );
         if (closeOutType == 0) {
             // this closeoutType is only for the buyer to close early
+            // and withdraw their funds
+            require(
+                closer == buyer || closer == validator,
+                "this account is not authorized to trigger an early closeout"
+            );
+            require(
+                contractState == ContractState.Running,
+                "the contract is not in the running state"
+            );
+
+            uint256 buyerPayout = getBuyerPayout();
+            bool comp = block.timestamp - startingBlockTimestamp >= terms._length;
+            history.push(HistoryEntry(comp, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
+            resetContractVariablesAndApplyFutureTerms();
+            emit contractClosed(closer);
+            
+            bool sent = withdrawFundsBuyer(buyerPayout);
+            require(sent, "Failed to withdraw funds");
+        } else if (closeOutType == 1) {
+            // this closeoutType is only for the seller to withdraw their funds
+            // at any time during the smart contracts lifecycle
+
+            require(
+                closer == seller,
+                "this account is not a seller of this contract"
+            );
+
+            uint256 amountToKeepInEscrow = 0;
+
+            if (contractState == ContractState.Running) {
+                // if contract is running we need to keep some funds 
+                // in the escrow for refund if seller cancels contract 
+                amountToKeepInEscrow = getBuyerPayout();
+            }
+
+            bool sent = withdrawAllFundsSeller(amountToKeepInEscrow);
+            require(sent, "Failed to withdraw funds");
+        } else if (closeOutType == 2) {
+            // this closeoutType is only for the seller to closeout after contract ended
+            // without claiming funds, keeping them in the escrow
+            require(
+                block.timestamp - startingBlockTimestamp >= terms._length,
+                "the contract has yet to be carried to term"
+            );
+            require(
+                contractState == ContractState.Running,
+                "the contract is not in the running state"
+            );
+
+            history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
+
+            resetContractVariablesAndApplyFutureTerms();
+            emit contractClosed(buyer);
+        }
+        else if (closeOutType == 3){
+            // this closeoutType is only for the seller to closeout after contract ended
+            // and claim all funds collected in the escrow
+            require(
+                closer == seller,
+                "only the seller can closeout AND withdraw after contract term"
+            );
+            require(
+                block.timestamp - startingBlockTimestamp >= terms._length,
+                "the contract has yet to be carried to term"
+            );
+            require(
+                contractState == ContractState.Running,
+                "the contract is not in the running state"
+            );
+
+            history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
+
+            resetContractVariablesAndApplyFutureTerms();
+            emit contractClosed(buyer);
+            
+            bool sent = withdrawAllFundsSeller(0);
+            require(sent, "Failed to withdraw funds");
+        } else {
+            revert("you must make a selection from 0 to 3");
+        }
+    }
+
+     function setContractCloseOutV2(address closer, uint256 closeOutType) public {
+        if (closeOutType == 0) {
+            // this closeoutType is only for the buyer or validator to close early
             // and withdraw their funds
             require(
                 closer == buyer || closer == validator,
