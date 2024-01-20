@@ -26,6 +26,7 @@ describe("Contract purchase", function () {
   const speed = String(1_000_000)
   const length = String(3600)
   const version = String(0)
+  const profitTarget = 0;
 
   before(async () => {
     await lumerin.methods.increaseAllowance(cloneFactoryAddress, "10000").send({ from: buyer })
@@ -74,7 +75,7 @@ describe("Contract purchase", function () {
 
   it('should purchase contract', async () => {
     const receipt = await cf.methods
-      .setCreateNewRentalContractV2(price, "0", speed, String(length), version, cloneFactoryAddress, "123")
+      .setCreateNewRentalContractV2(price, "0", speed, String(length), profitTarget, cloneFactoryAddress, "123")
       .send({ from: seller, value: fee })
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
@@ -89,7 +90,7 @@ describe("Contract purchase", function () {
 
   it('should emit "contractPurchased" on purchase', async () => {
     const receipt = await cf.methods
-      .setCreateNewRentalContractV2(price, "0", speed, String(length), version, cloneFactoryAddress, "123")
+      .setCreateNewRentalContractV2(price, "0", speed, String(length), profitTarget, cloneFactoryAddress, "123")
       .send({ from: seller, value: fee })
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
@@ -117,7 +118,7 @@ describe("Contract purchase", function () {
 
   it('should fail purchase of deleted contract', async () => {
     const receipt = await cf.methods
-      .setCreateNewRentalContractV2(price, "0", speed, String(length), version, cloneFactoryAddress, "123")
+      .setCreateNewRentalContractV2(price, "0", speed, String(length), profitTarget, cloneFactoryAddress, "123")
       .send({ from: seller, value: fee })
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
@@ -132,7 +133,7 @@ describe("Contract purchase", function () {
 
   it('should fail purchase if fee is not paid', async () => {
     const receipt = await cf.methods
-      .setCreateNewRentalContractV2(price, "0", speed, String(length), version, cloneFactoryAddress, "123")
+      .setCreateNewRentalContractV2(price, "0", speed, String(length), profitTarget, cloneFactoryAddress, "123")
       .send({ from: seller, value: fee })
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
