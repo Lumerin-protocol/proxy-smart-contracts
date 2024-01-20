@@ -63,10 +63,10 @@ describe("Contract closeout", function () {
     await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
     await AdvanceBlockTime(web3, Number(length))
 
-    const impl = Implementation(web3, hrContractAddr)
-    await impl.methods.setContractCloseOut("0").send({ from: buyer, value: fee })
+    await cf.methods.setContractCloseout(hrContractAddr, "0").send({ from: buyer, value: fee })
+
     try {
-      await impl.methods.setContractCloseOut("0").send({ from: buyer, value: fee })
+      await cf.methods.setContractCloseout(hrContractAddr, "0").send({ from: buyer, value: fee })
       expect.fail("should not allow closeout type 0 twice")
     } catch (err) {
       // after first closeout the buyer field is set to zero address
@@ -82,8 +82,21 @@ describe("Contract closeout", function () {
     await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
     await AdvanceBlockTime(web3, Number(length))
 
-    const impl = Implementation(web3, hrContractAddr)
-    await impl.methods.setContractCloseOut("0").send({ from: buyer, value: 0 })
+    await cf.methods.setContractCloseout(hrContractAddr, "0").send({ from: buyer, value: "0" })
+  })
+
+  it("should emit contractClosed for type 0", async function () {
+    const receipt = await cf.methods.setCreateNewRentalContract(price, "0", speed, length, cloneFactoryAddress, "123").send({ from: seller, value: fee })
+    const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
+
+    const receipt2 = await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
+    await AdvanceBlockTime(web3, Number(length))
+
+    await cf.methods.setContractCloseout(hrContractAddr, "0").send({ from: buyer })
+    const events = await cf.getPastEvents("contractClosed", { fromBlock: receipt2.blockNumber, toBlock: "latest" })
+    expect(events.length).equal(1)
+    expect(events[0].returnValues._address).equal(hrContractAddr)
+    expect(events[0].returnValues._closeOutType).equal("0")
   })
 })
 
@@ -116,8 +129,7 @@ async function testEarlyCloseout(progress, fee, seller, buyer, cloneFactoryAddre
   await AdvanceBlockTime(web3, progress * Number(length))
 
   // closeout by buyer
-  const impl = Implementation(web3, hrContractAddr)
-  await impl.methods.setContractCloseOut("0").send({ from: buyer, value: fee })
+  await cf.methods.setContractCloseout(hrContractAddr, "0").send({ from: buyer, value: fee })
   const buyerBalanceAfter = Number(await lumerin.methods.balanceOf(buyer).call());
   const deltaBuyerBalance = buyerBalanceAfter - buyerBalance;
   const buyerRefundFraction = (1 - progress)
@@ -125,7 +137,7 @@ async function testEarlyCloseout(progress, fee, seller, buyer, cloneFactoryAddre
   expect(deltaBuyerBalance).equal(buyerRefundAmount, "buyer should be " + buyerRefundFraction * 100 + "% refunded")
 
   // claim by seller
-  await impl.methods.setContractCloseOut("1").send({ from: seller, value: fee })
+  await cf.methods.setContractCloseout(hrContractAddr, "1").send({ from: seller, value: fee })
   const sellerBalanceAfter = Number(await lumerin.methods.balanceOf(seller).call());
   const deltaSellerBalance = sellerBalanceAfter - sellerBalance;
   const sellerClaimFraction = progress

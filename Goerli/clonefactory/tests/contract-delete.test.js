@@ -47,7 +47,7 @@ describe("Contract delete", function () {
     }
   })
 
-  it("should delete contract and emit event", async function () {
+  it("should delete contract and emit events", async function () {
     await cf.methods.setContractDeleted(hrContractAddr, true).send({ from: seller })
     const impl = Implementation(web3, hrContractAddr)
     const data = await impl.methods.getPublicVariables().call()
@@ -59,8 +59,14 @@ describe("Contract delete", function () {
       e.returnValues._address === hrContractAddr &&
       e.returnValues._isDeleted === true
     )
+    const events2 = await cf.getPastEvents("contractDeletedOrRestored", { fromBlock: 0, toBlock: "latest" })
+    const isNewEventFound = events2.find((e) =>
+      e.returnValues._address === hrContractAddr &&
+      e.returnValues._isDeleted === true
+    )
 
     expect(isEventFound).not.undefined
+    expect(isNewEventFound).not.undefined
   })
 
   it("should error on second attempt to delete", async function () {
@@ -81,7 +87,7 @@ describe("Contract delete", function () {
     }
   })
 
-  it("should undelete contract and emit event", async function () {
+  it("should undelete contract and emit events", async function () {
     await cf.methods.setContractDeleted(hrContractAddr, false).send({ from: seller })
     const impl = Implementation(web3, hrContractAddr)
     const data = await impl.methods.getPublicVariables().call()
@@ -94,7 +100,14 @@ describe("Contract delete", function () {
       e.returnValues._isDeleted === false
     )
 
+    const events2 = await cf.getPastEvents("contractDeletedOrRestored", { fromBlock: 0, toBlock: "latest" })
+    const isNewEventFound = events2.find((e) =>
+      e.returnValues._address === hrContractAddr &&
+      e.returnValues._isDeleted === false
+    )
+
     expect(isEventFound).not.undefined
+    expect(isNewEventFound).not.undefined
   })
 
   it("should allow purchase if contract undeleted", async function () {

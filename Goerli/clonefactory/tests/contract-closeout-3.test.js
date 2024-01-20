@@ -42,8 +42,7 @@ describe("Contract closeout", function () {
 
     await AdvanceBlockTime(web3, Number(length))
 
-    const impl = Implementation(web3, hrContractAddr)
-    await impl.methods.setContractCloseOut("3").send({ from: seller, value: fee })
+    await cf.methods.setContractCloseout(hrContractAddr, "3").send({ from: seller, value: fee })
 
     const sellerBalanceAfter = Number(await lumerin.methods.balanceOf(seller).call());
     const deltaSellerBalance = sellerBalanceAfter - sellerBalance;
@@ -62,7 +61,8 @@ describe("Contract closeout", function () {
 
     const impl = Implementation(web3, hrContractAddr)
     try {
-      await impl.methods.setContractCloseOut("3").send({ from: seller, value: fee })
+      await cf.methods.setContractCloseout(hrContractAddr, "3").send({ from: seller, value: fee })
+
       expect.fail("should not allow closeout type 3 for incompleted contract")
     } catch (err) {
       expect(err.message).includes("the contract has yet to be carried to term")
@@ -78,7 +78,8 @@ describe("Contract closeout", function () {
 
     const impl = Implementation(web3, hrContractAddr)
     try {
-      await impl.methods.setContractCloseOut("3").send({ from: buyer, value: fee })
+      await cf.methods.setContractCloseout(hrContractAddr, "3").send({ from: buyer, value: fee })
+
       expect.fail("should not allow closeout type 3 for buyer")
     } catch (err) {
       expect(err.message).includes("only the seller can closeout AND withdraw after contract term")
@@ -93,9 +94,10 @@ describe("Contract closeout", function () {
     await AdvanceBlockTime(web3, Number(length))
 
     const impl = Implementation(web3, hrContractAddr)
-    await impl.methods.setContractCloseOut("3").send({ from: seller, value: fee })
+    await cf.methods.setContractCloseout(hrContractAddr, "3").send({ from: seller, value: fee })
+
     try {
-      await impl.methods.setContractCloseOut("3").send({ from: seller, value: fee })
+      await cf.methods.setContractCloseout(hrContractAddr, "3").send({ from: seller, value: fee })
       expect.fail("should not allow closeout type 3 twice")
     } catch (err) {
       expect(err.message).includes("the contract is not in the running state")
@@ -109,12 +111,27 @@ describe("Contract closeout", function () {
     await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
     await AdvanceBlockTime(web3, Number(length))
 
-    const impl = Implementation(web3, hrContractAddr)
     try {
-      await impl.methods.setContractCloseOut("3").send({ from: seller, value: 0 })
+      await cf.methods.setContractCloseout(hrContractAddr, "3").send({ from: seller, value: 0 })
       expect.fail("should require fee")
     } catch (err) {
       expect(err.message).includes("Insufficient ETH provided for marketplace fee")
     }
+  })
+
+  it("should emit contractClosed for type 3", async function () {
+    const receipt = await cf.methods.setCreateNewRentalContractV2(price, "0", speed, length, "0", cloneFactoryAddress, "123").send({ from: seller, value: fee })
+    const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
+
+    const receipt2 = await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
+    await AdvanceBlockTime(web3, Number(length))
+
+    await cf.methods.setContractCloseout(hrContractAddr, "3").send({ from: seller, value: fee })
+
+    const events = await cf.getPastEvents("contractClosed", { fromBlock: receipt2.blockNumber, toBlock: "latest" })
+
+    expect(events.length).equal(1)
+    expect(events[0].returnValues._address).equal(hrContractAddr)
+    expect(events[0].returnValues._closeOutType).equal("3")
   })
 })

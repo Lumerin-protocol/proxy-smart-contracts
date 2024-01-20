@@ -46,7 +46,7 @@ describe("Contract history", function () {
     await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
 
     const impl = Implementation(web3, hrContractAddr)
-    await impl.methods.setContractCloseOut("0").send({ from: buyer })
+    await cf.methods.setContractCloseout(hrContractAddr, "0").send({ from: buyer })
     const data = await impl.methods.getHistory("0", "100").call()
 
     expect(data.length).equal(1)
@@ -59,7 +59,7 @@ describe("Contract history", function () {
 
     await AdvanceBlockTime(web3, 3600)
     const impl = Implementation(web3, hrContractAddr)
-    await impl.methods.setContractCloseOut("2").send({ from: seller, value: fee })
+    await cf.methods.setContractCloseout(hrContractAddr, "2").send({ from: seller, value: fee })
 
     const data = await impl.methods.getHistory("0", "100").call()
     const entry = data.find(entry => entry._purchaseTime == purchaseTime)
@@ -73,7 +73,7 @@ describe("Contract history", function () {
     const { timestamp: purchaseTime } = await web3.eth.getBlock(receipt.blockNumber);
 
     const impl = Implementation(web3, hrContractAddr)
-    const receipt2 = await impl.methods.setContractCloseOut("0").send({ from: buyer })
+    const receipt2 = await cf.methods.setContractCloseout(hrContractAddr, "0").send({ from: buyer })
     const { timestamp: endTime } = await web3.eth.getBlock(receipt2.blockNumber);
     const data = await impl.methods.getHistory("0", "100").call()
 

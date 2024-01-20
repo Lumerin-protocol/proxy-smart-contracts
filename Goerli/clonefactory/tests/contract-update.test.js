@@ -115,7 +115,7 @@ describe("Contract terms update", function () {
   it("should apply futureTerms after contract closed and emit event", async function () {
     const newPrice = ToString(3 * 10 ** 8);
     const impl = Implementation(web3, hrContractAddr)
-    const receipt = await impl.methods.setContractCloseOut("0").send({ from: buyer })
+    const receipt = await cf.methods.setContractCloseout(hrContractAddr, "0").send({ from: buyer })
 
     const futureTerms = await impl.methods.futureTerms().call()
 
