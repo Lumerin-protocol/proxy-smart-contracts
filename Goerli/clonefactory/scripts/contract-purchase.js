@@ -1,7 +1,7 @@
 //@ts-check
 require("dotenv").config();
 /**
- * @type {import("hardhat/types/runtime").HardhatRuntimeEnvironment}
+ * @type {import("@nomiclabs/hardhat-ethers")}
  */
 const { ethers } = require("hardhat");
 const { encrypt } = require('ecies-geth')
@@ -64,12 +64,12 @@ async function main() {
     Buffer.from(dest)
   )
 
+  console.log(await implementation.getPublicVariables())
+
   const purchase = await cloneFactory
     .connect(buyer)
     .setPurchaseRentalContract(contractAddress, encryptedDest.toString('hex'), 0, { value: fee.toString() })
   const receipt = await purchase.wait();
-
-  console.log(receipt)
 
   console.log(`Purchased: ${contractAddress}, gas used ${receipt.gasUsed.toString()}`);
 }

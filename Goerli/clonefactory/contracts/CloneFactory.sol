@@ -25,9 +25,12 @@ contract CloneFactory is Initializable {
     mapping(address => bool) public isContractDead; // keeps track of contracts that are no longer valid
     
     event contractCreated(address indexed _address, string _pubkey); //emitted whenever a contract is created
-    event clonefactoryContractPurchased(address indexed _address); //emitted whenever a contract is purchased
-    event contractDeleteUpdated(address _address, bool _isDeleted); //emitted whenever a contract is deleted/restored
+    event clonefactoryContractPurchased(address indexed _address); // deprecated
+    event contractPurchased(address indexed _address, address indexed _buyer); //emitted whenever a contract is purchased
+    event contractDeleteUpdated(address _address, bool _isDeleted); // deprecated
+    event contractDeletedOrRestored(address indexed _address, bool _isDeleted); // emitted whenever a contract is deleted/restored
     event purchaseInfoUpdated(address indexed _address);
+    event contractClosed(address indexed _address, uint256 _closeOutType);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "you are not authorized");
@@ -47,6 +50,17 @@ contract CloneFactory is Initializable {
         _;
     }
 
+    modifier knownContract(address _contractAddress){
+        require(rentalContractsMap[_contractAddress], "unknown contract address");
+        _;
+    }
+
+    modifier onlySeller(address _contractAddress){
+        Implementation _contract = Implementation(_contractAddress);
+        require(msg.sender == _contract.seller(), "you are not authorized");
+        _;
+    }
+
     function initialize(address _baseImplementation, address _lumerin, address _feeRecipient) public initializer {
         lumerin = Lumerin(_lumerin);
         baseImplementation = _baseImplementation;
@@ -55,8 +69,7 @@ contract CloneFactory is Initializable {
         feeRecipient.recipient = _feeRecipient;
     }
 
-    function payMarketplaceFee()
-        public payable sufficientFee returns (bool) {
+    function payMarketplaceFee() public payable sufficientFee returns (bool) {
         (bool sent,) = payable(feeRecipient.recipient).call{value: feeRecipient.fee}("");
         require(sent, "Failed to pay marketplace listing fee");
         return sent;
@@ -131,9 +144,7 @@ contract CloneFactory is Initializable {
         address _contractAddress,
         string calldata _cipherText,
         uint32 termsVersion
-    ) external payable sufficientFee {
-        // TODO: add a test case so any third-party implementations will be discarded
-        require(rentalContractsMap[_contractAddress], "unknown contract address");
+    ) external payable sufficientFee knownContract(_contractAddress) {
         Implementation targetContract = Implementation(_contractAddress);
         require(
             !targetContract.isDeleted(), "cannot purchase deleted contract");
@@ -172,7 +183,8 @@ contract CloneFactory is Initializable {
             msg.sender
         );
 
-        emit clonefactoryContractPurchased(_contractAddress);
+        emit clonefactoryContractPurchased(_contractAddress); // TODO: remove in next version
+        emit contractPurchased(_contractAddress, msg.sender);
     }
 
     function getContractList() external view returns (address[] memory) {
@@ -206,12 +218,10 @@ contract CloneFactory is Initializable {
         feeRecipient.recipient = recipient;
     }
 
-    function setContractDeleted(address _contractAddress, bool _isDeleted) public {
-        require(rentalContractsMap[_contractAddress], "unknown contract address");
-        Implementation _contract = Implementation(_contractAddress);
-        require(msg.sender == _contract.seller() || msg.sender == owner, "you are not authorized");
+    function setContractDeleted(address _contractAddress, bool _isDeleted) public knownContract(_contractAddress) onlySeller(_contractAddress) {
         Implementation(_contractAddress).setContractDeleted(_isDeleted);
-        emit contractDeleteUpdated(_contractAddress, _isDeleted);
+        emit contractDeleteUpdated(_contractAddress, _isDeleted); // TODO: remove in next version
+        emit contractDeletedOrRestored(_contractAddress, _isDeleted);
     }
 
     function setUpdateContractInformation(
@@ -220,7 +230,7 @@ contract CloneFactory is Initializable {
         uint256 _limit,
         uint256 _speed,
         uint256 _length
-    ) external payable {
+    ) external payable knownContract(_contractAddress) onlySeller(_contractAddress) {
         updateContract(_contractAddress, _price, _limit, _speed, _length, 0);
     }
 
@@ -231,7 +241,7 @@ contract CloneFactory is Initializable {
         uint256 _speed,
         uint256 _length,
         int8 _profitTarget
-    ) external {
+    ) external knownContract(_contractAddress) onlySeller(_contractAddress) {
         updateContract(_contractAddress, _price, _limit, _speed, _length, _profitTarget);
     }
 
@@ -243,11 +253,23 @@ contract CloneFactory is Initializable {
         uint256 _length,
         int8 _profitTarget
     ) internal {
-        require(rentalContractsMap[_contractAddress], "unknown contract address");
-        Implementation _contract = Implementation(_contractAddress);
-        require(msg.sender == _contract.seller(), "you are not authorized");
-
         Implementation(_contractAddress).setUpdatePurchaseInformation(_price, _limit, _speed, _length, _profitTarget);
-        emit purchaseInfoUpdated(address(this));
+        emit purchaseInfoUpdated(_contractAddress);
+    }
+
+    function setContractCloseout(address _contractAddress, uint256 _closeOutType) external payable knownContract(_contractAddress) {
+        if (_closeOutType == 1 || _closeOutType == 3) {
+            require(msg.value >= feeRecipient.fee, "Insufficient ETH provided for marketplace fee");
+        }
+        
+        Implementation(_contractAddress).setContractCloseOutV2(msg.sender, _closeOutType);
+        if (_closeOutType != 1) {
+            emit contractClosed(_contractAddress, _closeOutType);
+        }
+        
+        if (_closeOutType == 1 || _closeOutType == 3) {
+            bool sent = payMarketplaceFee();
+            require(sent, "Failed to pay marketplace withdrawal fee");
+        }
     }
 }

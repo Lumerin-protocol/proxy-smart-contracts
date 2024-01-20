@@ -48,7 +48,7 @@ contract Implementation is Initializable, Escrow {
     }
 
     event contractPurchased(address indexed _buyer); //make indexed
-    event contractClosed(address indexed _buyer);
+    event contractClosed(address indexed _closer);
     event purchaseInfoUpdated(address indexed _address);
     event cipherTextUpdated(string newCipherText);
 
@@ -248,12 +248,16 @@ contract Implementation is Initializable, Escrow {
         return 0;
     }
 
-    function setContractCloseOut(uint256 closeOutType) public payable {
+    function setContractCloseOut(address closer, uint256 closeOutType) public {
+        require(
+            msg.sender == cloneFactory,
+            "this address is not approved to call this function"
+        );
         if (closeOutType == 0) {
             // this closeoutType is only for the buyer to close early
             // and withdraw their funds
             require(
-                msg.sender == buyer || msg.sender == validator,
+                closer == buyer || closer == validator,
                 "this account is not authorized to trigger an early closeout"
             );
             require(
@@ -265,7 +269,7 @@ contract Implementation is Initializable, Escrow {
             bool comp = block.timestamp - startingBlockTimestamp >= terms._length;
             history.push(HistoryEntry(comp, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
             resetContractVariablesAndApplyFutureTerms();
-            emit contractClosed(buyer);
+            emit contractClosed(closer);
             
             bool sent = withdrawFundsBuyer(buyerPayout);
             require(sent, "Failed to withdraw funds");
@@ -274,7 +278,7 @@ contract Implementation is Initializable, Escrow {
             // at any time during the smart contracts lifecycle
 
             require(
-                msg.sender == seller,
+                closer == seller,
                 "this account is not a seller of this contract"
             );
 
@@ -288,9 +292,6 @@ contract Implementation is Initializable, Escrow {
 
             bool sent = withdrawAllFundsSeller(amountToKeepInEscrow);
             require(sent, "Failed to withdraw funds");
-            
-            sent = CloneFactory(cloneFactory).payMarketplaceFee{value:msg.value}();
-            require(sent, "Failed to pay marketplace withdrawal fee");
         } else if (closeOutType == 2) {
             // this closeoutType is only for the seller to closeout after contract ended
             // without claiming funds, keeping them in the escrow
@@ -312,7 +313,7 @@ contract Implementation is Initializable, Escrow {
             // this closeoutType is only for the seller to closeout after contract ended
             // and claim all funds collected in the escrow
             require(
-                msg.sender == seller,
+                closer == seller,
                 "only the seller can closeout AND withdraw after contract term"
             );
             require(
@@ -328,11 +329,93 @@ contract Implementation is Initializable, Escrow {
 
             resetContractVariablesAndApplyFutureTerms();
             emit contractClosed(buyer);
-
-            bool sent = CloneFactory(cloneFactory).payMarketplaceFee{value:msg.value}();
-            require(sent, "Failed to pay marketplace withdrawal fee");
             
-            sent = withdrawAllFundsSeller(0);
+            bool sent = withdrawAllFundsSeller(0);
+            require(sent, "Failed to withdraw funds");
+        } else {
+            revert("you must make a selection from 0 to 3");
+        }
+    }
+
+     function setContractCloseOutV2(address closer, uint256 closeOutType) public {
+        if (closeOutType == 0) {
+            // this closeoutType is only for the buyer or validator to close early
+            // and withdraw their funds
+            require(
+                closer == buyer || closer == validator,
+                "this account is not authorized to trigger an early closeout"
+            );
+            require(
+                contractState == ContractState.Running,
+                "the contract is not in the running state"
+            );
+
+            uint256 buyerPayout = getBuyerPayout();
+            bool comp = block.timestamp - startingBlockTimestamp >= terms._length;
+            history.push(HistoryEntry(comp, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
+            resetContractVariablesAndApplyFutureTerms();
+            emit contractClosed(closer);
+            
+            bool sent = withdrawFundsBuyer(buyerPayout);
+            require(sent, "Failed to withdraw funds");
+        } else if (closeOutType == 1) {
+            // this closeoutType is only for the seller to withdraw their funds
+            // at any time during the smart contracts lifecycle
+
+            require(
+                closer == seller,
+                "this account is not a seller of this contract"
+            );
+
+            uint256 amountToKeepInEscrow = 0;
+
+            if (contractState == ContractState.Running) {
+                // if contract is running we need to keep some funds 
+                // in the escrow for refund if seller cancels contract 
+                amountToKeepInEscrow = getBuyerPayout();
+            }
+
+            bool sent = withdrawAllFundsSeller(amountToKeepInEscrow);
+            require(sent, "Failed to withdraw funds");
+        } else if (closeOutType == 2) {
+            // this closeoutType is only for the seller to closeout after contract ended
+            // without claiming funds, keeping them in the escrow
+            require(
+                block.timestamp - startingBlockTimestamp >= terms._length,
+                "the contract has yet to be carried to term"
+            );
+            require(
+                contractState == ContractState.Running,
+                "the contract is not in the running state"
+            );
+
+            history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
+
+            resetContractVariablesAndApplyFutureTerms();
+            emit contractClosed(buyer);
+        }
+        else if (closeOutType == 3){
+            // this closeoutType is only for the seller to closeout after contract ended
+            // and claim all funds collected in the escrow
+            require(
+                closer == seller,
+                "only the seller can closeout AND withdraw after contract term"
+            );
+            require(
+                block.timestamp - startingBlockTimestamp >= terms._length,
+                "the contract has yet to be carried to term"
+            );
+            require(
+                contractState == ContractState.Running,
+                "the contract is not in the running state"
+            );
+
+            history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
+
+            resetContractVariablesAndApplyFutureTerms();
+            emit contractClosed(buyer);
+            
+            bool sent = withdrawAllFundsSeller(0);
             require(sent, "Failed to withdraw funds");
         } else {
             revert("you must make a selection from 0 to 3");

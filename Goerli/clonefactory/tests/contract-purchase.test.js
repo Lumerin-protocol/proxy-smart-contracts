@@ -3,7 +3,7 @@ const { expect } = require("chai");
 const ethers = require("hardhat");
 const Web3 = require("web3");
 const { Lumerin, CloneFactory, Implementation } = require("../build-js/dist");
-const { LocalTestnetAddresses } = require("./utils");
+const { LocalTestnetAddresses, RandomEthAddress } = require("./utils");
 
 describe("Contract purchase", function () {
   const {
@@ -11,6 +11,7 @@ describe("Contract purchase", function () {
     cloneFactoryAddress,
     owner,
     seller,
+    buyer,
   } = LocalTestnetAddresses;
 
   /** @type {import("web3").default} */
@@ -24,8 +25,12 @@ describe("Contract purchase", function () {
   const limit = String(0)
   const speed = String(1_000_000)
   const length = String(3600)
+  const version = String(0)
+  const profitTarget = 0;
 
   before(async () => {
+    await lumerin.methods.increaseAllowance(cloneFactoryAddress, "10000").send({ from: buyer })
+    await lumerin.methods.transfer(buyer, "10000").send({ from: owner })
     await cf.methods.setAddToWhitelist(seller).send({ from: owner })
     fee = await cf.methods.marketplaceFee().call()
   })
@@ -66,5 +71,76 @@ describe("Contract purchase", function () {
       _speed: "0",
       _length: "0",
     })
+  });
+
+  it('should purchase contract', async () => {
+    const receipt = await cf.methods
+      .setCreateNewRentalContractV2(price, "0", speed, String(length), profitTarget, cloneFactoryAddress, "123")
+      .send({ from: seller, value: fee })
+    const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
+
+    const stateBefore = await Implementation(web3, hrContractAddr).methods.contractState().call()
+    expect(stateBefore).to.equal("0")
+
+    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", version).send({ from: buyer, value: fee })
+
+    const stateAfter = await Implementation(web3, hrContractAddr).methods.contractState().call()
+    expect(stateAfter).to.equal("1")
+  })
+
+  it('should emit "contractPurchased" on purchase', async () => {
+    const receipt = await cf.methods
+      .setCreateNewRentalContractV2(price, "0", speed, String(length), profitTarget, cloneFactoryAddress, "123")
+      .send({ from: seller, value: fee })
+    const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
+
+    const events = await cf.getPastEvents("contractPurchased", { fromBlock: receipt.blockNumber, toBlock: "latest" })
+    const isEmitted = events.some((e) => e.returnValues._address === hrContractAddr);
+    expect(isEmitted).to.be.false
+
+    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", version).send({ from: buyer, value: fee })
+
+    const events2 = await cf.getPastEvents("contractPurchased", { fromBlock: receipt.blockNumber, toBlock: "latest" })
+    const isEmitted2 = events2.some((e) => e.returnValues._address === hrContractAddr);
+    expect(isEmitted2).to.be.true
+  })
+
+  it('should fail purchase of contract which clonefactory doesnt know about', async () => {
+    const hrContractAddr = RandomEthAddress()
+
+    try {
+      await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", version).send({ from: buyer, value: fee })
+      expect.fail("purchase should fail")
+    } catch (err) {
+      expect(err.message).to.contain("unknown contract address")
+    }
+  })
+
+  it('should fail purchase of deleted contract', async () => {
+    const receipt = await cf.methods
+      .setCreateNewRentalContractV2(price, "0", speed, String(length), profitTarget, cloneFactoryAddress, "123")
+      .send({ from: seller, value: fee })
+    const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
+
+    await cf.methods.setContractDeleted(hrContractAddr, true).send({ from: seller })
+
+    try {
+      await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", version).send({ from: buyer, value: fee })
+    } catch (err) {
+      expect(err.message).to.contain("cannot purchase deleted contract")
+    }
+  })
+
+  it('should fail purchase if fee is not paid', async () => {
+    const receipt = await cf.methods
+      .setCreateNewRentalContractV2(price, "0", speed, String(length), profitTarget, cloneFactoryAddress, "123")
+      .send({ from: seller, value: fee })
+    const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
+
+    try {
+      await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", version).send({ from: buyer })
+    } catch (err) {
+      expect(err.message).to.contain("Insufficient ETH provided for marketplace fee")
+    }
   })
 });
