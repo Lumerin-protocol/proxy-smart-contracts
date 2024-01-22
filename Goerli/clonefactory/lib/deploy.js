@@ -89,9 +89,7 @@ async function UpdateCloneFactory(newCloneFactoryContractName, cloneFactoryAddr,
   log("Current CLONEFACTORY implementation:", currentCloneFactoryImpl);
 
   const CloneFactory = await ethers.getContractFactory(newCloneFactoryContractName);
-  // await upgrades.forceImport(cloneFactoryAddr, CloneFactory)
-  const cloneFactory = await upgrades.upgradeProxy(cloneFactoryAddr, CloneFactory, { unsafeAllow: ['constructor'] });
-  await cloneFactory.deployed();
+  const cloneFactory = await upgrades.upgradeProxy(cloneFactoryAddr, CloneFactory, { unsafeAllow: ['constructor'] }, log);
 
   const receipt = await ethers.provider.getTransactionReceipt(cloneFactory.deployTransaction.hash);
   const newCloneFactoryImpl = await upgrades.erc1967.getImplementationAddress(cloneFactoryAddr)
@@ -135,9 +133,10 @@ async function UpdateImplementation(newImplementationContractName, cloneFactoryA
   log();
 
   // IMPORTANT: remove unsafeSkipStorageCheck and struct-definition for future upgrades
-  const newImplementation = await upgrades.upgradeBeacon(baseImplementationAddr, Implementation, { unsafeAllow: ['constructor'], unsafeSkipStorageCheck: true });
+  const newImplementation = await upgrades.upgradeBeacon(baseImplementationAddr, Implementation, { unsafeAllow: ['constructor'], unsafeSkipStorageCheck: true }, log);
   const newLogicAddr = await upgrades.beacon.getImplementationAddress(newImplementation.address);
   log("New beacon proxy logic:", newLogicAddr)
+
 
   if (oldLogicAddr == newLogicAddr) {
     log("Warning. Implementation proxy logic address didn't change, because it may be the same implementation. Please test manually.");
