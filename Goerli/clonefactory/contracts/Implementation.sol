@@ -16,12 +16,12 @@ contract Implementation is Initializable, Escrow {
     address public seller; // address of the seller of the contract
     address public cloneFactory;
     address public validator; // address of the validator, can close out contract early, if empty - no validator (buyer node)
-    string public encryptedValidatorURL; // if using own validator (buyer-node) this will be the encrypted buyer address. Encrypted with the seller's public key
+    string public encrValidatorURL; // if using own validator (buyer-node) this will be the encrypted buyer address. Encrypted with the seller's public key
     string public pubKey; // encrypted data for pool target info
     bool public isDeleted; // used to track if the contract is deleted, separate variable to account for the possibility of a contract being deleted when it is still running
     HistoryEntry[] public history;
     Terms public futureTerms;
-    string public encryptedDestURL; // where to redirect the hashrate after validation (for both third-party validator and buyer-node) If empty, then the hashrate will be redirected to the default pool of the buyer node
+    string public encrDestURL; // where to redirect the hashrate after validation (for both third-party validator and buyer-node) If empty, then the hashrate will be redirected to the default pool of the buyer node
 
     enum ContractState {
         Available,
@@ -86,7 +86,7 @@ contract Implementation is Initializable, Escrow {
             uint256 _startingBlockTimestamp,
             address _buyer,
             address _seller,
-            string memory _encryptedPoolData,
+            string memory _encrPoolData,
             bool _isDeleted,
             uint256 _balance,
             bool _hasFutureTerms,
@@ -103,7 +103,7 @@ contract Implementation is Initializable, Escrow {
             startingBlockTimestamp,
             buyer,
             seller,
-            encryptedValidatorURL,
+            encrValidatorURL,
             isDeleted,
             lumerin.balanceOf(address(this)),
             hasFutureTerms,
@@ -120,7 +120,7 @@ contract Implementation is Initializable, Escrow {
             uint256 _startingBlockTimestamp,
             address _buyer,
             address _seller,
-            string memory _encryptedPoolData,
+            string memory _encrPoolData,
             bool _isDeleted,
             uint256 _balance,
             bool _hasFutureTerms
@@ -133,7 +133,7 @@ contract Implementation is Initializable, Escrow {
             startingBlockTimestamp,
             buyer,
             seller,
-            encryptedValidatorURL,
+            encrValidatorURL,
             isDeleted,
             lumerin.balanceOf(address(this)),
             hasFutureTerms
@@ -172,8 +172,8 @@ contract Implementation is Initializable, Escrow {
 
     //function that the clone factory calls to purchase the contract
     function setPurchaseContract(
-        string calldata _encryptedValidatorURL,
-        string calldata _encryptedDestURL,
+        string calldata _encrValidatorURL,
+        string calldata _encrDestURL,
         address _buyer,
         address _validator
     ) public {
@@ -185,8 +185,8 @@ contract Implementation is Initializable, Escrow {
             contractState == ContractState.Available,
             "contract is not in an available state"
         );
-        encryptedValidatorURL = _encryptedValidatorURL;
-        encryptedDestURL = _encryptedDestURL;
+        encrValidatorURL = _encrValidatorURL;
+        encrDestURL = _encrDestURL;
         buyer = _buyer;
         validator = _validator;
         startingBlockTimestamp = block.timestamp;
@@ -208,15 +208,15 @@ contract Implementation is Initializable, Escrow {
             contractState == ContractState.Running,
             "the contract is not in the running state"
         );
-        encryptedValidatorURL = _newEncryptedPoolData;
+        encrValidatorURL = _newEncryptedPoolData;
         emit cipherTextUpdated(_newEncryptedPoolData);
     }
 
     // allows the buyer to update the mining destination in the middle of the contract
     // this is V2 of the function setUpdateMiningInformation
     function setDestination(
-        string calldata _encryptedValidatorURL,
-        string calldata _encryptedDestURL
+        string calldata _encrValidatorURL,
+        string calldata _encrDestURL
     ) external {
         require(
             msg.sender == buyer,
@@ -226,10 +226,10 @@ contract Implementation is Initializable, Escrow {
             contractState == ContractState.Running,
             "the contract is not in the running state"
         );
-        encryptedDestURL = _encryptedDestURL;
-        encryptedValidatorURL = _encryptedValidatorURL;
-        emit cipherTextUpdated(_encryptedValidatorURL); // DEPRECATED, will be removed in future versions
-        emit destinationUpdated(_encryptedValidatorURL, _encryptedDestURL);
+        encrDestURL = _encrDestURL;
+        encrValidatorURL = _encrValidatorURL;
+        emit cipherTextUpdated(_encrValidatorURL); // DEPRECATED, will be removed in future versions
+        emit destinationUpdated(_encrValidatorURL, _encrDestURL);
     }
 
     //function which can edit the cost, length, and hashrate of a given contract
@@ -254,8 +254,8 @@ contract Implementation is Initializable, Escrow {
 
     function resetContractVariablesAndApplyFutureTerms() internal {
         buyer = address(0);
-        encryptedValidatorURL = "";
-        encryptedDestURL = "";
+        encrValidatorURL = "";
+        encrDestURL = "";
         contractState = ContractState.Available;
 
         if(futureTerms._length != 0) {
