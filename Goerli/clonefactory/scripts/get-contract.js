@@ -14,9 +14,11 @@ async function main() {
 
   const Implementation = await ethers.getContractFactory("Implementation");
   const implementation = Implementation.attach(contractAddress);
-  const terms = await implementation.terms()
+  const pubVars = await implementation.getPublicVariablesV2()
+  console.log("Public vars:", pubVars)
 
-  console.log(terms)
+  const destURL = await implementation.encrDestURL()
+  console.log("Encrypted dest url:", destURL)
 }
 
 main()
