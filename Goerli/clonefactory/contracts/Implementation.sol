@@ -86,7 +86,7 @@ contract Implementation is Initializable, Escrow {
             uint256 _startingBlockTimestamp,
             address _buyer,
             address _seller,
-            string memory _encrPoolData,
+            string memory _encryptedPoolData,
             bool _isDeleted,
             uint256 _balance,
             bool _hasFutureTerms,
@@ -120,7 +120,7 @@ contract Implementation is Initializable, Escrow {
             uint256 _startingBlockTimestamp,
             address _buyer,
             address _seller,
-            string memory _encrPoolData,
+            string memory _encryptedPoolData,
             bool _isDeleted,
             uint256 _balance,
             bool _hasFutureTerms
@@ -140,14 +140,17 @@ contract Implementation is Initializable, Escrow {
         );
     }
 
-    function getHistory(uint256 _offset, uint256 _limit) public view returns (HistoryEntry[] memory) {
+    function getHistory(
+        uint256 _offset,
+        uint256 _limit
+    ) public view returns (HistoryEntry[] memory) {
         if (_offset > history.length) {
             _offset = history.length;
         }
         if (_offset + _limit > history.length) {
             _limit = history.length - _offset;
         }
-         
+
         HistoryEntry[] memory values = new HistoryEntry[](_limit);
         for (uint256 i = 0; i < _limit; i++) {
             // return values in reverse historical for displaying purposes
@@ -157,7 +160,11 @@ contract Implementation is Initializable, Escrow {
         return values;
     }
 
-    function getStats() public view returns (uint256 _successCount, uint256 _failCount){
+    function getStats()
+        public
+        view
+        returns (uint256 _successCount, uint256 _failCount)
+    {
         uint256 successCount = 0;
         uint256 failCount = 0;
         for (uint256 i = 0; i < history.length; i++) {
@@ -245,9 +252,23 @@ contract Implementation is Initializable, Escrow {
             "this address is not approved to call this function"
         );
         if (contractState == ContractState.Running) {
-            futureTerms = Terms(_price, _limit, _speed, _length, terms._version + 1, _profitTarget);
+            futureTerms = Terms(
+                _price,
+                _limit,
+                _speed,
+                _length,
+                terms._version + 1,
+                _profitTarget
+            );
         } else {
-            terms = Terms(_price, _limit, _speed, _length, terms._version + 1, _profitTarget);
+            terms = Terms(
+                _price,
+                _limit,
+                _speed,
+                _length,
+                terms._version + 1,
+                _profitTarget
+            );
             emit purchaseInfoUpdated(address(this));
         }
     }
@@ -258,18 +279,29 @@ contract Implementation is Initializable, Escrow {
         encrDestURL = "";
         contractState = ContractState.Available;
 
-        if(futureTerms._length != 0) {
-            terms = Terms(futureTerms._price, futureTerms._limit, futureTerms._speed, futureTerms._length, futureTerms._version, futureTerms._profitTarget);
+        if (futureTerms._length != 0) {
+            terms = Terms(
+                futureTerms._price,
+                futureTerms._limit,
+                futureTerms._speed,
+                futureTerms._length,
+                futureTerms._version,
+                futureTerms._profitTarget
+            );
             futureTerms = Terms(0, 0, 0, 0, 0, 0);
             emit purchaseInfoUpdated(address(this));
         }
     }
 
     function getBuyerPayout() internal view returns (uint256) {
-        uint256 elapsedContractTime = (block.timestamp - startingBlockTimestamp);
+        uint256 elapsedContractTime = (block.timestamp -
+            startingBlockTimestamp);
         if (elapsedContractTime <= terms._length) {
             // order of operations is important as we are dealing with uint256!
-           return terms._price - terms._price * elapsedContractTime / terms._length;
+            return
+                terms._price -
+                (terms._price * elapsedContractTime) /
+                terms._length;
         }
         return 0;
     }
@@ -288,11 +320,22 @@ contract Implementation is Initializable, Escrow {
             );
 
             uint256 buyerPayout = getBuyerPayout();
-            bool comp = block.timestamp - startingBlockTimestamp >= terms._length;
-            history.push(HistoryEntry(comp, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
+            bool comp = block.timestamp - startingBlockTimestamp >=
+                terms._length;
+            history.push(
+                HistoryEntry(
+                    comp,
+                    startingBlockTimestamp,
+                    block.timestamp,
+                    terms._price,
+                    terms._speed,
+                    terms._length,
+                    buyer
+                )
+            );
             resetContractVariablesAndApplyFutureTerms();
             emit contractClosed(buyer);
-            
+
             bool sent = withdrawFundsBuyer(buyerPayout);
             require(sent, "Failed to withdraw funds");
         } else if (closeOutType == 1) {
@@ -307,15 +350,17 @@ contract Implementation is Initializable, Escrow {
             uint256 amountToKeepInEscrow = 0;
 
             if (contractState == ContractState.Running) {
-                // if contract is running we need to keep some funds 
-                // in the escrow for refund if seller cancels contract 
+                // if contract is running we need to keep some funds
+                // in the escrow for refund if seller cancels contract
                 amountToKeepInEscrow = getBuyerPayout();
             }
 
             bool sent = withdrawAllFundsSeller(amountToKeepInEscrow);
             require(sent, "Failed to withdraw funds");
-            
-            sent = CloneFactory(cloneFactory).payMarketplaceFee{value:msg.value}();
+
+            sent = CloneFactory(cloneFactory).payMarketplaceFee{
+                value: msg.value
+            }();
             require(sent, "Failed to pay marketplace withdrawal fee");
         } else if (closeOutType == 2) {
             // this closeoutType is only for the seller to closeout after contract ended
@@ -329,12 +374,21 @@ contract Implementation is Initializable, Escrow {
                 "the contract is not in the running state"
             );
 
-            history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
+            history.push(
+                HistoryEntry(
+                    true,
+                    startingBlockTimestamp,
+                    block.timestamp,
+                    terms._price,
+                    terms._speed,
+                    terms._length,
+                    buyer
+                )
+            );
 
             resetContractVariablesAndApplyFutureTerms();
             emit contractClosed(buyer);
-        }
-        else if (closeOutType == 3){
+        } else if (closeOutType == 3) {
             // this closeoutType is only for the seller to closeout after contract ended
             // and claim all funds collected in the escrow
             require(
@@ -350,14 +404,26 @@ contract Implementation is Initializable, Escrow {
                 "the contract is not in the running state"
             );
 
-            history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
+            history.push(
+                HistoryEntry(
+                    true,
+                    startingBlockTimestamp,
+                    block.timestamp,
+                    terms._price,
+                    terms._speed,
+                    terms._length,
+                    buyer
+                )
+            );
 
             resetContractVariablesAndApplyFutureTerms();
             emit contractClosed(buyer);
 
-            bool sent = CloneFactory(cloneFactory).payMarketplaceFee{value:msg.value}();
+            bool sent = CloneFactory(cloneFactory).payMarketplaceFee{
+                value: msg.value
+            }();
             require(sent, "Failed to pay marketplace withdrawal fee");
-            
+
             sent = withdrawAllFundsSeller(0);
             require(sent, "Failed to withdraw funds");
         } else {
@@ -375,7 +441,7 @@ contract Implementation is Initializable, Escrow {
             isDeleted != _isDeleted,
             "contract delete state is already set to this value"
         );
-        
+
         isDeleted = _isDeleted;
     }
 }
