@@ -1,4 +1,3 @@
-//@ts-check
 import { THPStoHPS, LMRToLMRWithDecimals, hoursToSeconds } from "./utils";
 
 interface AggregatedContractEntry {

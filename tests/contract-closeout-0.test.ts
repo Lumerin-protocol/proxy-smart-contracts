@@ -1,4 +1,3 @@
-//@ts-check
 import { expect } from "chai"
 import ethers from "hardhat"
 import Web3 from "web3"

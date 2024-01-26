@@ -116,7 +116,7 @@ export async function UpdateImplementation(newImplementationContractName: string
 
 export async function ApproveSeller(sellerAddr: string, cloneFactory: any, from: string, log = noop) {
   log(`Approving seller ${sellerAddr}`)
-  await cloneFactory.methods.setAddToWhitelist(sellerAddr).send({ from });
+  await cloneFactory.methods.setAddToWhitelist(sellerAddr).send({ from, gas: 1000000});
   log("Seller approved");
 }
 
@@ -124,7 +124,7 @@ export async function CreateContract(priceDecimalLMR: string, durationSeconds: s
   const pubKey = trimRight64Bytes(remove0xPrefix(fromWallet.publicKey));
   const receipt = await cloneFactory.methods
     .setCreateNewRentalContractV2(priceDecimalLMR, "0", hrGHS, durationSeconds, "0", fromWallet.address, pubKey)
-    .send({ from: fromWallet.address, value: marketplaceFee });
+    .send({ from: fromWallet.address, value: marketplaceFee, gas: 1000000});
   console.log(receipt.events.contractCreated.returnValues._address);
 
   const address = receipt.events.contractCreated.returnValues._address;

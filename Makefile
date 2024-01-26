@@ -7,38 +7,38 @@ test:
 	kill "$$(lsof -t -i:8545)" || true
 	make compile
 	make -B build-js 
-	yarn hardhat node --config hardhat-base.config.ts & ./node-local-deploy.sh && yarn hardhat test --network localhost --config hardhat-base.config.ts tests/*.js
+	yarn hardhat node --config hardhat-base.config.ts & ./node-local-deploy.sh && yarn hardhat test --network localhost --config hardhat-base.config.ts tests/*.ts
 	kill "$$(lsof -t -i:8545)" || true
 
 test-upgrade:
-	yarn hardhat --network localhost --config hardhat-base.config.ts test --bail tests/upgrades/*.js 
+	yarn hardhat --network localhost --config hardhat-base.config.ts test --bail tests/upgrades/*.ts 
 
 compile:
 	yarn hardhat compile --config hardhat-base.config.ts
 
 deploy-lumerin:
-	yarn hardhat run --network default ./scripts/deploy-lumerin.js
+	yarn hardhat run --network default ./scripts/deploy-lumerin.ts
 
 deploy-clonefactory:
-	yarn hardhat run --network default ./scripts/deploy-clonefactory.js
+	yarn hardhat run --network default ./scripts/deploy-clonefactory.ts
 
 deploy-faucet:
-	yarn hardhat run --network default ./scripts/deploy-faucet.js
+	yarn hardhat run --network default ./scripts/deploy-faucet.ts
 
 update-clonefactory:
-	yarn hardhat run --network default ./scripts/update-clonefactory.js
+	yarn hardhat run --network default ./scripts/update-clonefactory.ts
 
 update-implementation:
-	yarn hardhat run --network default ./scripts/update-implementation.js
+	yarn hardhat run --network default ./scripts/update-implementation.ts
 
 populate-contracts:
-	yarn hardhat run --network default ./scripts/populate-contracts.js
+	yarn hardhat run --network default ./scripts/populate-contracts.ts
 
 whitelist-clonefactory:
-	yarn hardhat run --network default ./scripts/whitelist-clonefactory.js
+	yarn hardhat run --network default ./scripts/whitelist-clonefactory.ts
 
 set-fee-recipient:
-	yarn hardhat run --network default ./scripts/set-feeRecipient.js
+	yarn hardhat run --network default ./scripts/set-feeRecipient.ts
 
 build-go:
 	./build-go.sh

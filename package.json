@@ -4,6 +4,9 @@
   "main": "index.js",
   "author": "Oleksandr Shevchuk <shev@titan.io>",
   "license": "MIT",
+  "engines": {
+    "node": "20.10.0"
+  },
   "devDependencies": {
     "@biomejs/biome": "1.5.3",
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
@@ -32,6 +35,6 @@
     "ecies-geth": "^1.7.0",
     "hardhat-abi-exporter": "^2.10.1",
     "wait-on": "^7.2.0",
-    "web3": "^4.4.0"
+    "web3": "^1.7.4"
   }
 }
