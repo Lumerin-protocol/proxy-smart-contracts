@@ -30,7 +30,7 @@ stages:
 
 variables:
   CI_GROUP_ID: "15533332" # id of the proxy group
-  NODE_IMAGE: "node:16-buster"
+  NODE_IMAGE: "node:20-buster"
 
 # Sets ENV_NAME=ENV_VALUE in shell and in gitlab ci group variables
 # ENV_NAME - variable name
