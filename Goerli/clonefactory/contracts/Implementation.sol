@@ -16,12 +16,12 @@ contract Implementation is Initializable, Escrow {
     address public seller; // address of the seller of the contract
     address public cloneFactory;
     address public validator; // address of the validator, can close out contract early, if empty - no validator (buyer node)
-    string public encryptedValidatorURL; // if using own validator (buyer-node) this will be the encrypted buyer address. Encrypted with the seller's public key
+    string public encrValidatorURL; // if using own validator (buyer-node) this will be the encrypted buyer address. Encrypted with the seller's public key
     string public pubKey; // encrypted data for pool target info
     bool public isDeleted; // used to track if the contract is deleted, separate variable to account for the possibility of a contract being deleted when it is still running
     HistoryEntry[] public history;
     Terms public futureTerms;
-    string public encryptedDestURL; // where to redirect the hashrate after validation (for both third-party validator and buyer-node) If empty, then the hashrate will be redirected to the default pool of the buyer node
+    string public encrDestURL; // where to redirect the hashrate after validation (for both third-party validator and buyer-node) If empty, then the hashrate will be redirected to the default pool of the buyer node
 
     enum ContractState {
         Available,
@@ -103,7 +103,7 @@ contract Implementation is Initializable, Escrow {
             startingBlockTimestamp,
             buyer,
             seller,
-            encryptedValidatorURL,
+            encrValidatorURL,
             isDeleted,
             lumerin.balanceOf(address(this)),
             hasFutureTerms,
@@ -133,21 +133,24 @@ contract Implementation is Initializable, Escrow {
             startingBlockTimestamp,
             buyer,
             seller,
-            encryptedValidatorURL,
+            encrValidatorURL,
             isDeleted,
             lumerin.balanceOf(address(this)),
             hasFutureTerms
         );
     }
 
-    function getHistory(uint256 _offset, uint256 _limit) public view returns (HistoryEntry[] memory) {
+    function getHistory(
+        uint256 _offset,
+        uint256 _limit
+    ) public view returns (HistoryEntry[] memory) {
         if (_offset > history.length) {
             _offset = history.length;
         }
         if (_offset + _limit > history.length) {
             _limit = history.length - _offset;
         }
-         
+
         HistoryEntry[] memory values = new HistoryEntry[](_limit);
         for (uint256 i = 0; i < _limit; i++) {
             // return values in reverse historical for displaying purposes
@@ -157,7 +160,11 @@ contract Implementation is Initializable, Escrow {
         return values;
     }
 
-    function getStats() public view returns (uint256 _successCount, uint256 _failCount){
+    function getStats()
+        public
+        view
+        returns (uint256 _successCount, uint256 _failCount)
+    {
         uint256 successCount = 0;
         uint256 failCount = 0;
         for (uint256 i = 0; i < history.length; i++) {
@@ -172,8 +179,8 @@ contract Implementation is Initializable, Escrow {
 
     //function that the clone factory calls to purchase the contract
     function setPurchaseContract(
-        string calldata _encryptedValidatorURL,
-        string calldata _encryptedDestURL,
+        string calldata _encrValidatorURL,
+        string calldata _encrDestURL,
         address _buyer,
         address _validator
     ) public {
@@ -185,8 +192,8 @@ contract Implementation is Initializable, Escrow {
             contractState == ContractState.Available,
             "contract is not in an available state"
         );
-        encryptedValidatorURL = _encryptedValidatorURL;
-        encryptedDestURL = _encryptedDestURL;
+        encrValidatorURL = _encrValidatorURL;
+        encrDestURL = _encrDestURL;
         buyer = _buyer;
         validator = _validator;
         startingBlockTimestamp = block.timestamp;
@@ -208,15 +215,15 @@ contract Implementation is Initializable, Escrow {
             contractState == ContractState.Running,
             "the contract is not in the running state"
         );
-        encryptedValidatorURL = _newEncryptedPoolData;
+        encrValidatorURL = _newEncryptedPoolData;
         emit cipherTextUpdated(_newEncryptedPoolData);
     }
 
     // allows the buyer to update the mining destination in the middle of the contract
     // this is V2 of the function setUpdateMiningInformation
     function setDestination(
-        string calldata _encryptedValidatorURL,
-        string calldata _encryptedDestURL
+        string calldata _encrValidatorURL,
+        string calldata _encrDestURL
     ) external {
         require(
             msg.sender == buyer,
@@ -226,10 +233,10 @@ contract Implementation is Initializable, Escrow {
             contractState == ContractState.Running,
             "the contract is not in the running state"
         );
-        encryptedDestURL = _encryptedDestURL;
-        encryptedValidatorURL = _encryptedValidatorURL;
-        emit cipherTextUpdated(_encryptedValidatorURL); // DEPRECATED, will be removed in future versions
-        emit destinationUpdated(_encryptedValidatorURL, _encryptedDestURL);
+        encrDestURL = _encrDestURL;
+        encrValidatorURL = _encrValidatorURL;
+        emit cipherTextUpdated(_encrValidatorURL); // DEPRECATED, will be removed in future versions
+        emit destinationUpdated(_encrValidatorURL, _encrDestURL);
     }
 
     //function which can edit the cost, length, and hashrate of a given contract
@@ -245,31 +252,56 @@ contract Implementation is Initializable, Escrow {
             "this address is not approved to call this function"
         );
         if (contractState == ContractState.Running) {
-            futureTerms = Terms(_price, _limit, _speed, _length, terms._version + 1, _profitTarget);
+            futureTerms = Terms(
+                _price,
+                _limit,
+                _speed,
+                _length,
+                terms._version + 1,
+                _profitTarget
+            );
         } else {
-            terms = Terms(_price, _limit, _speed, _length, terms._version + 1, _profitTarget);
+            terms = Terms(
+                _price,
+                _limit,
+                _speed,
+                _length,
+                terms._version + 1,
+                _profitTarget
+            );
             emit purchaseInfoUpdated(address(this));
         }
     }
 
     function resetContractVariablesAndApplyFutureTerms() internal {
         buyer = address(0);
-        encryptedValidatorURL = "";
-        encryptedDestURL = "";
+        encrValidatorURL = "";
+        encrDestURL = "";
         contractState = ContractState.Available;
 
-        if(futureTerms._length != 0) {
-            terms = Terms(futureTerms._price, futureTerms._limit, futureTerms._speed, futureTerms._length, futureTerms._version, futureTerms._profitTarget);
+        if (futureTerms._length != 0) {
+            terms = Terms(
+                futureTerms._price,
+                futureTerms._limit,
+                futureTerms._speed,
+                futureTerms._length,
+                futureTerms._version,
+                futureTerms._profitTarget
+            );
             futureTerms = Terms(0, 0, 0, 0, 0, 0);
             emit purchaseInfoUpdated(address(this));
         }
     }
 
     function getBuyerPayout() internal view returns (uint256) {
-        uint256 elapsedContractTime = (block.timestamp - startingBlockTimestamp);
+        uint256 elapsedContractTime = (block.timestamp -
+            startingBlockTimestamp);
         if (elapsedContractTime <= terms._length) {
             // order of operations is important as we are dealing with uint256!
-           return terms._price - terms._price * elapsedContractTime / terms._length;
+            return
+                terms._price -
+                (terms._price * elapsedContractTime) /
+                terms._length;
         }
         return 0;
     }
@@ -288,11 +320,22 @@ contract Implementation is Initializable, Escrow {
             );
 
             uint256 buyerPayout = getBuyerPayout();
-            bool comp = block.timestamp - startingBlockTimestamp >= terms._length;
-            history.push(HistoryEntry(comp, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
+            bool comp = block.timestamp - startingBlockTimestamp >=
+                terms._length;
+            history.push(
+                HistoryEntry(
+                    comp,
+                    startingBlockTimestamp,
+                    block.timestamp,
+                    terms._price,
+                    terms._speed,
+                    terms._length,
+                    buyer
+                )
+            );
             resetContractVariablesAndApplyFutureTerms();
             emit contractClosed(buyer);
-            
+
             bool sent = withdrawFundsBuyer(buyerPayout);
             require(sent, "Failed to withdraw funds");
         } else if (closeOutType == 1) {
@@ -307,15 +350,17 @@ contract Implementation is Initializable, Escrow {
             uint256 amountToKeepInEscrow = 0;
 
             if (contractState == ContractState.Running) {
-                // if contract is running we need to keep some funds 
-                // in the escrow for refund if seller cancels contract 
+                // if contract is running we need to keep some funds
+                // in the escrow for refund if seller cancels contract
                 amountToKeepInEscrow = getBuyerPayout();
             }
 
             bool sent = withdrawAllFundsSeller(amountToKeepInEscrow);
             require(sent, "Failed to withdraw funds");
-            
-            sent = CloneFactory(cloneFactory).payMarketplaceFee{value:msg.value}();
+
+            sent = CloneFactory(cloneFactory).payMarketplaceFee{
+                value: msg.value
+            }();
             require(sent, "Failed to pay marketplace withdrawal fee");
         } else if (closeOutType == 2) {
             // this closeoutType is only for the seller to closeout after contract ended
@@ -329,12 +374,21 @@ contract Implementation is Initializable, Escrow {
                 "the contract is not in the running state"
             );
 
-            history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
+            history.push(
+                HistoryEntry(
+                    true,
+                    startingBlockTimestamp,
+                    block.timestamp,
+                    terms._price,
+                    terms._speed,
+                    terms._length,
+                    buyer
+                )
+            );
 
             resetContractVariablesAndApplyFutureTerms();
             emit contractClosed(buyer);
-        }
-        else if (closeOutType == 3){
+        } else if (closeOutType == 3) {
             // this closeoutType is only for the seller to closeout after contract ended
             // and claim all funds collected in the escrow
             require(
@@ -350,14 +404,26 @@ contract Implementation is Initializable, Escrow {
                 "the contract is not in the running state"
             );
 
-            history.push(HistoryEntry(true, startingBlockTimestamp, block.timestamp, terms._price, terms._speed, terms._length, buyer));
+            history.push(
+                HistoryEntry(
+                    true,
+                    startingBlockTimestamp,
+                    block.timestamp,
+                    terms._price,
+                    terms._speed,
+                    terms._length,
+                    buyer
+                )
+            );
 
             resetContractVariablesAndApplyFutureTerms();
             emit contractClosed(buyer);
 
-            bool sent = CloneFactory(cloneFactory).payMarketplaceFee{value:msg.value}();
+            bool sent = CloneFactory(cloneFactory).payMarketplaceFee{
+                value: msg.value
+            }();
             require(sent, "Failed to pay marketplace withdrawal fee");
-            
+
             sent = withdrawAllFundsSeller(0);
             require(sent, "Failed to withdraw funds");
         } else {
@@ -375,7 +441,7 @@ contract Implementation is Initializable, Escrow {
             isDeleted != _isDeleted,
             "contract delete state is already set to this value"
         );
-        
+
         isDeleted = _isDeleted;
     }
 }

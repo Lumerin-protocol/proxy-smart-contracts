@@ -61,8 +61,8 @@ describe("Contract purchase", function () {
     await cf.methods.setPurchaseRentalContractV2(hrContractAddr, validatorAddr, encValidatorURL.toString('hex'), encDestURL.toString('hex'), _version)
       .send({ from: buyer, value: fee })
 
-    const actValidatorURL = await impl.methods.encryptedValidatorURL().call()
-    const actDestURL = await impl.methods.encryptedDestURL().call()
+    const actValidatorURL = await impl.methods.encrValidatorURL().call()
+    const actDestURL = await impl.methods.encrDestURL().call()
     const actValidatorAddr = await impl.methods.validator().call()
 
     expect(actValidatorURL).equal(encValidatorURL.toString('hex'))
@@ -86,8 +86,8 @@ describe("Contract purchase", function () {
       .send({ from: buyer, value: fee })
 
 
-    const actValidatorURL = await impl.methods.encryptedValidatorURL().call()
-    const actDestURL = await impl.methods.encryptedDestURL().call()
+    const actValidatorURL = await impl.methods.encrValidatorURL().call()
+    const actDestURL = await impl.methods.encrDestURL().call()
     const actValidatorAddr = await impl.methods.validator().call()
 
     expect(actValidatorURL).equal(encValidatorURL.toString('hex'))

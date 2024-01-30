@@ -82,3 +82,6 @@ node-local:
 
 node-local-deploy:
 	./node-local-deploy.sh
+
+node-local-update:
+	./node-local-update.sh

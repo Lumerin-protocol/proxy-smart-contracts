@@ -232,20 +232,24 @@ test:
     - cd ./Goerli/clonefactory/ && yarn install
     - make test
 
-test-upgrade:
-  environment: test
-  stage: test
-  image: $NODE_IMAGE
-  tags: *tags-dev
-  allow_failure: false
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-  script:
-    - cd ./Goerli/clonefactory/
-    - yarn install
-    - make compile
-    - make build-js
-    - BRANCH_TO_TEST_AGAINST=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME make test-upgrade
+# TODO: decide how to run upgrade tests when we have different versions of the smart-contract in the target branch
+# it could be done by running the upgrade tests against particular commit, or maybe by using predefined scripts versioned
+# together with the particular smart-contract version
+#
+# test-upgrade:
+#   environment: test
+#   stage: test
+#   image: $NODE_IMAGE
+#   tags: *tags-dev
+#   allow_failure: false
+#   rules:
+#     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+#   script:
+#     - cd ./Goerli/clonefactory/
+#     - yarn install
+#     - make compile
+#     - make build-js
+#     - BRANCH_TO_TEST_AGAINST=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME make test-upgrade
 
 deploy-lumerintoken-dev:
   <<: *deploy_lumerintoken_dev_stg

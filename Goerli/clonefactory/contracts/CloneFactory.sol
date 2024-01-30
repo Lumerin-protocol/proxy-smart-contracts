@@ -139,28 +139,28 @@ contract CloneFactory is Initializable {
     //
     // for using self-hosted validator (buyer-node) set
     //   _validatorAddress to address(0)
-    //   _encValidatorURL to node public address encrypted with seller pubkey
-    //   _encDestURL to your target pool encrypted with buyer pubkey, if empty, default buyer pool should be used
+    //   _encrValidatorURL to node public address encrypted with seller pubkey
+    //   _encrDestURL to your target pool encrypted with buyer pubkey, if empty, default buyer pool should be used
     //
     // for using lumerin validator set
     //   _validatorAddress to lumerin validator address
-    //   _encValidatorURL to lumerin validator public url encrypted with seller pubkey
-    //   _encDestURL to your target pool encrypted with validator pubkey
+    //   _encrValidatorURL to lumerin validator public url encrypted with seller pubkey
+    //   _encrDestURL to your target pool encrypted with validator pubkey
     function setPurchaseRentalContractV2(
         address _contractAddress,
         address _validatorAddress,
-        string calldata _encValidatorURL,
-        string calldata _encDestURL,
+        string calldata _encrValidatorURL,
+        string calldata _encrDestURL,
         uint32 termsVersion
     ) external payable sufficientFee {
-        purchaseContract(_contractAddress, _validatorAddress, _encValidatorURL, _encDestURL, termsVersion);
+        purchaseContract(_contractAddress, _validatorAddress, _encrValidatorURL, _encrDestURL, termsVersion);
     }
 
     function purchaseContract(
         address _contractAddress,
         address _validatorAddress,
-        string memory _encValidatorURL,
-        string memory _encDestURL,
+        string memory _encrValidatorURL,
+        string memory _encrDestURL,
         uint32 termsVersion
     ) internal {
         // TODO: add a test case so any third-party implementations will be discarded
@@ -199,8 +199,8 @@ contract CloneFactory is Initializable {
         require(tokensTransfered, "lumerin transfer failed");
 
         targetContract.setPurchaseContract(
-            _encValidatorURL,
-            _encDestURL,
+            _encrValidatorURL,
+            _encrDestURL,
             msg.sender,
             _validatorAddress
         );
