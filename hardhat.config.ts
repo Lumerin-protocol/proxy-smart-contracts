@@ -1,7 +1,5 @@
 import base from "./hardhat-base.config";
 import type { HardhatUserConfig } from "hardhat/config";
-import "@nomicfoundation/hardhat-toolbox";
-import "@openzeppelin/hardhat-upgrades";
 
 // #TODO put to default config content from base config and introduce a new config file hardhat-network.config.ts
 
