@@ -17,6 +17,7 @@ export FEE_RECIPIENT_ADDRESS="0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 export FAUCET_DAILY_MAX_LMR=80000000000 # 800 LMR
 export FAUCET_LMR_PAYOUT=200000000 # 2 LMR
 export FAUCET_ETH_PAYOUT=10000000000000000 # 0.01 ETH
+export BUILD_FULL_MARKETPLACE=false
 
 # deploy lumerin token
 yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/deploy-lumerin.ts

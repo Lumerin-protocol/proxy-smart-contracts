@@ -10,7 +10,8 @@ import { HttpNetworkConfig } from "hardhat/types"
 async function main() {
   console.log("Contracts population script")
 
-  const env = requireEnvsSet("CLONE_FACTORY_ADDRESS", "SELLER_PRIVATEKEY", "BUILD_FULL_MARKETPLACE")
+  const env = requireEnvsSet("CLONE_FACTORY_ADDRESS", "SELLER_PRIVATEKEY")
+  const buildFullMarketplace = process.env.BUILD_FULL_MARKETPLACE === "true"
 
   const seller = new Wallet(env.SELLER_PRIVATEKEY).connect(ethers.provider)
   console.log("Deploying contracts with the seller account:", seller.address);
@@ -22,7 +23,7 @@ async function main() {
   web3.eth.accounts.wallet.create(0).add(account)
   const cf = CloneFactory(web3, env.CLONE_FACTORY_ADDRESS)
 
-  const contractList = buildContractsList(env.BUILD_FULL_MARKETPLACE === "true");
+  const contractList = buildContractsList(buildFullMarketplace);
   const fee = await cf.methods.marketplaceFee().call()
   console.log(`Marketplace fee: ${fee} wei`);
 
