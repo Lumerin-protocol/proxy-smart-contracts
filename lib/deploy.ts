@@ -41,7 +41,7 @@ export async function DeployCloneFactory(lumerinAddr: string, deployerPkey: stri
 	const CloneFactory = await ethers.getContractFactory("CloneFactory", deployer);
 	const cloneFactory = await upgrades.deployProxy(CloneFactory, [
 			impl.address,
-			process.env.LUMERIN_TOKEN_ADDRESS,
+			lumerinAddr,
 			feeRecipientAddress,
 		], { unsafeAllow: ["constructor"] },
 	);

@@ -22,8 +22,8 @@ describe("Clonefactory update", function () {
   let createdContractAddr = "";
 
   it("should deploy a new clonefactory", async () => {
-    ({ address: lumerinAddr } = await DeployLumerin(deployerPrivateKey));
-    ({ address: cloneFactoryAddr } = await DeployCloneFactory(lumerinAddr, deployerPrivateKey, feeRecipientAddress));
+    ({ address: lumerinAddr } = await DeployLumerin(deployerPrivateKey, console.log));
+    ({ address: cloneFactoryAddr } = await DeployCloneFactory(lumerinAddr, deployerPrivateKey, feeRecipientAddress, console.log));
 
     const cloneFactory = CloneFactory(web3, cloneFactoryAddr);
     const list = await cloneFactory.methods.getContractList().call();
