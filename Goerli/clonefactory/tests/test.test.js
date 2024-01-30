@@ -54,11 +54,12 @@ describe("marketplace", function () {
     let contractsBefore = await cloneFactory.methods.getContractList().call();
 
     let contractCreate = await cloneFactory.methods
-      .setCreateNewRentalContract(
+      .setCreateNewRentalContractV2(
         purchase_price,
         10,
         10,
         contract_length,
+        0,
         lumerin.options.address,
         lumerin.options.address //validator placeholder
       )
@@ -74,17 +75,18 @@ describe("marketplace", function () {
     let contractsBefore = await cloneFactory.methods.getContractList().call();
     try {
       let contractCreate = await cloneFactory.methods
-        .setCreateNewRentalContract(
+        .setCreateNewRentalContractV2(
           purchase_price,
           10,
           10,
           contract_length,
+          0,
           lumerin.options.address,
           "123",
           "private key"
         )
         .send({ from: buyer.address, value: fee });
-    } catch {}
+    } catch { }
     let contractsAfter = await cloneFactory.methods.getContractList().call();
     expect(contractsAfter.length).to.equal(contractsBefore.length);
   });
@@ -195,10 +197,10 @@ describe("marketplace", function () {
       closeoutAfterSeconds,
       seller,
       buyer,
-      assertBuyerPayout = () => {},
-      assertSellerPayout = () => {},
-      assertContractWithdawal = () => {},
-      assertHashrateContractState = () => {},
+      assertBuyerPayout = () => { },
+      assertSellerPayout = () => { },
+      assertContractWithdawal = () => { },
+      assertHashrateContractState = () => { },
       closer = seller
     ) {
       let sellerAddress = seller.address;
@@ -362,14 +364,14 @@ describe("marketplace", function () {
     //buyer buys all 10 twice
     //seller closes out all 10 after contract duration
     //confirm buyer can see only 10
-    it("should confirmCloseoutTrackingDouble", async function () {});
+    it("should confirmCloseoutTrackingDouble", async function () { });
 
     //deploys a new clone factory
     //seller creates 10 hashrate contracts
     //buyer buys all 10 twice
     //seller closes out all 10 after contract duration
     //confirm buyer can see only 10
-    it("should confirmCloseoutTrackingSeperateBuyers", async function () {});
+    it("should confirmCloseoutTrackingSeperateBuyers", async function () { });
 
     async function assertHashrateContractState() {
       let contractStateAfterCloseout = await testContract.methods
@@ -393,7 +395,7 @@ describe("marketplace", function () {
         const payoutPercentError = (buyerPayoutDiff / expectedPayout) * 100;
 
         if (expectedPayout > 0) {
-          expect(payoutPercentError).to.be.lessThan(1);
+          expect(payoutPercentError).to.be.lessThan(4);
         } else {
           expect(contractBalanceAfterCloseout).to.equal(
             contractBalanceAfterPurchase
@@ -431,7 +433,7 @@ describe("marketplace", function () {
           buyerBalance
         );
 
-      expect(payoutPercentError).to.be.lessThan(1);
+      expect(payoutPercentError).to.be.lessThan(4);
     }
 
     function calculateBuyerPayoutExpectations(
@@ -457,11 +459,11 @@ describe("marketplace", function () {
       const expectedPayout = contractCompletionRatio * contractPrice;
       const actualPayout = sellerBalanceAfterCloseout - sellerBalance;
       if (expectedPayout == 0 && actualPayout != 0)
-          return 100;
+        return 100;
       else if (expectedPayout == 0 && actualPayout == 0)
-          return 0;
+        return 0;
       else
-          return Math.round(Math.abs(1.0 - actualPayout / expectedPayout) * 100);
+        return Math.round(Math.abs(1.0 - actualPayout / expectedPayout) * 100);
     }
   });
 

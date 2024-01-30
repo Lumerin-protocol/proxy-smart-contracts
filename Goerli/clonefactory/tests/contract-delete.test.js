@@ -30,7 +30,7 @@ describe("Contract delete", function () {
   })
 
   it("should create contract and check its status", async function () {
-    const receipt = await cf.methods.setCreateNewRentalContract("1", "0", "1", "3600", cloneFactoryAddress, "123").send({ from: seller, value: fee })
+    const receipt = await cf.methods.setCreateNewRentalContractV2("1", "0", "1", "3600", "0", cloneFactoryAddress, "123").send({ from: seller, value: fee })
     hrContractAddr = receipt.events?.contractCreated.returnValues._address;
     const impl = Implementation(web3, hrContractAddr)
     const data = await impl.methods.getPublicVariables().call()

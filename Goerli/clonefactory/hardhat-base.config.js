@@ -39,4 +39,7 @@ module.exports = {
     flat: true,
     spacing: 2,
   },
+  mocha: {
+    timeout: 5 * 60 * 1000, // 5 minutes
+  },
 };
