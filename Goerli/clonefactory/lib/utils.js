@@ -6,8 +6,8 @@ const remove0xPrefix = privateKey => privateKey.replace('0x', '');
 
 /** @param {string} publicKeyHex */
 const trimRight64Bytes = publicKeyHex => {
-  if (publicKeyHex.length === 130) {
-    return publicKeyHex.slice(2);
+  if (publicKeyHex.length > 128) {
+    return publicKeyHex.slice(-128);
   }
   return publicKeyHex;
 }
