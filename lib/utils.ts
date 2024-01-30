@@ -37,15 +37,11 @@ export function hoursToSeconds(hours: number) {
 export function noop(...args: any[]) {}
 
 /** Returns true if all specified env variables are set */
-export function requireEnvsSet<T extends string | number | symbol>(...envs:[T, ...T[]]): Record<typeof envs[number], string> {
+export function requireEnvsSet<T extends string>(...envs:[T, ...T[]]): Record<typeof envs[number], string> {
   for (const envName of envs){
-    requireTruthyString(process.env[envName]);
+    if (!process.env[envName]) {
+      throw new Error(`Environment variable ${envName} is required but not set`);
+    }
   }
   return process.env as Record<typeof envs[number], string>;
-}
-
-export function requireTruthyString(value: string | undefined): asserts value is string{
-  if (!value) {
-    throw new Error(`Environment variable ${value} is required but not set`);
-  }
 }
