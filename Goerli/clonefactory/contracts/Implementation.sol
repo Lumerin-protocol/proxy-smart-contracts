@@ -27,7 +27,6 @@ contract Implementation is Initializable, Escrow {
         Running
     }
 
-
     struct Terms {
         uint256 _price; // cost to purchase contract
         uint256 _limit; // variable used to aid in the lumerin nodes decision making // Not used anywhere

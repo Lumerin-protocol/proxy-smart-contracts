@@ -43,7 +43,6 @@ async function main() {
   console.log(`Purchasing contract: ${contractAddress}`);
   console.log(`Using buyer address: ${buyer.address}`);
   console.log("\n");
-
   const CloneFactory = await ethers.getContractFactory("CloneFactory");
   const cloneFactory = CloneFactory.attach(cloneFactoryAddress);
   console.log("Using account:", buyer.address);

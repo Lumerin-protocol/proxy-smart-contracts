@@ -877,9 +877,9 @@
   integrity sha512-He3LieZ1pP2TNt5JbkPA4PNT9WC3gOTOlDcFGJW4Le4QKqwmiNJCRt44APfxMxvq7OugU/cqYuPcSBzOw38DAg==
 
 "@openzeppelin/defender-base-client@^1.46.0":
-  version "1.52.0"
-  resolved "https://registry.yarnpkg.com/@openzeppelin/defender-base-client/-/defender-base-client-1.52.0.tgz#7a000eeba9705c75e6be5de5d32e07d377aed55d"
-  integrity sha512-VFNu/pjVpAnFKIfuKT1cn9dRpbcO8FO8EAmVZ2XrrAsKXEWDZ3TNBtACxmj7fAu0ad/TzRkb66o5rMts7Fv7jw==
+  version "1.47.0"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/defender-base-client/-/defender-base-client-1.47.0.tgz#f9d47f4cf0a75b4e4e5139dec780a3f26f5e2019"
+  integrity sha512-y9dDm+gX0MHHEn17W7f7oO3X083JAVMk3YcuXHavSE7kjiCLoFOaZ23joYqoHeaccL10nGt7KOOzZ0sh9iJHTQ==
   dependencies:
     amazon-cognito-identity-js "^6.0.1"
     async-retry "^1.3.3"
@@ -911,18 +911,18 @@
     node-fetch "^2.6.0"
 
 "@openzeppelin/upgrades-core@^1.27.0":
-  version "1.31.1"
-  resolved "https://registry.yarnpkg.com/@openzeppelin/upgrades-core/-/upgrades-core-1.31.1.tgz#d4f9ff703c4006d45c02e08819357a4f92860b8b"
-  integrity sha512-BdkTZwvBxgZ9BYYfhOhuivmqZLOZ/bm6mK5eEDZ36I3Fy64a9BDL/NusaDV5XAoGn4La/j9dZSbTtgP/6d8jAQ==
+  version "1.27.3"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/upgrades-core/-/upgrades-core-1.27.3.tgz#d5578e3a3ccd18a61fc585945be67951480238b5"
+  integrity sha512-IqlSMUkno1XKF4L46aUqZ4BqHxj4dF0BRGrFcKeG2Q0vrsKoazhY67JG9bO+wMYG4zxl6jgmG0bd5ef9HLcLmw==
   dependencies:
-    cbor "^9.0.0"
+    cbor "^8.0.0"
     chalk "^4.1.0"
     compare-versions "^6.0.0"
     debug "^4.1.1"
     ethereumjs-util "^7.0.3"
     minimist "^1.2.7"
     proper-lockfile "^4.1.1"
-    solidity-ast "^0.4.51"
+    solidity-ast "^0.4.15"
 
 "@resolver-engine/core@^0.3.3":
   version "0.3.3"
@@ -1558,17 +1558,6 @@ array-unique@^0.3.2:
   resolved "https://registry.yarnpkg.com/array-unique/-/array-unique-0.3.2.tgz#a894b75d4bc4f6cd679ef3244a9fd8f46ae2d428"
   integrity sha512-SleRWjh9JUud2wH1hPs9rZBZ33H6T9HOiL0uwGnGx9FpE6wKGyfWugmbkEOIs6qWrZhg0LWeLziLrEwQJhs5mQ==
 
-array.prototype.findlast@^1.2.2:
-  version "1.2.3"
-  resolved "https://registry.yarnpkg.com/array.prototype.findlast/-/array.prototype.findlast-1.2.3.tgz#4e4b375de5adf4897fed155e2d2771564865cc3b"
-  integrity sha512-kcBubumjciBg4JKp5KTKtI7ec7tRefPk88yjkWJwaVKYd9QfTaxcsOxoMNKd7iBr447zCfDV0z1kOF47umv42g==
-  dependencies:
-    call-bind "^1.0.2"
-    define-properties "^1.2.0"
-    es-abstract "^1.22.1"
-    es-shim-unscopables "^1.0.0"
-    get-intrinsic "^1.2.1"
-
 array.prototype.reduce@^1.0.6:
   version "1.0.6"
   resolved "https://registry.yarnpkg.com/array.prototype.reduce/-/array.prototype.reduce-1.0.6.tgz#63149931808c5fc1e1354814923d92d45f7d96d5"
@@ -1705,7 +1694,16 @@ axios@^0.21.2:
   dependencies:
     follow-redirects "^1.14.0"
 
-axios@^1.4.0, axios@^1.6.1:
+axios@^1.4.0:
+  version "1.4.0"
+  resolved "https://registry.yarnpkg.com/axios/-/axios-1.4.0.tgz#38a7bf1224cd308de271146038b551d725f0be1f"
+  integrity sha512-S4XCWMEmzvo64T9GfvQDOXgYRDJ/wsSZc7Jvdgx5u1sd0JwsuPLqb3SYmusag+edF6ziyMensPVqLTSc1PiSEA==
+  dependencies:
+    follow-redirects "^1.15.0"
+    form-data "^4.0.0"
+    proxy-from-env "^1.1.0"
+
+axios@^1.6.1:
   version "1.6.2"
   resolved "https://registry.yarnpkg.com/axios/-/axios-1.6.2.tgz#de67d42c755b571d3e698df1b6504cde9b0ee9f2"
   integrity sha512-7i24Ri4pmDRfJTR7LDBhsOTtcm+9kjX5WiY1X3wIisx6G9So3pfMkEiU7emUBe46oceVImccTEM3k6C5dbVW8A==
@@ -2677,17 +2675,10 @@ catering@^2.1.0, catering@^2.1.1:
   resolved "https://registry.yarnpkg.com/catering/-/catering-2.1.1.tgz#66acba06ed5ee28d5286133982a927de9a04b510"
   integrity sha512-K7Qy8O9p76sL3/3m7/zLKbRkyOlSZAgzEaLhyj2mXS8PsCud2Eo4hAb8aLtZqHh0QGqLcb9dlJSu6lHRVENm1w==
 
-cbor@^8.1.0:
+cbor@^8.0.0, cbor@^8.1.0:
   version "8.1.0"
   resolved "https://registry.yarnpkg.com/cbor/-/cbor-8.1.0.tgz#cfc56437e770b73417a2ecbfc9caf6b771af60d5"
   integrity sha512-DwGjNW9omn6EwP70aXsn7FQJx5kO12tX0bZkaTjzdVFM6/7nhA4t0EENocKGx6D2Bch9PE2KzCUf5SceBdeijg==
-  dependencies:
-    nofilter "^3.1.0"
-
-cbor@^9.0.0:
-  version "9.0.1"
-  resolved "https://registry.yarnpkg.com/cbor/-/cbor-9.0.1.tgz#b16e393d4948d44758cd54ac6151379d443b37ae"
-  integrity sha512-/TQOWyamDxvVIv+DY9cOLNuABkoyz8K/F3QE56539pGVYohx0+MEA1f4lChFTX79dBTBS7R1PF6ovH7G+VtBfQ==
   dependencies:
     nofilter "^3.1.0"
 
@@ -3517,13 +3508,6 @@ es-set-tostringtag@^2.0.1:
   dependencies:
     get-intrinsic "^1.2.2"
     has-tostringtag "^1.0.0"
-    hasown "^2.0.0"
-
-es-shim-unscopables@^1.0.0:
-  version "1.0.2"
-  resolved "https://registry.yarnpkg.com/es-shim-unscopables/-/es-shim-unscopables-1.0.2.tgz#1f6942e71ecc7835ed1c8a83006d8771a63a3763"
-  integrity sha512-J3yBRXCzDu4ULnQwxyToo/OjdMx6akgVC7K6few0a7F/0wLtmKKN7I73AH5T2836UuXRqN7Qg+IIUw/+YJksRw==
-  dependencies:
     hasown "^2.0.0"
 
 es-to-primitive@^1.2.1:
@@ -7918,12 +7902,10 @@ solc@^0.6.3:
     semver "^5.5.0"
     tmp "0.0.33"
 
-solidity-ast@^0.4.51:
-  version "0.4.53"
-  resolved "https://registry.yarnpkg.com/solidity-ast/-/solidity-ast-0.4.53.tgz#098259472fccd234ff00f050afaf7843a7ccd635"
-  integrity sha512-/7xYF//mAt4iP9S21fCFSLMouYXzXJqrd84jbI1LHL1rq7XhyFLUXxVcRkl9KqEEQmI+DmDbTeS6W5cEwcJ2wQ==
-  dependencies:
-    array.prototype.findlast "^1.2.2"
+solidity-ast@^0.4.15:
+  version "0.4.49"
+  resolved "https://registry.yarnpkg.com/solidity-ast/-/solidity-ast-0.4.49.tgz#ecba89d10c0067845b7848c3a3e8cc61a4fc5b82"
+  integrity sha512-Pr5sCAj1SFqzwFZw1HPKSq0PehlQNdM8GwKyAVYh2DOn7/cCK8LUKD1HeHnKtTgBW7hi9h4nnnan7hpAg5RhWQ==
 
 solidity-comments-extractor@^0.0.7:
   version "0.0.7"
@@ -8429,10 +8411,15 @@ tslib@^1.11.1, tslib@^1.9.3:
   resolved "https://registry.yarnpkg.com/tslib/-/tslib-1.14.1.tgz#cf2d38bdc34a134bcaf1091c41f6619e2f672d00"
   integrity sha512-Xni35NKzjgMrwevysHTCArtLDpPvye8zV/0E4EyYn43P7/7qvQwPh9BGkHewbMulVntbigmcT7rdX3BNo9wRJg==
 
-tslib@^2.1.0, tslib@^2.3.1, tslib@^2.5.0:
+tslib@^2.1.0:
   version "2.6.2"
   resolved "https://registry.yarnpkg.com/tslib/-/tslib-2.6.2.tgz#703ac29425e7b37cd6fd456e92404d46d1f3e4ae"
   integrity sha512-AEYxH93jGFPn/a2iVAwW87VuUIkR1FVUKB77NwMF7nBTDkDrrT/Hpt/IrCJ0QXhW27jTBDcf5ZY7w6RiqTMw2Q==
+
+tslib@^2.3.1, tslib@^2.5.0:
+  version "2.6.0"
+  resolved "https://registry.yarnpkg.com/tslib/-/tslib-2.6.0.tgz#b295854684dbda164e181d259a22cd779dcd7bc3"
+  integrity sha512-7At1WUettjcSRHXCyYtTselblcHl9PJFFVKiCAy/bY97+BPZXSQ2wbq0P9s8tK2G7dFQfNnlJnPAiArVBVBsfA==
 
 tsort@0.0.1:
   version "0.0.1"
