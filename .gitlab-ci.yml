@@ -195,7 +195,10 @@ build-contracts-go:
   needs: ["compile-contracts"]
   image: ethereum/client-go:alltools-stable
   tags: *tags-lmn
-  script: ./build-go.sh
+  before_script:
+    - apt-get -yq update && apt-get -yqq install jq
+  script: 
+    - ./build-go.sh
   artifacts:
     untracked: true
     paths:
