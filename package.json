@@ -1,0 +1,40 @@
+{
+  "name": "smart-contracts-v2",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Oleksandr Shevchuk <shev@titan.io>",
+  "license": "MIT",
+  "engines": {
+    "node": "20.x"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.5.3",
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "@openzeppelin/contracts": "^4.5.0",
+    "@openzeppelin/contracts-upgradeable": "^4.8.3",
+    "@typechain/ethers-v5": "^11.1.2",
+    "@types/chai": "^4.2.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.6",
+    "chai": "^4.2.0",
+    "ethers": "5.5.4",
+    "hardhat": "^2.19.4",
+    "hardhat-gas-reporter": "^1.0.8",
+    "solidity-coverage": "^0.8.0",
+    "ts-node": "^10.9.2",
+    "typechain": "^8.3.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.5",
+    "@openzeppelin/hardhat-upgrades": "^1.25.0",
+    "dotenv": "^16.4.1",
+    "ecies-geth": "^1.7.0",
+    "hardhat-abi-exporter": "^2.10.1",
+    "wait-on": "^7.2.0",
+    "web3": "^1.7.4"
+  }
+}

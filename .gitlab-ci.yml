@@ -30,7 +30,7 @@ stages:
 
 variables:
   CI_GROUP_ID: "15533332" # id of the proxy group
-  NODE_IMAGE: "node:16-buster"
+  NODE_IMAGE: "node:20-buster"
 
 # Sets ENV_NAME=ENV_VALUE in shell and in gitlab ci group variables
 # ENV_NAME - variable name
@@ -73,7 +73,7 @@ variables:
       fi
     fi
     set -e
-  - if [ -f artifacts.zip ]; then unzip artifacts.zip "Goerli/clonefactory/.openzeppelin" -d . && echo "artifacts downloaded";  fi
+  - if [ -f artifacts.zip ]; then unzip artifacts.zip "./.openzeppelin" -d . && echo "artifacts downloaded";  fi
   - if [ ! -f artifacts.zip ]; then echo "artifacts not downloaded"; fi
 
 # Deploys clonefactory to the blockchain using env variables from the corresponding environment
@@ -86,14 +86,13 @@ variables:
   when: manual
   artifacts:
     paths:
-      - Goerli/clonefactory/.openzeppelin
+      - .openzeppelin
     reports:
       dotenv: deploy.env
   environment:
     name: dev # The environment.name should be overriden
     url: $DYNAMIC_ENVIRONMENT_URL
   script:
-    - cd ./Goerli/clonefactory/
     - make deploy-clonefactory
     - export ENV_NAME="CLONE_FACTORY_ADDRESS" ENV_VALUE=$(cat clonefactory-addr.tmp) ENV_ENV=$CI_ENVIRONMENT_SLUG
     - *set-env
@@ -108,11 +107,10 @@ variables:
   when: manual
   artifacts:
     paths:
-      - Goerli/clonefactory/.openzeppelin
+      - .openzeppelin
   environment:
     name: dev # The environment.name should be overriden
   script:
-    - cd ./Goerli/clonefactory/
     - make deploy-faucet
 
 .update_clonefactory_template: &update_clonefactory_template
@@ -122,13 +120,12 @@ variables:
   when: manual
   artifacts:
     paths:
-      - Goerli/clonefactory/.openzeppelin
+      - .openzeppelin
   environment:
     name: dev
   script:
     - export UPGRADE_JOB_NAME="update-clonefactory-$CI_ENVIRONMENT_SLUG" DEPLOY_JOB_NAME="deploy-clonefactory-$CI_ENVIRONMENT_SLUG"
     - *download-smart-contract-artifacts
-    - cd ./Goerli/clonefactory/
     - make update-clonefactory
 
 .update_implementation_template: &update_implementation_template
@@ -138,13 +135,12 @@ variables:
   when: manual
   artifacts:
     paths:
-      - Goerli/clonefactory/.openzeppelin
+      - .openzeppelin
   environment:
     name: dev
   script:
     - export UPGRADE_JOB_NAME="update-implementation-$CI_ENVIRONMENT_SLUG" DEPLOY_JOB_NAME="deploy-clonefactory-$CI_ENVIRONMENT_SLUG"
     - *download-smart-contract-artifacts
-    - cd ./Goerli/clonefactory/
     - make update-implementation
 
 .deploy_hr_contracts_template: &deploy_hr_contracts_template
@@ -155,7 +151,6 @@ variables:
   environment:
     name: dev
   script:
-    - cd ./Goerli/clonefactory/
     - make populate-contracts
 
 .whitelist_clonefactory_template: &whitelist_clonefactory_template
@@ -167,7 +162,6 @@ variables:
     name: dev
     action: prepare
   script:
-    - cd ./Goerli/clonefactory/
     - make whitelist-clonefactory
 
 .deploy_lumerintoken_dev_stg: &deploy_lumerintoken_dev_stg
@@ -176,7 +170,6 @@ variables:
   image: $NODE_IMAGE
   when: manual
   script: 
-    - cd ./Goerli/clonefactory/
     - make deploy-lumerin
     - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp)
     - *set-env
@@ -189,35 +182,35 @@ compile-contracts:
     name: dev
     action: prepare
   script:
-    - cd ./Goerli/clonefactory/ && yarn install && make compile
+    - yarn install && make compile
   artifacts:
     paths:
-      - Goerli/clonefactory/abi
-      - Goerli/clonefactory/artifacts
-      - Goerli/clonefactory/cache
-      - Goerli/clonefactory/node_modules
+      - abi
+      - artifacts
+      - cache
+      - node_modules
 
 build-contracts-go:
   stage: build
   needs: ["compile-contracts"]
   image: ethereum/client-go:alltools-stable
   tags: *tags-lmn
-  script: cd ./Goerli/clonefactory && ./build-go.sh
+  script: ./build-go.sh
   artifacts:
     untracked: true
     paths:
-      - Goerli/clonefactory/build-go
+      - build-go
 
 build-contracts-js:
   stage: build
   needs: ["compile-contracts"]
   image: $NODE_IMAGE
   tags: *tags-dev
-  script: cd ./Goerli/clonefactory && make build-js
+  script: make build-js
   artifacts:
     untracked: true
     paths:
-      - Goerli/clonefactory/build-js
+      - build-js
 
 test:
   environment: test
@@ -229,7 +222,7 @@ test:
   only:
     - branches    
   script:
-    - cd ./Goerli/clonefactory/ && yarn install
+    - yarn install
     - make test
 
 # TODO: decide how to run upgrade tests when we have different versions of the smart-contract in the target branch
@@ -245,7 +238,6 @@ test:
 #   rules:
 #     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
 #   script:
-#     - cd ./Goerli/clonefactory/
 #     - yarn install
 #     - make compile
 #     - make build-js
@@ -274,7 +266,6 @@ deploy-lumerintoken-stg:
 #   only:
 #     - main
 #   script:
-#     - cd ./Goerli/clonefactory/
 #     - make deploy-lumerin
 #     - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp) ENV_ENV="lmn"
 #     - *set-env
@@ -429,7 +420,7 @@ release-contracts-go:
   script:
     - cp $SSH_KEY_CONTRACTS_GO ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
-    - cd ./Goerli/clonefactory/ && make release-go
+    - make release-go
 
 release-contracts-js:
   stage: release-bindings
@@ -446,7 +437,7 @@ release-contracts-js:
   script:
     - cp $SSH_KEY_CONTRACTS_JS ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
-    - cd ./Goerli/clonefactory/ && make release-js
+    - make release-js
 
 release-contracts-audit:
   stage: release-bindings
@@ -463,7 +454,7 @@ release-contracts-audit:
   script:
     - cp $SSH_KEY_SMART_CONTRACTS ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
-    - cd ./Goerli/clonefactory/ && make update-public-contracts
+    - make update-public-contracts
 
 set-fee-recipient-dev:
   stage: contract-functions
@@ -474,7 +465,7 @@ set-fee-recipient-dev:
   before_script:
     - apt-get -yq update && apt-get -yqq install
   script:
-    - cd ./Goerli/clonefactory/ && make set-fee-recipient
+    - make set-fee-recipient
 
 set-fee-recipient-stg:
   stage: contract-functions
@@ -485,7 +476,7 @@ set-fee-recipient-stg:
   before_script:
     - apt-get -yq update && apt-get -yqq install
   script:
-    - cd ./Goerli/clonefactory/ && make set-fee-recipient
+    - make set-fee-recipient
 
 set-fee-recipient-lmn:
   stage: contract-functions
@@ -496,4 +487,4 @@ set-fee-recipient-lmn:
   before_script:
     - apt-get -yq update && apt-get -yqq install
   script:
-    - cd ./Goerli/clonefactory/ && make set-fee-recipient
+    - make set-fee-recipient
