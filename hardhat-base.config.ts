@@ -1,8 +1,20 @@
 import type { HardhatUserConfig } from "hardhat/config";
-import {} from "@openzeppelin/hardhat-upgrades";
-import {} from "hardhat-abi-exporter";
-import {} from "dotenv/config";
-import {} from "hardhat-abi-exporter";
+
+import '@nomiclabs/hardhat-ethers';
+import "@openzeppelin/hardhat-upgrades";
+import "hardhat-abi-exporter";
+import "dotenv/config";
+
+// TODO: integrate the rest of the plugins if needed
+//
+// import "@nomicfoundation/hardhat-chai-matchers";
+// import "@nomicfoundation/hardhat-ethers";
+// import "@nomicfoundation/hardhat-verify";
+// import "@typechain/hardhat";
+// import "hardhat-gas-reporter";
+// import "solidity-coverage";
+// import "@nomicfoundation/hardhat-network-helpers";
+// import "@nomicfoundation/hardhat-toolbox"
 
 // Base config is used for local deployment and/or contract build
 const config: HardhatUserConfig = {
