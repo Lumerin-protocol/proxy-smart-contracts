@@ -200,10 +200,7 @@
           },
           "t_enum(ContractState)3563": {
             "label": "enum Implementation.ContractState",
-            "members": [
-              "Available",
-              "Running"
-            ],
+            "members": ["Available", "Running"],
             "numberOfBytes": "1"
           },
           "t_string_storage": {
@@ -501,10 +498,7 @@
           },
           "t_enum(ContractState)3289": {
             "label": "enum Implementation.ContractState",
-            "members": [
-              "Available",
-              "Running"
-            ],
+            "members": ["Available", "Running"],
             "numberOfBytes": "1"
           },
           "t_int8": {
@@ -885,6 +879,153 @@
             "numberOfBytes": "32"
           },
           "t_struct(FeeRecipient)4613_storage": {
+            "label": "struct FeeRecipient",
+            "members": [
+              {
+                "label": "fee",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "recipient",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {}
+      }
+    },
+    "5a9fa8e347da9c7b742b9c1c3c87bbe26491db01667ae751299d13b537b29b09": {
+      "address": "0x022c52744bf9EA0138B02D851F84198f61181957",
+      "txHash": "0x297f095d4dd8aa641e039763b59ca4c419e1eb35dd712805a91cd85c0a8c5952",
+      "layout": {
+        "solcVersion": "0.8.18",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:63",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:68"
+          },
+          {
+            "label": "lumerin",
+            "offset": 2,
+            "slot": "0",
+            "type": "t_contract(Lumerin)4654",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:16"
+          },
+          {
+            "label": "baseImplementation",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_address",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:17"
+          },
+          {
+            "label": "owner",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_address",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:18"
+          },
+          {
+            "label": "noMoreWhitelist",
+            "offset": 20,
+            "slot": "2",
+            "type": "t_bool",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:19"
+          },
+          {
+            "label": "rentalContracts",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_array(t_address)dyn_storage",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:20"
+          },
+          {
+            "label": "rentalContractsMap",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:21"
+          },
+          {
+            "label": "feeRecipient",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_struct(FeeRecipient)4661_storage",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:22"
+          },
+          {
+            "label": "whitelist",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:24"
+          },
+          {
+            "label": "isContractDead",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "CloneFactory",
+            "src": "contracts/CloneFactory.sol:25"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_address)dyn_storage": {
+            "label": "address[]",
+            "numberOfBytes": "32"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_contract(Lumerin)4654": {
+            "label": "contract Lumerin",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(FeeRecipient)4661_storage": {
             "label": "struct FeeRecipient",
             "members": [
               {
