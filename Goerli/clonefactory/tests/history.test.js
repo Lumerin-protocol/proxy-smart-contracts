@@ -5,7 +5,7 @@ const Web3 = require("web3");
 const { Lumerin, CloneFactory, Implementation } = require("../build-js/dist");
 const { AdvanceBlockTime, LocalTestnetAddresses } = require("./utils");
 
-describe("Contract delete", function () {
+describe("Contract history", function () {
   const {
     lumerinAddress,
     cloneFactoryAddress,
@@ -34,7 +34,7 @@ describe("Contract delete", function () {
   })
 
   it("should create contract and check its history", async function () {
-    const receipt = await cf.methods.setCreateNewRentalContract(price, "0", speed, length, cloneFactoryAddress, "123").send({ from: seller, value: fee })
+    const receipt = await cf.methods.setCreateNewRentalContractV2(price, "0", speed, length, "0", cloneFactoryAddress, "123").send({ from: seller, value: fee })
     hrContractAddr = receipt.events?.contractCreated.returnValues._address;
     const impl = Implementation(web3, hrContractAddr)
     const data = await impl.methods.getHistory("0", "100").call()
