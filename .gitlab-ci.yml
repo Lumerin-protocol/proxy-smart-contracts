@@ -14,6 +14,17 @@ variables:
   CONTRACT_STATE_SUBGROUP: "gitlab.com/TitanInd/proxy/smart-contracts-state" 
   NODE_IMAGE: "node:20-buster"
 
+
+#####################################
+#           Misc Templates          #
+#####################################
+
+# OpenSSH install
+.install-ssh: &install-ssh
+  - apt-get -yq update && apt-get -yqq install openssh-client
+  - mkdir ~/.ssh
+  - ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
+
 # Tags for all jobs
 .tags-dev: &tags-dev
   - devops
@@ -77,7 +88,12 @@ variables:
   - cd ..
   - rm -rf ./temp
 
-.deploy_lumerintoken_dev_stg: &deploy_lumerintoken_dev_stg
+
+#####################################
+#         Deploy Templates          #
+#####################################
+
+.deploy_lumerintoken: &deploy_lumerintoken
   stage: deploy-contracts
   needs: ["compile-contracts", "test", "build-contracts-js"]
   image: $NODE_IMAGE
@@ -127,39 +143,6 @@ variables:
   script:
     - make deploy-faucet
 
-.update_clonefactory_template: &update_clonefactory_template
-  stage: update-contracts
-  needs: ["compile-contracts", "test", "build-contracts-js"]
-  image: $NODE_IMAGE
-  when: manual
-  artifacts:
-    paths:
-      - .openzeppelin
-  environment:
-    name: dev
-    url: $EXPLORER_URL/$CLONE_FACTORY_ADDRESS
-  script:
-    - *download-state
-    - cp ./.openzeppelin/unknown-421614.json ./.openzeppelin/test.json 
-    # - make update-clonefactory
-    - *upload-state
-
-.update_implementation_template: &update_implementation_template
-  stage: update-contracts
-  needs: ["compile-contracts", "test", "build-contracts-js"]
-  image: $NODE_IMAGE
-  when: manual
-  artifacts:
-    paths:
-      - .openzeppelin
-  environment:
-    name: dev
-    url: $EXPLORER_URL/$CLONE_FACTORY_ADDRESS
-  script:
-    - *download-state
-    - make update-implementation
-    - *upload-state
-
 .deploy_hr_contracts_template: &deploy_hr_contracts_template
   stage: populate-hr-contracts
   needs: ["compile-contracts", "test", "build-contracts-js"]
@@ -180,6 +163,52 @@ variables:
     action: prepare
   script:
     - make whitelist-clonefactory
+
+
+#####################################
+#         Update Templates          #
+#####################################
+
+.update_clonefactory_template: &update_clonefactory_template
+  stage: update-contracts
+  needs: ["compile-contracts", "test", "build-contracts-js"]
+  image: $NODE_IMAGE
+  when: manual
+  artifacts:
+    paths:
+      - .openzeppelin
+  environment:
+    name: dev
+    url: $EXPLORER_URL/$CLONE_FACTORY_ADDRESS
+  before_script:
+    - *install-ssh
+  script:
+    - *download-state
+    - cp ./.openzeppelin/unknown-421614.json ./.openzeppelin/test.json 
+    # - make update-clonefactory
+    - *upload-state
+
+.update_implementation_template: &update_implementation_template
+  stage: update-contracts
+  needs: ["compile-contracts", "test", "build-contracts-js"]
+  image: $NODE_IMAGE
+  when: manual
+  artifacts:
+    paths:
+      - .openzeppelin
+  environment:
+    name: dev
+    url: $EXPLORER_URL/$CLONE_FACTORY_ADDRESS
+  before_script:
+    - *install-ssh
+  script:
+    - *download-state
+    - make update-implementation
+    - *upload-state
+
+#####################################
+#       Contracts libs jobs         #
+#####################################
 
 compile-contracts:
   stage: build
@@ -253,10 +282,15 @@ test:
 #     - make build-js
 #     - BRANCH_TO_TEST_AGAINST=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME make test-upgrade
 
+
+#####################################
+#           Deploy Jobs             #
+#####################################
+
 deploy-lumerintoken-dev:
   variables:
     EXPLORER_URL: "https://sepolia.arbiscan.io/address"
-  <<: *deploy_lumerintoken_dev_stg
+  <<: *deploy_lumerintoken
   environment:
     name: dev
   tags: *tags-dev
@@ -264,85 +298,19 @@ deploy-lumerintoken-dev:
 deploy-lumerintoken-stg:
   variables:
     EXPLORER_URL: "https://arbiscan.io/address"
-  <<: *deploy_lumerintoken_dev_stg
+  <<: *deploy_lumerintoken
   environment:
     name: stg
   tags: *tags-stg
 
-# Will be used only when we will have a separate lumerin token for LMN environment
-#
+# We shouldn't redeploy LMR token on mainnet
 # deploy-lumerintoken-lmn:
-#   stage: deploy-contracts
-#   needs: ["compile-contracts"]
-#   image: $NODE_IMAGE
-#   tags: *tags-lmn
-#   when: manual
-#   only:
-#     - main
-#   script:
-#     - make deploy-lumerin
-#     - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp) ENV_ENV="lmn"
-#     - *set-env
-
-update-clonefactory-dev:
-  <<: *update_clonefactory_template
-  environment:
-    name: dev
-  tags: *tags-dev
-
-update-clonefactory-stg:
-  <<: *update_clonefactory_template
-  environment:
-    name: stg
-  tags: *tags-stg
-
-update-clonefactory-lmn:
-  <<: *update_clonefactory_template
-  environment:
-    name: lmn
-  tags: *tags-lmn
-
-update-implementation-dev:
-  <<: *update_implementation_template
-  environment:
-    name: dev
-  tags: *tags-dev
-
-update-implementation-stg:
-  <<: *update_implementation_template
-  environment:
-    name: stg
-  tags: *tags-stg
-
-update-implementation-lmn:
-  <<: *update_implementation_template
-  environment:
-    name: lmn
-  tags: *tags-lmn
-
-whitelist-clonefactory-dev:
-  <<: *whitelist_clonefactory_template
-  environment:
-    name: dev
-  tags: *tags-dev
-  # only:
-  #   - dev
-
-whitelist-clonefactory-stg:
-  <<: *whitelist_clonefactory_template
-  environment:
-    name: stg
-  tags: *tags-stg
-  # only:
-  #   - stg
-
-whitelist-clonefactory-lmn:
-  <<: *whitelist_clonefactory_template
-  environment:
-    name: lmn
-  tags: *tags-lmn
-  # only:
-  #   - lmn
+#   variables:
+#     EXPLORER_URL: "https://arbiscan.io/address"
+#   <<: *deploy_lumerintoken
+#   environment:
+#     name: lmn
+#   tags: *tags-stg
 
 deploy-clonefactory-dev:
   variables:
@@ -398,6 +366,53 @@ deploy-faucet-lmn:
   # only:
   #   - lmn
 
+
+
+
+#####################################
+#           Update Jobs             #
+#####################################
+
+update-clonefactory-dev:
+  <<: *update_clonefactory_template
+  environment:
+    name: dev
+  tags: *tags-dev
+
+update-clonefactory-stg:
+  <<: *update_clonefactory_template
+  environment:
+    name: stg
+  tags: *tags-stg
+
+update-clonefactory-lmn:
+  <<: *update_clonefactory_template
+  environment:
+    name: lmn
+  tags: *tags-lmn
+
+update-implementation-dev:
+  <<: *update_implementation_template
+  environment:
+    name: dev
+  tags: *tags-dev
+
+update-implementation-stg:
+  <<: *update_implementation_template
+  environment:
+    name: stg
+  tags: *tags-stg
+
+update-implementation-lmn:
+  <<: *update_implementation_template
+  environment:
+    name: lmn
+  tags: *tags-lmn
+
+#####################################
+#             Actions               #
+#####################################
+
 populate-hr-contracts-dev:
   <<: *deploy_hr_contracts_template
   needs: ["compile-contracts", "build-contracts-js"]
@@ -424,6 +439,57 @@ populate-hr-contracts-lmn:
   tags: *tags-lmn
   # only:
   #   - main
+
+whitelist-clonefactory-dev:
+  <<: *whitelist_clonefactory_template
+  environment:
+    name: dev
+  tags: *tags-dev
+  # only:
+  #   - dev
+
+whitelist-clonefactory-stg:
+  <<: *whitelist_clonefactory_template
+  environment:
+    name: stg
+  tags: *tags-stg
+  # only:
+  #   - stg
+
+whitelist-clonefactory-lmn:
+  <<: *whitelist_clonefactory_template
+  environment:
+    name: lmn
+  tags: *tags-lmn
+  # only:
+  #   - lmn
+
+set-fee-recipient-dev:
+  stage: contract-functions
+  image: $NODE_IMAGE
+  when: manual
+  environment: dev
+  tags: *tags-dev
+  script:
+    - make set-fee-recipient
+
+set-fee-recipient-stg:
+  stage: contract-functions
+  image: $NODE_IMAGE
+  when: manual
+  environment: stg
+  tags: *tags-stg
+  script:
+    - make set-fee-recipient
+
+set-fee-recipient-lmn:
+  stage: contract-functions
+  image: $NODE_IMAGE
+  when: manual
+  environment: lmn
+  tags: *tags-lmn
+  script:
+    - make set-fee-recipient
 
 release-contracts-go:
   stage: release-bindings
@@ -476,29 +542,3 @@ release-contracts-audit:
     - chmod 600 ~/.ssh/id_rsa
     - make update-public-contracts
 
-set-fee-recipient-dev:
-  stage: contract-functions
-  image: $NODE_IMAGE
-  when: manual
-  environment: dev
-  tags: *tags-dev
-  script:
-    - make set-fee-recipient
-
-set-fee-recipient-stg:
-  stage: contract-functions
-  image: $NODE_IMAGE
-  when: manual
-  environment: stg
-  tags: *tags-stg
-  script:
-    - make set-fee-recipient
-
-set-fee-recipient-lmn:
-  stage: contract-functions
-  image: $NODE_IMAGE
-  when: manual
-  environment: lmn
-  tags: *tags-lmn
-  script:
-    - make set-fee-recipient
