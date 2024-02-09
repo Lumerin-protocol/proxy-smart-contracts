@@ -9,6 +9,11 @@ stages:
   - populate-hr-contracts
   - deploy-contracts
 
+variables:
+  CI_GROUP_ID: "15533332" # id of the proxy group
+  CONTRACT_STATE_SUBGROUP: "gitlab.com/TitanInd/proxy/smart-contracts-state" 
+  NODE_IMAGE: "node:20-buster"
+
 # Tags for all jobs
 .tags-dev: &tags-dev
   - devops
@@ -27,10 +32,6 @@ stages:
   - bedrock
   - docker
   - titanio-lmn
-
-variables:
-  CI_GROUP_ID: "15533332" # id of the proxy group
-  NODE_IMAGE: "node:20-buster"
 
 # Sets ENV_NAME=ENV_VALUE in shell and in gitlab ci group variables
 # ENV_NAME - variable name
@@ -55,30 +56,43 @@ variables:
     --form "environment_scope=$ENV_ENV"'
   - unset ENV_NAME ENV_VALUE ENV_ENV
 
-# Downloads artifacts from previous successful upgradeable smart-contract deploy
-# Required variables:
-# UPGRADE_JOB_NAME - name of the job that upgrades the upgradeable smart-contract
-# DEPLOY_JOB_NAME - name of the job that deploys the upgradeable smart-contract
-.download-smart-contract-artifacts: &download-smart-contract-artifacts
-  - echo "Downloading artifacts from previous successful deploy" 
-  - echo "Downloading artifacts from $UPGRADE_JOB_NAME"
-  - | 
-    set +e
-    curl --fail --location --output artifacts.zip --header "PRIVATE-TOKEN: $GITLAB_TOKEN" "https://gitlab.com/api/v4/projects/$CI_PROJECT_ID/jobs/artifacts/main/download?job=$UPGRADE_JOB_NAME"
-    if [ $? -ne 0 ]; then
-      echo "cannot find update artifacts, trying from $DEPLOY_JOB_NAME"
-      curl --fail --location --output artifacts.zip --header "PRIVATE-TOKEN: $GITLAB_TOKEN" "https://gitlab.com/api/v4/projects/$CI_PROJECT_ID/jobs/artifacts/main/download?job=$DEPLOY_JOB_NAME"
-      if [ $? -ne 0 ]; then
-        echo "cannot find deploy artifacts, using artifacts from source control"
-      fi
-    fi
-    set -e
-  - if [ -f artifacts.zip ]; then unzip artifacts.zip "./.openzeppelin" -d . && echo "artifacts downloaded";  fi
-  - if [ ! -f artifacts.zip ]; then echo "artifacts not downloaded"; fi
+# Downloads contract state stored in a specified repository
+.download-state: &download-state
+  - echo "Downloading contract state"
+  - cp $SSH_KEY_CONTRACTS_STATE ~/.ssh/id_rsa
+  - git archive --remote=ssh://git@$CONTRACT_STATE_SUBGROUP/$CI_ENVIRONMENT_NAME.git --format=tar main .openzeppelin | tar xf -
+  - rm -f ~/.ssh/id_rsa
+  - echo "Downloading completed"
+
+# Uploads contract state to a specified repository
+.upload-state: &upload-state
+  - echo "Uploading contract state"
+  - cp $SSH_KEY_CONTRACTS_STATE ~/.ssh/id_rsa
+  - git clone ssh://git@$CONTRACT_STATE_SUBGROUP/$CI_ENVIRONMENT_NAME.git ./temp
+  - cp -r .openzeppelin ./temp
+  - cd ./temp
+  - git add .
+  - git commit -m "Contract upgrade, CI commit SHA $CI_COMMIT_SHA, CI pipeline ID $CI_PIPELINE_ID, CI job ID $CI_JOB_ID"
+  - git push
+  - cd ..
+  - rm -rf ./temp
+
+.deploy_lumerintoken_dev_stg: &deploy_lumerintoken_dev_stg
+  stage: deploy-contracts
+  needs: ["compile-contracts", "test", "build-contracts-js"]
+  image: $NODE_IMAGE
+  when: manual
+  script: 
+    - make deploy-lumerin
+    - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp)
+    - *set-env
+    - export DYNAMIC_ENVIRONMENT_URL="$EXPLORER_URL/$(cat clonefactory-addr.tmp)"
+    - echo "DYNAMIC_ENVIRONMENT_URL=$DYNAMIC_ENVIRONMENT_URL" >> deploy.env
 
 # Deploys clonefactory to the blockchain using env variables from the corresponding environment
 # Updates the environment url to the etherscan url of the contract
-# TODO: fix hardcoded etherscan url
+# Requires the following variables to be set:
+# - EXPLORER_URL = "https://sepolia.arbiscan.io/address" - the explorer url of the corresponding network 
 .deploy_clonefactory_template: &deploy_clonefactory_template
   stage: deploy-contracts
   needs: ["compile-contracts", "test", "build-contracts-js"]
@@ -96,9 +110,9 @@ variables:
     - make deploy-clonefactory
     - export ENV_NAME="CLONE_FACTORY_ADDRESS" ENV_VALUE=$(cat clonefactory-addr.tmp) ENV_ENV=$CI_ENVIRONMENT_SLUG
     - *set-env
-    - export DYNAMIC_ENVIRONMENT_URL="https://sepolia.arbiscan.io/address/$(cat clonefactory-addr.tmp)"
-    - cd ../..
+    - export DYNAMIC_ENVIRONMENT_URL="$EXPLORER_URL/$(cat clonefactory-addr.tmp)"
     - echo "DYNAMIC_ENVIRONMENT_URL=$DYNAMIC_ENVIRONMENT_URL" >> deploy.env
+    - *upload-state
 
 .deploy_faucet_template: &deploy_faucet_template
   stage: deploy-contracts
@@ -123,10 +137,11 @@ variables:
       - .openzeppelin
   environment:
     name: dev
+    url: $EXPLORER_URL/$CLONE_FACTORY_ADDRESS
   script:
-    - export UPGRADE_JOB_NAME="update-clonefactory-$CI_ENVIRONMENT_SLUG" DEPLOY_JOB_NAME="deploy-clonefactory-$CI_ENVIRONMENT_SLUG"
-    - *download-smart-contract-artifacts
+    - *download-state
     - make update-clonefactory
+    - *upload-state
 
 .update_implementation_template: &update_implementation_template
   stage: update-contracts
@@ -138,10 +153,11 @@ variables:
       - .openzeppelin
   environment:
     name: dev
+    url: $EXPLORER_URL/$CLONE_FACTORY_ADDRESS
   script:
-    - export UPGRADE_JOB_NAME="update-implementation-$CI_ENVIRONMENT_SLUG" DEPLOY_JOB_NAME="deploy-clonefactory-$CI_ENVIRONMENT_SLUG"
-    - *download-smart-contract-artifacts
+    - *download-state
     - make update-implementation
+    - *upload-state
 
 .deploy_hr_contracts_template: &deploy_hr_contracts_template
   stage: populate-hr-contracts
@@ -163,16 +179,6 @@ variables:
     action: prepare
   script:
     - make whitelist-clonefactory
-
-.deploy_lumerintoken_dev_stg: &deploy_lumerintoken_dev_stg
-  stage: deploy-contracts
-  needs: ["compile-contracts", "test", "build-contracts-js"]
-  image: $NODE_IMAGE
-  when: manual
-  script: 
-    - make deploy-lumerin
-    - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp)
-    - *set-env
 
 compile-contracts:
   stage: build
@@ -247,12 +253,16 @@ test:
 #     - BRANCH_TO_TEST_AGAINST=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME make test-upgrade
 
 deploy-lumerintoken-dev:
+  variables:
+    EXPLORER_URL: "https://sepolia.arbiscan.io/address"
   <<: *deploy_lumerintoken_dev_stg
   environment:
     name: dev
   tags: *tags-dev
 
 deploy-lumerintoken-stg:
+  variables:
+    EXPLORER_URL: "https://arbiscan.io/address"
   <<: *deploy_lumerintoken_dev_stg
   environment:
     name: stg
@@ -334,6 +344,8 @@ whitelist-clonefactory-lmn:
   #   - lmn
 
 deploy-clonefactory-dev:
+  variables:
+    EXPLORER_URL: "https://sepolia.arbiscan.io/address"
   <<: *deploy_clonefactory_template
   environment:
     name: dev
@@ -342,6 +354,8 @@ deploy-clonefactory-dev:
   #   - dev
 
 deploy-clonefactory-stg:
+  variables:
+    EXPLORER_URL: "https://arbiscan.io/address"
   <<: *deploy_clonefactory_template
   environment:
     name: stg
@@ -350,6 +364,8 @@ deploy-clonefactory-stg:
   #   - stg
 
 deploy-clonefactory-lmn:
+  variables:
+    EXPLORER_URL: "https://arbiscan.io/address"
   <<: *deploy_clonefactory_template
   environment:
     name: lmn
@@ -465,8 +481,6 @@ set-fee-recipient-dev:
   when: manual
   environment: dev
   tags: *tags-dev
-  before_script:
-    - apt-get -yq update && apt-get -yqq install
   script:
     - make set-fee-recipient
 
@@ -476,8 +490,6 @@ set-fee-recipient-stg:
   when: manual
   environment: stg
   tags: *tags-stg
-  before_script:
-    - apt-get -yq update && apt-get -yqq install
   script:
     - make set-fee-recipient
 
@@ -487,7 +499,5 @@ set-fee-recipient-lmn:
   when: manual
   environment: lmn
   tags: *tags-lmn
-  before_script:
-    - apt-get -yq update && apt-get -yqq install
   script:
     - make set-fee-recipient
