@@ -23,7 +23,7 @@ variables:
 .install-ssh: &install-ssh
   - apt-get -yq update && apt-get -yqq install openssh-client
   - mkdir ~/.ssh
-  - ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
+  - ssh-keyscan -t rsa github.com gitlab.com >> ~/.ssh/known_hosts
 
 # Tags for all jobs
 .tags-dev: &tags-dev
