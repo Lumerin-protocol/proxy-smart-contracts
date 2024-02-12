@@ -71,6 +71,7 @@ variables:
 .download-state: &download-state
   - echo "Downloading contract state"
   - cp $SSH_KEY_CONTRACTS_STATE ~/.ssh/id_rsa
+  - chmod 600 ~/.ssh/id_rsa
   - git archive --remote=ssh://git@$CONTRACT_STATE_SUBGROUP/$CI_ENVIRONMENT_NAME.git --format=tar main .openzeppelin | tar xf -
   - rm -f ~/.ssh/id_rsa
   - echo "Downloading completed"
@@ -79,6 +80,7 @@ variables:
 .upload-state: &upload-state
   - echo "Uploading contract state"
   - cp $SSH_KEY_CONTRACTS_STATE ~/.ssh/id_rsa
+  - chmod 600 ~/.ssh/id_rsa
   - git clone ssh://git@$CONTRACT_STATE_SUBGROUP/$CI_ENVIRONMENT_NAME.git ./temp
   - cp -r .openzeppelin ./temp
   - cd ./temp
@@ -87,6 +89,8 @@ variables:
   - git push
   - cd ..
   - rm -rf ./temp
+  - rm -f ~/.ssh/id_rsa
+  - echo "Uploading completed"
 
 
 #####################################
@@ -507,6 +511,7 @@ release-contracts-go:
     - cp $SSH_KEY_CONTRACTS_GO ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - make release-go
+    - rm -f ~/.ssh/id_rsa
 
 release-contracts-js:
   stage: release-bindings
@@ -524,6 +529,7 @@ release-contracts-js:
     - cp $SSH_KEY_CONTRACTS_JS ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - make release-js
+    - rm -f ~/.ssh/id_rsa
 
 release-contracts-audit:
   stage: release-bindings
@@ -541,4 +547,5 @@ release-contracts-audit:
     - cp $SSH_KEY_SMART_CONTRACTS ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - make update-public-contracts
+    - rm -f ~/.ssh/id_rsa
 
