@@ -81,8 +81,8 @@ variables:
   - echo "Uploading contract state"
   - cp $SSH_KEY_CONTRACTS_STATE ~/.ssh/id_rsa
   - chmod 600 ~/.ssh/id_rsa
-  - git config --local user.email "smart-contracts-ci@lumerin.io"
-  - git config --local user.name "Smart Contracts CI"
+  - git config --global user.email "smart-contracts-ci@lumerin.io"
+  - git config --global user.name "Smart Contracts CI"
   - git clone ssh://git@$CONTRACT_STATE_SUBGROUP/$CI_ENVIRONMENT_NAME.git ./temp
   - cp -r .openzeppelin ./temp
   - cd ./temp
