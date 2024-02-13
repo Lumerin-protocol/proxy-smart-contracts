@@ -87,7 +87,7 @@ variables:
   - cp -r .openzeppelin ./temp
   - cd ./temp
   - git add .
-  - git commit -m "Contract upgrade, CI commit SHA $CI_COMMIT_SHA, CI pipeline ID $CI_PIPELINE_ID, CI job ID $CI_JOB_ID"
+  - git commit -m "Contract upgrade, CI commit SHA $CI_COMMIT_SHORT_SHA, CI pipeline ID $CI_PIPELINE_ID, CI job ID $CI_JOB_ID"
   - git push
   - cd ..
   - rm -rf ./temp
