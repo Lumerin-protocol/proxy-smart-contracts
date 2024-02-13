@@ -190,8 +190,7 @@ variables:
     - *install-ssh
   script:
     - *download-state
-    - cp ./.openzeppelin/unknown-421614.json ./.openzeppelin/test.json 
-    # - make update-clonefactory
+    - make update-clonefactory
     - *upload-state
 
 .update_implementation_template: &update_implementation_template
