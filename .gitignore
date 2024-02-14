@@ -1,21 +1,53 @@
-BuildFiles/Clones.json
-BuildFiles/Context.json
-BuildFiles/ERC20.json
-BuildFiles/ERC20Burnable.json
-BuildFiles/IERC20.json
-BuildFiles/IERC20Metadata.json
-BuildFiles/Initializable.json
-BuildFiles/Math.json
-BuildFiles/Migrations.json
-BuildFiles/MyToken.json
-BuildFiles/Ownable.json
-BuildFiles/Pausable.json
-BuildFiles/TitanToken.json
-BuildFiles/real_contracts_build.zip
-Marketplace/.DS_Store
-testing/test_hashrate/.DS_Store
-testing/test_hashrate/.gitkeep
-testing/test_hashrate/ganache_logs/
-testing/test_hashrate/hooka.js
+node_modules
+.env
 
-.DS_Store
+# Hardhat files
+/cache
+/artifacts
+
+# TypeChain files
+/typechain
+/typechain-types
+
+# solidity-coverage files
+/coverage
+/coverage.json
+
+node_modules
+.env
+
+# Hardhat files
+/cache
+/artifacts
+
+# TypeChain files
+/typechain
+/typechain-types
+
+# solidity-coverage files
+/coverage
+/coverage.json
+
+node_modules
+.env
+
+# Hardhat files
+/cache
+/artifacts
+/abi
+
+# TypeChain files
+/typechain
+/typechain-types
+
+# solidity-coverage files
+/coverage
+/coverage.json
+
+# generated code
+/build-go
+/build-js
+*.tmp
+
+# tests
+/test-temp
