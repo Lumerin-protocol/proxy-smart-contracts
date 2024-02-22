@@ -3,23 +3,29 @@ pragma solidity >0.8.10;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-struct Validator {
-    address addr;
-    string url;
-    uint last_seen;
-    uint stake;
-    uint index;
-    uint votes;
-    address last_punisher;
-}
-
 contract ValidatorRegistry is Initializable {
+    struct Validator {
+        bytes url;              // using bytes to minimize gas cost
+        uint last_seen;
+        uint stake;             // current stake in ETH
+        uint listReference;     // index of the entry in the validatorList
+        address last_punisher;  // last address that punished this validator
+        uint8 punish_votes;     // how many votes to punish this validator has received
+    }
+
     address public owner;
-    uint public stake_minimum = 1; // minimum stake to be considered usable
-    uint public stake_register = 10; // amount needed to register as a validator
-    uint public punish_amount = 1; // how much to punish by
-    uint public pubish_threshold = 3; // how many votes before punishment
-    Validator[] public validators; // our list of validators
+    uint public stake_minimum;      // minimum amount of stake in ETH to be considered usable
+    uint public stake_register;     // amount of ETH needed to stake to register as a validator
+    uint public punish_amount;      // how much ETH to punish by
+    uint8 public punish_threshold;  // how many votes before punishment
+
+    mapping (address => Validator) public validatorMap; // map of all validators
+    address[] public validatorList; // list of active validators (with stake above the minimum)
+
+    event RegistryConfigured();
+    event ValidatorUpdated(address indexed validator, bool isActive);
+    event ValidatorPunished(address indexed validator, bool isActive);
+    event ValidatorDeregistered(address indexed validator);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "you are not authorized");
@@ -27,120 +33,120 @@ contract ValidatorRegistry is Initializable {
     }
 
     modifier onlyOwnerOrValidator() {
-        bool found = false;
-        for (uint i=0; i<validators.length; i++) {
-            if (msg.sender == validators[i].addr) {
-                found = true;
-                break;
-            }
-        }
-        require(found || msg.sender == owner, "you are not authorized");
+        require(msg.sender == owner || validatorMap[msg.sender].stake > 0, "you are not authorized");
         _;
     }
 
-    function initialize() public initializer {
+    function initialize(uint _stake_minimum, uint _stake_register, uint _punish_amount, uint8 _punish_threshold) public initializer {
         owner = msg.sender;
+        configure(_stake_minimum, _stake_register, _punish_amount, _punish_threshold);
     }
 
-    function setStakeMinimum(uint val) public onlyOwner {
-        stake_minimum = val;
+    function configure(uint _stake_minimum, uint _stake_register, uint _punish_amount, uint8 _punish_threshold) public onlyOwner {
+        stake_minimum = _stake_minimum;
+        stake_register = _stake_register;
+        punish_amount = _punish_amount;
+        punish_threshold = _punish_threshold;
+        emit RegistryConfigured();
     }
 
-    function setStakeRegister(uint val) public onlyOwner {
-        stake_register = val;
-    }
-
-    function setPunishAmount(uint val) public onlyOwner {
-        punish_amount = val;
-    }
-
-    function validator_register(string calldata url, address addr) public payable {
+    // registers a new validator (consider using validator_update)
+    function validator_register(bytes calldata url) public payable {
         // add to list of validators and escrow the stake
         require(msg.value >= stake_register, "not staking enough");
-        require(msg.sender == addr, "can only register self");
-        (Validator memory v, bool found) = validator_find(url, addr);
-        if (!found) {
-            v = Validator(addr, url, block.timestamp, 0, 0, 0, address(0));
-            v.index = validators.length;
-            validators.push(v);
-        }
-        stake_add(v);
+        
+        bool found = validatorMap[msg.sender].stake > 0;
+        require(!found, "validator already registered");
+
+        validatorList.push(msg.sender);
+        validatorMap[msg.sender] = Validator(url, block.timestamp, msg.value, validatorList.length, address(0), 0);
     }
 
-    function validator_deregister(string calldata url, address addr) public {
-        // remove validator from registry
-        require(msg.sender == addr, "can only deregister self");
-        (Validator memory v,) = validator_find(url, addr);
-        stake_refund(v);
+    // add new validator, add more stake and/or update existing validator url
+    function validator_update(bytes calldata url) public payable {
+        uint newStake = validatorMap[msg.sender].stake + msg.value;
+        uint stake_required = validatorMap[msg.sender].url.length > 0 ? stake_minimum : stake_register;
+        require(newStake >= stake_required, "not staking enough");
+        
+        validatorMap[msg.sender].stake = newStake;
+        validatorMap[msg.sender].url = url;
+        validatorMap[msg.sender].last_seen = block.timestamp;
+
+        if (!isActive(msg.sender)){
+            validatorList.push(msg.sender);
+            validatorMap[msg.sender].listReference = validatorList.length;
+        }
+
+        emit ValidatorUpdated(msg.sender, true);
     }
 
-    function validator_find(string calldata url, address addr) public view returns (Validator memory, bool) {
-        // find validator by url and address...
-        Validator memory v;
-        bool found;
-        for (uint i=0; i<validators.length; i++) {
-            Validator storage e = validators[i];
-            if (keccak256(abi.encodePacked(e.url)) == keccak256(abi.encodePacked(url))
-                && e.addr == addr) {
-                v = e;
-                found = true;
-                break;
-            }
-        }
-        return (v, found);
+    // totally removes validator from the list and refunds the stake
+    function validator_deregister2() public {
+        Validator memory v = validatorMap[msg.sender];
+        require(v.stake > 0, "no funds staked");
+        
+        validator_delete_from_list(msg.sender);
+        delete validatorMap[msg.sender];
+
+        emit ValidatorDeregistered(msg.sender);
+        
+        payable(msg.sender).call{value: v.stake};
     }
 
     function validator_random_staked() public view returns(Validator memory, bool) {
         // select a pseudo random validator from all validators that have a remaining stake
-        require(validators.length > 0, "no validators registered");
-        Validator memory v;
-        int trys = int(validators.length);
-        bool found = false;
-        while (trys-- > 0) {
-            uint r = (block.timestamp + uint(trys)) % validators.length;
-            v = validators[r];
-            if (v.stake >= stake_minimum) {
-                found = true;
-                break;
-            }
+        if (validatorList.length == 0) {
+            return (Validator("", 0, 0, 0, address(0), 0), false);
         }
-        if (!found)
-            v = Validator(address(0), "", 0, 0, 0, 0, address(0));
-        return (v, found);
+
+        uint randomIndex = uint(keccak256(abi.encodePacked(block.timestamp))) % validatorList.length;
+        return (validatorMap[validatorList[randomIndex]], true);
     }
 
-    function validator_punish(string calldata url, address addr) public onlyOwnerOrValidator {
+    function validator_punish(address addr) public onlyOwnerOrValidator {
         // reduce validators stake (when votes reach threshold)
-        (Validator memory v, ) = validator_find(url, addr);
-        require(msg.sender != v.last_punisher, "already punished");
-        v.votes += 1;
+        Validator memory v = validatorMap[addr];
+        require(v.stake > 0, "validator not found or has no stake");
+        require(v.last_punisher != msg.sender, "already punished");
+
+        v.punish_votes += 1;
         v.last_punisher = msg.sender;
-        if (v.votes >= pubish_threshold) {
-            if (int(v.stake) - int(punish_amount) < 0)
+        
+        if (v.punish_votes >= punish_threshold) {
+            
+            if (v.stake < punish_amount){
                 v.stake = 0;
-            else
+            } else {
                 v.stake -= punish_amount;
-            v.votes = 0;
+            }
+            
+            if (v.stake < stake_minimum) {
+                // deletes from list if stake is too low but doesn't delete the entry in the map to keep stacked value
+                validator_delete_from_list(addr);
+            }
+            emit ValidatorPunished(addr, v.stake > stake_minimum);
+            v.punish_votes = 0;
         }
-        validators[v.index] = v;
+
+        validatorMap[addr] = v;
     }
 
-    function stake_add(Validator memory v) public payable {
-        // pay stake
-        require(msg.value >= stake_register, "not staking enough");
-        uint amount = msg.value;
-        v.stake += amount;
-        v.last_seen = block.timestamp;
-        validators[v.index] = v;
+    function validator_delete_from_list(address addr) internal returns (bool success){
+        if (!isActive(addr)) {
+            return false;
+        }
+        uint rowToDelete = validatorMap[addr].listReference;
+        address keyToMove = validatorList[validatorList.length-1];
+        validatorList[rowToDelete] = keyToMove;
+        validatorMap[keyToMove].listReference = rowToDelete;
+        validatorList.pop();
+        return true;
     }
 
-    function stake_refund(Validator memory v) internal {
-        // send all of v.stake to v.addr...
-        require(v.stake > 0, "no funds staked");
-        payable(v.addr).call{value: v.stake};
-        v.stake = 0;
-        v.last_seen = block.timestamp;
-        validators[v.index] = v;
+    // returns true if this validator is in the list of active validators
+    function isActive(address addr) public view returns(bool isIndeed) {
+        if(validatorList.length == 0) return false;
+        return (validatorList[validatorMap[addr].listReference] == addr);
     }
 }
 
