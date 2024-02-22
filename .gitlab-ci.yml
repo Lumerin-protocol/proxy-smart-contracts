@@ -136,6 +136,27 @@ variables:
     - echo "DYNAMIC_ENVIRONMENT_URL=$DYNAMIC_ENVIRONMENT_URL" >> deploy.env
     - *upload-state
 
+.deploy_validator_registry_template: &deploy_validator_registry_template
+  stage: deploy-contracts
+  needs: ["compile-contracts", "test", "build-contracts-js"]
+  image: $NODE_IMAGE
+  when: manual
+  artifacts:
+    paths:
+      - .openzeppelin
+    reports:
+      dotenv: deploy.env
+  environment:
+    name: dev # The environment.name should be overriden
+    url: $DYNAMIC_ENVIRONMENT_URL
+  script:
+    - make deploy-validator-registry
+    - export ENV_NAME="VALIDATOR_REGISTRY_ADDRESS" ENV_VALUE=$(cat validator-registry-addr.tmp) ENV_ENV=$CI_ENVIRONMENT_SLUG
+    - *set-env
+    - export DYNAMIC_ENVIRONMENT_URL="$EXPLORER_URL/$(cat validator-registry-addr.tmp)"
+    - echo "DYNAMIC_ENVIRONMENT_URL=$DYNAMIC_ENVIRONMENT_URL" >> deploy.env
+    - *upload-state
+
 .deploy_faucet_template: &deploy_faucet_template
   stage: deploy-contracts
   needs: ["compile-contracts", "test", "build-contracts-js"]
@@ -209,6 +230,24 @@ variables:
   script:
     - *download-state
     - make update-implementation
+    - *upload-state
+
+.update_validator_registry_template: &update_validator_registry_template
+  stage: update-contracts
+  needs: ["compile-contracts", "test", "build-contracts-js"]
+  image: $NODE_IMAGE
+  when: manual
+  artifacts:
+    paths:
+      - .openzeppelin
+  environment:
+    name: dev
+    url: $EXPLORER_URL/$VALIDATOR_REGISTRY_ADDRESS
+  before_script:
+    - *install-ssh
+  script:
+    - *download-state
+    - make update-validator-registry
     - *upload-state
 
 #####################################
@@ -371,8 +410,35 @@ deploy-faucet-lmn:
   # only:
   #   - lmn
 
+deploy-validator-registry-dev:
+  variables:
+    EXPLORER_URL: "https://sepolia.arbiscan.io/address"
+  <<: *deploy_validator_registry_template
+  environment:
+    name: dev
+  tags: *tags-dev
+  # only:
+  #   - dev
 
+deploy-validator-registry-stg:
+  variables:
+    EXPLORER_URL: "https://arbiscan.io/address"
+  <<: *deploy_validator_registry_template
+  environment:
+    name: stg
+  tags: *tags-stg
+  # only:
+  #   - stg
 
+deploy-validator-registry-lmn:
+  variables:
+    EXPLORER_URL: "https://arbiscan.io/address"
+  <<: *deploy_validator_registry_template
+  environment:
+    name: lmn
+  tags: *tags-lmn
+  # only:
+  #   - main
 
 #####################################
 #           Update Jobs             #
@@ -410,6 +476,24 @@ update-implementation-stg:
 
 update-implementation-lmn:
   <<: *update_implementation_template
+  environment:
+    name: lmn
+  tags: *tags-lmn
+
+update-validator-registry-dev:
+  <<: *update_validator_registry_template
+  environment:
+    name: dev
+  tags: *tags-dev
+
+update-validator-registry-stg:
+  <<: *update_validator_registry_template
+  environment:
+    name: stg
+  tags: *tags-stg
+
+update-validator-registry-lmn:
+  <<: *update_validator_registry_template
   environment:
     name: lmn
   tags: *tags-lmn
