@@ -14,10 +14,10 @@ contract ValidatorRegistry is Initializable {
     }
 
     address public owner;
-    uint public stake_minimum = 1; // minimum amount of stake in ETH to be considered usable
-    uint public stake_register = 10; // amount of ETH needed to stake to register as a validator
-    uint public punish_amount = 1; // how much ETH to punish by
-    uint8 public punish_threshold = 3; // how many votes before punishment
+    uint public stake_minimum;      // minimum amount of stake in ETH to be considered usable
+    uint public stake_register;     // amount of ETH needed to stake to register as a validator
+    uint public punish_amount;      // how much ETH to punish by
+    uint8 public punish_threshold;  // how many votes before punishment
 
     mapping (address => Validator) public validatorMap; // map of all validators
     address[] public validatorList; // list of active validators (with stake above the minimum)
@@ -37,8 +37,9 @@ contract ValidatorRegistry is Initializable {
         _;
     }
 
-    function initialize() public initializer {
+    function initialize(uint _stake_minimum, uint _stake_register, uint _punish_amount, uint8 _punish_threshold) public initializer {
         owner = msg.sender;
+        configure(_stake_minimum, _stake_register, _punish_amount, _punish_threshold);
     }
 
     function configure(uint _stake_minimum, uint _stake_register, uint _punish_amount, uint8 _punish_threshold) public onlyOwner {
@@ -80,7 +81,7 @@ contract ValidatorRegistry is Initializable {
     }
 
     // totally removes validator from the list and refunds the stake
-    function validator_deregister() public {
+    function validator_deregister2() public {
         Validator memory v = validatorMap[msg.sender];
         require(v.stake > 0, "no funds staked");
         

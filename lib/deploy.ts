@@ -3,128 +3,299 @@ import { Wallet } from "ethers";
 import { ethers, upgrades } from "hardhat";
 
 export async function DeployLumerin(deployerPkey: string, log = noop) {
-	const deployer = new Wallet(deployerPkey).connect(ethers.provider);
+  const deployer = new Wallet(deployerPkey).connect(ethers.provider);
 
-	log("Deploying LUMERIN with the account:", deployer.address);
-	log("Account balance:",(await ethers.provider.getBalance(deployer.address)).toString());
+  log("Deploying LUMERIN with the account:", deployer.address);
+  log(
+    "Account balance:",
+    (await ethers.provider.getBalance(deployer.address)).toString(),
+  );
 
-	const Lumerin = await ethers.getContractFactory("Lumerin", deployer);
-	const lumerin = await Lumerin.deploy();
-	await lumerin.deployed();
+  const Lumerin = await ethers.getContractFactory("Lumerin", deployer);
+  const lumerin = await Lumerin.deploy();
+  await lumerin.deployed();
 
-	log("Success. LUMERIN address:", lumerin.address);
-	return { address: lumerin.address };
+  log("Success. LUMERIN address:", lumerin.address);
+  return { address: lumerin.address };
 }
 
-export async function DeployCloneFactory(lumerinAddr: string, deployerPkey: string, feeRecipientAddress: string, log = noop) {
-	const deployer = new Wallet(deployerPkey).connect(ethers.provider);
+export async function DeployCloneFactory(
+  lumerinAddr: string,
+  deployerPkey: string,
+  feeRecipientAddress: string,
+  log = noop,
+) {
+  const deployer = new Wallet(deployerPkey).connect(ethers.provider);
 
-	log("Deployer address:", deployer.address);
-	log("Deployer balance:", (await ethers.provider.getBalance(deployer.address)).toString());
-	log("LUMERIN address:", lumerinAddr);
-	log();
+  log("Deployer address:", deployer.address);
+  log(
+    "Deployer balance:",
+    (await ethers.provider.getBalance(deployer.address)).toString(),
+  );
+  log("LUMERIN address:", lumerinAddr);
+  log();
 
-	log("1. Deploying upgradeable base IMPLEMENTATION");
-	const Implementation = await ethers.getContractFactory("Implementation", deployer);
-	const impl = await upgrades.deployBeacon(Implementation, { unsafeAllow: ["constructor"] });
-	await impl.deployed();
-	log("Beacon deployed at address:", impl.address);
+  log("1. Deploying upgradeable base IMPLEMENTATION");
+  const Implementation = await ethers.getContractFactory(
+    "Implementation",
+    deployer,
+  );
+  const impl = await upgrades.deployBeacon(Implementation, {
+    unsafeAllow: ["constructor"],
+  });
+  await impl.deployed();
+  log("Beacon deployed at address:", impl.address);
 
-	const beaconProxy = await upgrades.deployBeaconProxy(impl.address, Implementation, [],
-		{ unsafeAllow: ["constructor"], initializer: false } as any,
-	);
-	await beaconProxy.deployed();
-	log("Beacon proxy deployed at address", beaconProxy.address);
-	log();
+  const beaconProxy = await upgrades.deployBeaconProxy(
+    impl.address,
+    Implementation,
+    [],
+    { unsafeAllow: ["constructor"], initializer: false } as any,
+  );
+  await beaconProxy.deployed();
+  log("Beacon proxy deployed at address", beaconProxy.address);
+  log();
 
-	log("2. Deploying upgradeable CLONEFACTORY");
-	const CloneFactory = await ethers.getContractFactory("CloneFactory", deployer);
-	const cloneFactory = await upgrades.deployProxy(CloneFactory, [
-			impl.address,
-			lumerinAddr,
-			feeRecipientAddress,
-		], { unsafeAllow: ["constructor"] },
-	);
-	await cloneFactory.deployed();
+  log("2. Deploying upgradeable CLONEFACTORY");
+  const CloneFactory = await ethers.getContractFactory(
+    "CloneFactory",
+    deployer,
+  );
+  const cloneFactory = await upgrades.deployProxy(
+    CloneFactory,
+    [impl.address, lumerinAddr, feeRecipientAddress],
+    { unsafeAllow: ["constructor"] },
+  );
+  await cloneFactory.deployed();
 
-	log("Success. CLONEFACTORY address:", cloneFactory.address);
-	return { address: cloneFactory.address };
+  log("Success. CLONEFACTORY address:", cloneFactory.address);
+  return { address: cloneFactory.address };
 }
 
-export async function UpdateCloneFactory(newCloneFactoryContractName: string, cloneFactoryAddr: string, deployerPkey: string, log = noop) {
+export async function DeployValidatorRegistry(
+  deployerPkey: string,
+  stakeMinimum: string,
+  stakeRegister: string,
+  punishAmount: string,
+  punishThreshold: number,
+  log = noop,
+) {
+  const deployer = new Wallet(deployerPkey).connect(ethers.provider);
+
+  log("Deploying VALIDATOR_REGISTRY with the account:", deployer.address);
+  log(
+    "Account balance:",
+    (await ethers.provider.getBalance(deployer.address)).toString(),
+  );
+
+  const ValidatorRegistry = await ethers.getContractFactory(
+    "ValidatorRegistry",
+    deployer,
+  );
+  const validatorRegistry = await upgrades.deployProxy(
+    ValidatorRegistry,
+    [stakeMinimum, stakeRegister, punishAmount, punishThreshold],
+    {
+      unsafeAllow: ["constructor"],
+    },
+  );
+  await validatorRegistry.deployed();
+
+  log("Success. VALIDATOR_REGISTRY address:", validatorRegistry.address);
+  return { address: validatorRegistry.address };
+}
+
+export async function UpdateCloneFactory(
+  newCloneFactoryContractName: string,
+  cloneFactoryAddr: string,
+  deployerPkey: string,
+  log = noop,
+) {
   const deployer = new Wallet(deployerPkey).connect(ethers.provider);
 
   log("Deployer address:", deployer.address);
   log("Deployer balance:", (await deployer.getBalance()).toString());
   log("CLONEFACTORY address:", cloneFactoryAddr);
-  log()
+  log();
 
-  const currentCloneFactoryImpl = await upgrades.erc1967.getImplementationAddress(cloneFactoryAddr)
+  const currentCloneFactoryImpl =
+    await upgrades.erc1967.getImplementationAddress(cloneFactoryAddr);
   log("Current CLONEFACTORY implementation:", currentCloneFactoryImpl);
 
-  const CloneFactory = await ethers.getContractFactory(newCloneFactoryContractName);
-  const cloneFactory = await upgrades.upgradeProxy(cloneFactoryAddr, CloneFactory, { unsafeAllow: ['constructor'] });
+  const CloneFactory = await ethers.getContractFactory(
+    newCloneFactoryContractName,
+  );
+  const cloneFactory = await upgrades.upgradeProxy(
+    cloneFactoryAddr,
+    CloneFactory,
+    { unsafeAllow: ["constructor"] },
+  );
   await cloneFactory.deployed();
 
-  const receipt = await ethers.provider.getTransactionReceipt(cloneFactory.deployTransaction.hash);
-  const newCloneFactoryImpl = await upgrades.erc1967.getImplementationAddress(cloneFactoryAddr)
-  log("New CLONEFACTORY implementation:", newCloneFactoryImpl, " gas used: ", receipt.gasUsed);
-  log()
+  const receipt = await ethers.provider.getTransactionReceipt(
+    cloneFactory.deployTransaction.hash,
+  );
+  const newCloneFactoryImpl =
+    await upgrades.erc1967.getImplementationAddress(cloneFactoryAddr);
+  log(
+    "New CLONEFACTORY implementation:",
+    newCloneFactoryImpl,
+    " gas used: ",
+    receipt.gasUsed,
+  );
+  log();
 
   if (currentCloneFactoryImpl === newCloneFactoryImpl) {
-    log("Warning: CLONEFACTORY implementation didn't change, cause it's likely the same implementation");
+    log(
+      "Warning: CLONEFACTORY implementation didn't change, cause it's likely the same implementation",
+    );
   } else {
-    log("CLONEFACTORY implementation updated")
+    log("CLONEFACTORY implementation updated");
   }
 }
 
-export async function UpdateImplementation(newImplementationContractName: string, cloneFactoryAddr: string, deployerPkey: string, log = noop) {
+export async function UpdateImplementation(
+  newImplementationContractName: string,
+  cloneFactoryAddr: string,
+  deployerPkey: string,
+  log = noop,
+) {
   const deployer = new Wallet(deployerPkey).connect(ethers.provider);
 
   log("Updating IMPLEMENTATION contract");
   log();
-  log("Clonefactory address", cloneFactoryAddr)
+  log("Clonefactory address", cloneFactoryAddr);
   log("Deployer account:", deployer.address);
   log("Account balance:", (await deployer.getBalance()).toString());
   log();
 
   const CloneFactory = await ethers.getContractFactory("CloneFactory");
-  const Implementation = await ethers.getContractFactory(newImplementationContractName, deployer);
+  const Implementation = await ethers.getContractFactory(
+    newImplementationContractName,
+    deployer,
+  );
 
-  const baseImplementationAddr = await CloneFactory.attach(cloneFactoryAddr).baseImplementation();
+  const baseImplementationAddr =
+    await CloneFactory.attach(cloneFactoryAddr).baseImplementation();
   log("Updating base implementation contract:", baseImplementationAddr);
 
-  const oldLogicAddr = await upgrades.beacon.getImplementationAddress(baseImplementationAddr);
-  log("Old beacon proxy logic:", oldLogicAddr)
+  const oldLogicAddr = await upgrades.beacon.getImplementationAddress(
+    baseImplementationAddr,
+  );
+  log("Old beacon proxy logic:", oldLogicAddr);
   log();
 
   // IMPORTANT: remove unsafeSkipStorageCheck and struct-definition for future upgrades
-  const newImplementation = await upgrades.upgradeBeacon(baseImplementationAddr, Implementation, { unsafeAllow: ['constructor'], unsafeSkipStorageCheck: true });
-  const newLogicAddr = await upgrades.beacon.getImplementationAddress(newImplementation.address);
-  log("New beacon proxy logic:", newLogicAddr)
+  const newImplementation = await upgrades.upgradeBeacon(
+    baseImplementationAddr,
+    Implementation,
+    { unsafeAllow: ["constructor"], unsafeSkipStorageCheck: true },
+  );
+  const newLogicAddr = await upgrades.beacon.getImplementationAddress(
+    newImplementation.address,
+  );
+  log("New beacon proxy logic:", newLogicAddr);
 
   if (oldLogicAddr === newLogicAddr) {
-    log("Warning. Implementation proxy logic address didn't change, because it may be the same implementation. Please test manually.");
+    log(
+      "Warning. Implementation proxy logic address didn't change, because it may be the same implementation. Please test manually.",
+    );
   } else {
-    log("Implementation proxy logic changed.")
-    log("New proxy logic address:", newLogicAddr)
+    log("Implementation proxy logic changed.");
+    log("New proxy logic address:", newLogicAddr);
   }
   log();
 
   log("SUCCESS. Base implementation contract updated.");
 }
 
-export async function ApproveSeller(sellerAddr: string, cloneFactory: any, from: string, log = noop) {
-  log(`Approving seller ${sellerAddr}`)
-  await cloneFactory.methods.setAddToWhitelist(sellerAddr).send({ from, gas: 1000000});
+export async function UpdateValidatorRegistry(
+  newValidatorRegistryContractName: string,
+  validatorRegistryAddr: string,
+  deployerPkey: string,
+  log = noop,
+) {
+  const deployer = new Wallet(deployerPkey).connect(ethers.provider);
+
+  log("Updating VALIDATOR_REGISTRY with the account:", deployer.address);
+  log(
+    "Account balance:",
+    (await ethers.provider.getBalance(deployer.address)).toString(),
+  );
+  log();
+
+  const currentImpl = await upgrades.erc1967.getImplementationAddress(
+    validatorRegistryAddr,
+  );
+  log("Current VALIDATOR_REGISTRY implementation:", currentImpl);
+
+  const ValidatorRegistry = await ethers.getContractFactory(
+    newValidatorRegistryContractName,
+  );
+  const validatorRegistry = await upgrades.upgradeProxy(
+    validatorRegistryAddr,
+    ValidatorRegistry,
+    { unsafeAllow: ["constructor"] },
+  );
+  await validatorRegistry.deployed();
+
+  const receipt = await ethers.provider.getTransactionReceipt(
+    validatorRegistry.deployTransaction.hash,
+  );
+  const newImpl = await upgrades.erc1967.getImplementationAddress(
+    validatorRegistryAddr,
+  );
+  log(
+    "New VALIDATOR_REGISTRY implementation:",
+    newImpl,
+    " gas used: ",
+    receipt.gasUsed,
+  );
+  log();
+
+  if (currentImpl === newImpl) {
+    log(
+      "Warning: implementation didn't change, cause it's likely the same implementation",
+    );
+  } else {
+    log("VALIDATOR_REGISTRY implementation updated");
+  }
+}
+
+export async function ApproveSeller(
+  sellerAddr: string,
+  cloneFactory: any,
+  from: string,
+  log = noop,
+) {
+  log(`Approving seller ${sellerAddr}`);
+  await cloneFactory.methods
+    .setAddToWhitelist(sellerAddr)
+    .send({ from, gas: 1000000 });
   log("Seller approved");
 }
 
-export async function CreateContract(priceDecimalLMR: string, durationSeconds: string, hrGHS: string, cloneFactory: any, fromWallet: Wallet, marketplaceFee: string, log = noop) {
+export async function CreateContract(
+  priceDecimalLMR: string,
+  durationSeconds: string,
+  hrGHS: string,
+  cloneFactory: any,
+  fromWallet: Wallet,
+  marketplaceFee: string,
+  log = noop,
+) {
   const pubKey = trimRight64Bytes(remove0xPrefix(fromWallet.publicKey));
   const receipt = await cloneFactory.methods
-    .setCreateNewRentalContractV2(priceDecimalLMR, "0", hrGHS, durationSeconds, "0", fromWallet.address, pubKey)
-    .send({ from: fromWallet.address, value: marketplaceFee, gas: 1000000});
+    .setCreateNewRentalContractV2(
+      priceDecimalLMR,
+      "0",
+      hrGHS,
+      durationSeconds,
+      "0",
+      fromWallet.address,
+      pubKey,
+    )
+    .send({ from: fromWallet.address, value: marketplaceFee, gas: 1000000 });
   console.log(receipt.events.contractCreated.returnValues._address);
 
   const address = receipt.events.contractCreated.returnValues._address;
@@ -134,6 +305,8 @@ export async function CreateContract(priceDecimalLMR: string, durationSeconds: s
 
   return { address, txHash };
 }
+
+
 
 // DEPLOY LUMERIN VIEM API EXAMPLE
 //
