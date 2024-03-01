@@ -248,7 +248,12 @@ contract EC {
 
         uint256 p = n;
         uint256 x = bytesToUint(compressed[1:33]);
-        uint256 y2 = (x**3 + a * x + b) % p;
+        // x^3 + ax + b
+        uint256 y2 = addmod(
+            mulmod(x, mulmod(x, x, p), p),
+            addmod(mulmod(x, a, p), b, p),
+            p
+        );
         uint256 y = modExp(y2, (p + 1) / 4, p);
         if ((y % 2) != prefix % 2) {
             y = p - y;
@@ -265,10 +270,10 @@ contract EC {
         base = base % modulus;
         while (exponent > 0) {
             if (exponent % 2 == 1) {
-                result = (result * base) % modulus;
+                result = mulmod(result, base, modulus);
             }
             exponent = exponent >> 1;
-            base = (base * base) % modulus;
+            base = mulmod(base, base, modulus);
         }
         return result;
     }
