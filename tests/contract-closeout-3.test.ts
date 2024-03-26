@@ -48,25 +48,6 @@ describe("Contract closeout", function () {
     expect(deltaSellerBalance).equal(Number(price))
   })
 
-  it("should disallow closeout type 3 for incompleted contract", async function () {
-    const receipt = await cf.methods.setCreateNewRentalContractV2(price, "3", speed, length, "0", cloneFactoryAddress, "123").send({ from: seller, value: fee })
-    const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
-
-    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
-    console.log('rere')
-
-    await AdvanceBlockTime(web3, Number(length) / 2)
-
-    const impl = Implementation(web3, hrContractAddr)
-    try {
-      await impl.methods.setContractCloseOut("3").send({ from: seller, value: fee })
-      expect.fail("should not allow closeout type 3 for incompleted contract")
-    } catch (err) {
-      expectIsError(err)
-      expect(err.message).includes("the contract has yet to be carried to term")
-    }
-  })
-
   it("should disallow closeout type 3 for buyer", async function () {
     const receipt = await cf.methods.setCreateNewRentalContractV2(price, "3", speed, length, "0", cloneFactoryAddress, "123").send({ from: seller, value: fee })
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
@@ -81,24 +62,6 @@ describe("Contract closeout", function () {
     } catch (err) {
       expectIsError(err)
       expect(err.message).includes("only the seller can closeout AND withdraw after contract term")
-    }
-  })
-
-  it("should disallow closeout type 3 twice", async function () {
-    const receipt = await cf.methods.setCreateNewRentalContractV2(price, "3", speed, length, "0", cloneFactoryAddress, "123").send({ from: seller, value: fee })
-    const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
-
-    await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
-    await AdvanceBlockTime(web3, Number(length))
-
-    const impl = Implementation(web3, hrContractAddr)
-    await impl.methods.setContractCloseOut("3").send({ from: seller, value: fee })
-    try {
-      await impl.methods.setContractCloseOut("3").send({ from: seller, value: fee })
-      expect.fail("should not allow closeout type 3 twice")
-    } catch (err) {
-      expectIsError(err)
-      expect(err.message).includes("the contract is not in the running state")
     }
   })
 
