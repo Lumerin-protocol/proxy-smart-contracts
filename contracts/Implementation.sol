@@ -30,7 +30,8 @@ contract Implementation is Initializable, Escrow {
     enum CloseReason {
         Unspecified,
         Underdelivery,
-        DestinationUnavailable
+        DestinationUnavailable,
+        ShareTimeout
     }
 
     struct Terms {
