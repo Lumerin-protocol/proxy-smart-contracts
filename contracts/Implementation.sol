@@ -52,12 +52,13 @@ contract Implementation is Initializable, Escrow {
         address _buyer;
     }
 
-    event contractPurchased(address indexed _buyer); //make indexed
+    event contractPurchased(address indexed _buyer);
     event contractClosed(address indexed _buyer); // Deprecated, use closedEarly instead
-    event closedEarly(CloseReason reason);
+    event closedEarly(CloseReason _reason);
     event purchaseInfoUpdated(address indexed _address); // emitted on either terms or futureTerms update
     event cipherTextUpdated(string newCipherText); // Deprecated, use event destinationUpdated
     event destinationUpdated(string newValidatorURL, string newDestURL);
+    event fundsClaimed();
 
     function initialize(
         uint256 _price,
@@ -375,13 +376,13 @@ contract Implementation is Initializable, Escrow {
         );
 
         uint256 amountToKeepInEscrow = 0;
-
         if (contractState() == ContractState.Running) {
             // if contract is running we need to keep some funds
             // in the escrow for refund if seller cancels contract
             amountToKeepInEscrow = getBuyerPayout();
         }
 
+        emit fundsClaimed();
         maybeApplyFutureTerms();
 
         CloneFactory(cloneFactory).payMarketplaceFee{
@@ -401,15 +402,14 @@ contract Implementation is Initializable, Escrow {
             "the contract is not in the running state"
         );
 
-        uint256 buyerPayout = getBuyerPayout();
-
         HistoryEntry storage historyEntry = history[history.length - 1];
         historyEntry._goodCloseout = false;
         historyEntry._endTime = block.timestamp;
-        startingBlockTimestamp = 0;
 
+        uint256 buyerPayout = getBuyerPayout();
+        startingBlockTimestamp = 0;
         maybeApplyFutureTerms();
-        
+
         emit contractClosed(buyer); // Deprecated, use closedEarly instead
         emit closedEarly(reason);
 
