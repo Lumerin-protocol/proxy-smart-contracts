@@ -6,7 +6,7 @@ async function main() {
   console.log("CloneFactory update script")
   console.log()
 
-  const env = requireEnvsSet("OWNER_PRIVATEKEY", "LUMERIN_TOKEN_ADDRESS", "FEE_RECIPIENT_ADDRESS", "CLONE_FACTORY_ADDRESS")
+  const env = requireEnvsSet("OWNER_PRIVATEKEY", "CLONE_FACTORY_ADDRESS");
   await UpdateCloneFactory("CloneFactory", env.CLONE_FACTORY_ADDRESS, env.OWNER_PRIVATEKEY, console.log)
   
   fs.writeFileSync("clonefactory-addr.tmp", env.CLONE_FACTORY_ADDRESS);

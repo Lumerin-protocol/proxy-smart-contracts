@@ -8,9 +8,8 @@ import {CloneFactory} from "./CloneFactory.sol";
 
 //MyToken is place holder for actual lumerin token, purely for testing purposes
 contract Implementation is Initializable, Escrow {
-    ContractState public contractState;
+    ContractState public emptySlot1; // not used anywhere, do not delete
     Terms public terms;
-
     uint256 public startingBlockTimestamp; // the timestamp of the block when the contract was purchased
     address public buyer; // address of the current purchaser of the contract
     address public seller; // address of the seller of the contract
@@ -19,13 +18,20 @@ contract Implementation is Initializable, Escrow {
     string public encrValidatorURL; // if using own validator (buyer-node) this will be the encrypted buyer address. Encrypted with the seller's public key
     string public pubKey; // encrypted data for pool target info
     bool public isDeleted; // used to track if the contract is deleted, separate variable to account for the possibility of a contract being deleted when it is still running
-    HistoryEntry[] public history;
+    HistoryEntry[] public history; // TODO: replace this struct with querying logs from a blockchain node
     Terms public futureTerms;
     string public encrDestURL; // where to redirect the hashrate after validation (for both third-party validator and buyer-node) If empty, then the hashrate will be redirected to the default pool of the buyer node
 
     enum ContractState {
         Available,
         Running
+    }
+
+    enum CloseReason {
+        Unspecified,
+        Underdelivery,
+        DestinationUnavailable,
+        ShareTimeout
     }
 
     struct Terms {
@@ -47,11 +53,13 @@ contract Implementation is Initializable, Escrow {
         address _buyer;
     }
 
-    event contractPurchased(address indexed _buyer); //make indexed
-    event contractClosed(address indexed _buyer);
-    event purchaseInfoUpdated(address indexed _address);
-    event cipherTextUpdated(string newCipherText);
+    event contractPurchased(address indexed _buyer);
+    event contractClosed(address indexed _buyer); // Deprecated, use closedEarly instead
+    event closedEarly(CloseReason _reason);
+    event purchaseInfoUpdated(address indexed _address); // emitted on either terms or futureTerms update
+    event cipherTextUpdated(string newCipherText); // Deprecated, use event destinationUpdated
     event destinationUpdated(string newValidatorURL, string newDestURL);
+    event fundsClaimed();
 
     function initialize(
         uint256 _price,
@@ -68,10 +76,17 @@ contract Implementation is Initializable, Escrow {
         terms = Terms(_price, _limit, _speed, _length, 0, _profitTarget);
         seller = _seller;
         cloneFactory = _cloneFactory;
-        contractState = ContractState.Available;
         pubKey = _pubKey;
         validator = _validator;
         Escrow.initialize(_lmrAddress);
+    }
+
+    function contractState() public view returns (ContractState) {
+        uint256 expirationTime = startingBlockTimestamp + terms._length;
+        if (block.timestamp < expirationTime) {
+            return ContractState.Running;
+        }
+        return ContractState.Available;
     }
 
     function getPublicVariables()
@@ -95,7 +110,7 @@ contract Implementation is Initializable, Escrow {
     {
         bool hasFutureTerms = futureTerms._length != 0;
         return (
-            contractState,
+            contractState(),
             terms._price,
             terms._limit,
             terms._speed,
@@ -128,7 +143,7 @@ contract Implementation is Initializable, Escrow {
     {
         bool hasFutureTerms = futureTerms._length != 0;
         return (
-            contractState,
+            contractState(),
             terms,
             startingBlockTimestamp,
             buyer,
@@ -189,15 +204,29 @@ contract Implementation is Initializable, Escrow {
             "this address is not approved to call the purchase function"
         );
         require(
-            contractState == ContractState.Available,
+            contractState() == ContractState.Available,
             "contract is not in an available state"
         );
+        
+        maybeApplyFutureTerms();
+
+        history.push(
+            HistoryEntry(
+                true,
+                block.timestamp,
+                block.timestamp + terms._length,
+                terms._price,
+                terms._speed,
+                terms._length,
+                buyer
+            )
+        );
+
         encrValidatorURL = _encrValidatorURL;
         encrDestURL = _encrDestURL;
         buyer = _buyer;
         validator = _validator;
         startingBlockTimestamp = block.timestamp;
-        contractState = ContractState.Running;
         createEscrow(seller, buyer, terms._price);
         emit contractPurchased(msg.sender);
     }
@@ -212,7 +241,7 @@ contract Implementation is Initializable, Escrow {
             "this account is not authorized to update the ciphertext information"
         );
         require(
-            contractState == ContractState.Running,
+            contractState() == ContractState.Running,
             "the contract is not in the running state"
         );
         encrValidatorURL = _newEncryptedPoolData;
@@ -230,7 +259,7 @@ contract Implementation is Initializable, Escrow {
             "this account is not authorized to update the ciphertext information"
         );
         require(
-            contractState == ContractState.Running,
+            contractState() == ContractState.Running,
             "the contract is not in the running state"
         );
         encrDestURL = _encrDestURL;
@@ -251,7 +280,7 @@ contract Implementation is Initializable, Escrow {
             msg.sender == cloneFactory,
             "this address is not approved to call this function"
         );
-        if (contractState == ContractState.Running) {
+        if (contractState() == ContractState.Running) {
             futureTerms = Terms(
                 _price,
                 _limit,
@@ -269,17 +298,12 @@ contract Implementation is Initializable, Escrow {
                 terms._version + 1,
                 _profitTarget
             );
-            emit purchaseInfoUpdated(address(this));
         }
+        emit purchaseInfoUpdated(address(this));
     }
 
-    function resetContractVariablesAndApplyFutureTerms() internal {
-        buyer = address(0);
-        encrValidatorURL = "";
-        encrDestURL = "";
-        contractState = ContractState.Available;
-
-        if (futureTerms._length != 0) {
+    function maybeApplyFutureTerms() internal {
+        if (futureTerms._version != 0) {
             terms = Terms(
                 futureTerms._price,
                 futureTerms._limit,
@@ -306,126 +330,27 @@ contract Implementation is Initializable, Escrow {
         return 0;
     }
 
+    // DEPRECATED, use closeEarly or claimFunds instead
     function setContractCloseOut(uint256 closeOutType) public payable {
         if (closeOutType == 0) {
             // this closeoutType is only for the buyer to close early
             // and withdraw their funds
-            require(
-                msg.sender == buyer || msg.sender == validator,
-                "this account is not authorized to trigger an early closeout"
-            );
-            require(
-                contractState == ContractState.Running,
-                "the contract is not in the running state"
-            );
-
-            uint256 buyerPayout = getBuyerPayout();
-            bool comp = block.timestamp - startingBlockTimestamp >=
-                terms._length;
-            history.push(
-                HistoryEntry(
-                    comp,
-                    startingBlockTimestamp,
-                    block.timestamp,
-                    terms._price,
-                    terms._speed,
-                    terms._length,
-                    buyer
-                )
-            );
-            resetContractVariablesAndApplyFutureTerms();
-            emit contractClosed(buyer);
-
-            bool sent = withdrawFundsBuyer(buyerPayout);
-            require(sent, "Failed to withdraw funds");
+            closeEarly(CloseReason.Unspecified);
         } else if (closeOutType == 1) {
             // this closeoutType is only for the seller to withdraw their funds
             // at any time during the smart contracts lifecycle
 
-            require(
-                msg.sender == seller,
-                "this account is not a seller of this contract"
-            );
-
-            uint256 amountToKeepInEscrow = 0;
-
-            if (contractState == ContractState.Running) {
-                // if contract is running we need to keep some funds
-                // in the escrow for refund if seller cancels contract
-                amountToKeepInEscrow = getBuyerPayout();
-            }
-
-            bool sent = withdrawAllFundsSeller(amountToKeepInEscrow);
-            require(sent, "Failed to withdraw funds");
-
-            sent = CloneFactory(cloneFactory).payMarketplaceFee{
-                value: msg.value
-            }();
-            require(sent, "Failed to pay marketplace withdrawal fee");
+            claimFunds();
         } else if (closeOutType == 2) {
             // this closeoutType is only for the seller to closeout after contract ended
             // without claiming funds, keeping them in the escrow
-            require(
-                block.timestamp - startingBlockTimestamp >= terms._length,
-                "the contract has yet to be carried to term"
-            );
-            require(
-                contractState == ContractState.Running,
-                "the contract is not in the running state"
-            );
-
-            history.push(
-                HistoryEntry(
-                    true,
-                    startingBlockTimestamp,
-                    block.timestamp,
-                    terms._price,
-                    terms._speed,
-                    terms._length,
-                    buyer
-                )
-            );
-
-            resetContractVariablesAndApplyFutureTerms();
-            emit contractClosed(buyer);
+            // NOOP after implementing auto-closeout
         } else if (closeOutType == 3) {
             // this closeoutType is only for the seller to closeout after contract ended
             // and claim all funds collected in the escrow
-            require(
-                msg.sender == seller,
-                "only the seller can closeout AND withdraw after contract term"
-            );
-            require(
-                block.timestamp - startingBlockTimestamp >= terms._length,
-                "the contract has yet to be carried to term"
-            );
-            require(
-                contractState == ContractState.Running,
-                "the contract is not in the running state"
-            );
-
-            history.push(
-                HistoryEntry(
-                    true,
-                    startingBlockTimestamp,
-                    block.timestamp,
-                    terms._price,
-                    terms._speed,
-                    terms._length,
-                    buyer
-                )
-            );
-
-            resetContractVariablesAndApplyFutureTerms();
-            emit contractClosed(buyer);
-
-            bool sent = CloneFactory(cloneFactory).payMarketplaceFee{
-                value: msg.value
-            }();
-            require(sent, "Failed to pay marketplace withdrawal fee");
-
-            sent = withdrawAllFundsSeller(0);
-            require(sent, "Failed to withdraw funds");
+            require(msg.sender == seller, "only the seller can closeout AND withdraw after contract term");
+            // no need to closeout after implementing auto-closeout
+            claimFunds();
         } else {
             revert("you must make a selection from 0 to 3");
         }
@@ -443,5 +368,52 @@ contract Implementation is Initializable, Escrow {
         );
 
         isDeleted = _isDeleted;
+    }
+
+    function claimFunds() public payable {
+        require(
+            msg.sender == seller,
+            "this account is not authorized to claim funds"
+        );
+
+        uint256 amountToKeepInEscrow = 0;
+        if (contractState() == ContractState.Running) {
+            // if contract is running we need to keep some funds
+            // in the escrow for refund if seller cancels contract
+            amountToKeepInEscrow = getBuyerPayout();
+        }
+
+        emit fundsClaimed();
+        maybeApplyFutureTerms();
+
+        CloneFactory(cloneFactory).payMarketplaceFee{
+            value: msg.value
+        }();
+
+        withdrawAllFundsSeller(amountToKeepInEscrow);
+    }
+
+    function closeEarly(CloseReason reason) public {
+        require(
+            msg.sender == buyer || msg.sender == validator,
+            "this account is not authorized to trigger an early closeout"
+        );
+        require(
+            contractState() == ContractState.Running,
+            "the contract is not in the running state"
+        );
+
+        HistoryEntry storage historyEntry = history[history.length - 1];
+        historyEntry._goodCloseout = false;
+        historyEntry._endTime = block.timestamp;
+
+        uint256 buyerPayout = getBuyerPayout();
+        startingBlockTimestamp = 0;
+        maybeApplyFutureTerms();
+
+        emit contractClosed(buyer); // Deprecated, use closedEarly instead
+        emit closedEarly(reason);
+
+        withdrawFundsBuyer(buyerPayout);
     }
 }
