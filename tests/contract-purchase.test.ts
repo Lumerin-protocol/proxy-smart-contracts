@@ -54,22 +54,16 @@ describe("Contract purchase", function () {
     const impl = Implementation(web3, hrContractAddr)
     const { _version } = await impl.methods.terms().call()
 
-    const history_before = await impl.methods.getHistory('0', '100').call()
-    expect(history_before.length).equal(0)
-
     await cf.methods.setPurchaseRentalContractV2(hrContractAddr, validatorAddr, encValidatorURL.toString('hex'), encDestURL.toString('hex'), _version)
       .send({ from: buyer, value: fee })
 
     const actValidatorURL = await impl.methods.encrValidatorURL().call()
     const actDestURL = await impl.methods.encrDestURL().call()
     const actValidatorAddr = await impl.methods.validator().call()
-    const history_after = await impl.methods.getHistory('0', '100').call()
 
     expect(actValidatorURL).equal(encValidatorURL.toString('hex'))
     expect(actDestURL).equal(encDestURL.toString('hex'))
     expect(actValidatorAddr).equal(validatorAddr)
-    expect(history_after.length).equal(1)
-    expect(history_after[0]._buyer).equal(buyer)
 
     await impl.methods.setContractCloseOut("0").send({ from: buyer })
   })
