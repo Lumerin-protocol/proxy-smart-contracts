@@ -15,9 +15,9 @@ const fullMarketplace: AggregatedContractEntry[] = [
 ]
 
 const partialMarketplace: AggregatedContractEntry[] = [
-  { speedTHPS: 100, lengthHours: 1, priceLMR: 1, count: 1 },
-  { speedTHPS: 100, lengthHours: .5, priceLMR: 1, count: 1 },
-  { speedTHPS: 100, lengthHours: 2, priceLMR: 1, count: 1 }
+  { speedTHPS: 100, lengthHours: 1, priceLMR: 1, count: 3 },
+  { speedTHPS: 100, lengthHours: .5, priceLMR: 1, count: 3 },
+  { speedTHPS: 100, lengthHours: 2, priceLMR: 1, count: 3 }
 ]
 
 function unwrapAggregated(entries: typeof fullMarketplace) {
