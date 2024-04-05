@@ -218,7 +218,7 @@ contract Implementation is Initializable, Escrow {
                 terms._price,
                 terms._speed,
                 terms._length,
-                buyer
+                _buyer
             )
         );
 
