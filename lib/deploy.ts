@@ -122,9 +122,28 @@ export async function ApproveSeller(sellerAddr: string, cloneFactory: any, from:
 
 export async function CreateContract(priceDecimalLMR: string, durationSeconds: string, hrGHS: string, cloneFactory: any, fromWallet: Wallet, marketplaceFee: string, log = noop) {
   const pubKey = trimRight64Bytes(remove0xPrefix(fromWallet.publicKey));
+  const gas = await cloneFactory.methods
+    .setCreateNewRentalContractV2(
+      priceDecimalLMR,
+      "0",
+      hrGHS,
+      durationSeconds,
+      "0",
+      fromWallet.address,
+      pubKey,
+    )
+    .estimateGas({ from: fromWallet.address, value: marketplaceFee });
   const receipt = await cloneFactory.methods
-    .setCreateNewRentalContractV2(priceDecimalLMR, "0", hrGHS, durationSeconds, "0", fromWallet.address, pubKey)
-    .send({ from: fromWallet.address, value: marketplaceFee, gas: 1000000});
+    .setCreateNewRentalContractV2(
+      priceDecimalLMR,
+      "0",
+      hrGHS,
+      durationSeconds,
+      "0",
+      fromWallet.address,
+      pubKey,
+    )
+    .send({ from: fromWallet.address, value: marketplaceFee, gas });
   console.log(receipt.events.contractCreated.returnValues._address);
 
   const address = receipt.events.contractCreated.returnValues._address;
@@ -134,6 +153,7 @@ export async function CreateContract(priceDecimalLMR: string, durationSeconds: s
 
   return { address, txHash };
 }
+
 
 // DEPLOY LUMERIN VIEM API EXAMPLE
 //
