@@ -107,7 +107,7 @@ describe("Contract terms update", function () {
       e.returnValues._address === hrContractAddr
     )
 
-    expect(isEventFound).to.be.false;
+    expect(isEventFound).to.be.true;
   })
 
   it("should apply futureTerms after contract closed and emit event", async function () {

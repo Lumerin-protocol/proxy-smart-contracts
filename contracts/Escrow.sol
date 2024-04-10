@@ -39,6 +39,8 @@ contract Escrow is Initializable, ReentrancyGuardUpgradeable {
     }
 
     // withdraws all funds except for the remaining amount to seller
+    // TODO: transfer always returns true, but throws on failure
+    // remove returning boolean
     function withdrawAllFundsSeller(uint256 remaining) internal nonReentrant returns (bool) {
         uint256 balance = lumerin.balanceOf(address(this)) - remaining;
         return lumerin.transfer(escrow_seller, balance);

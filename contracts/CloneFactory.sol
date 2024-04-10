@@ -55,6 +55,7 @@ contract CloneFactory is Initializable {
         feeRecipient.recipient = _feeRecipient;
     }
 
+    // TODO: remove return value and just use require
     function payMarketplaceFee()
         public payable sufficientFee returns (bool) {
         (bool sent,) = payable(feeRecipient.recipient).call{value: feeRecipient.fee}("");
@@ -173,31 +174,32 @@ contract CloneFactory is Initializable {
             "cannot purchase your own contract"
         );
 
-        (uint256 _price,,,, uint32 _version,) = targetContract.terms();
+        uint256 _price;
+        uint32 _version;
 
+        (_price,,,,_version,) = targetContract.futureTerms();
+        if (_version == 0) {
+            (_price,,,,_version,) = targetContract.terms();
+        }
         require(
             _version == termsVersion,
             "cannot purchase, contract terms were updated"
         );
 
         /* ETH buyer marketplace purchase fee */
-        bool sent = payMarketplaceFee();
-        require(sent, "Failed to pay marketplace purchase fee");
+        payMarketplaceFee();
 
-        uint256 requiredAllowance = _price;
         uint256 actualAllowance = lumerin.allowance(msg.sender, address(this));
         require(
-            actualAllowance >= requiredAllowance,
+            actualAllowance >= _price,
             "not authorized to spend required funds"
         );
 
-        bool tokensTransfered = lumerin.transferFrom(
+        lumerin.transferFrom(
             msg.sender,
             _contractAddress,
             _price
         );
-        require(tokensTransfered, "lumerin transfer failed");
-
         targetContract.setPurchaseContract(
             _encrValidatorURL,
             _encrDestURL,

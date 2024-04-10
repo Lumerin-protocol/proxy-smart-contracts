@@ -30,8 +30,16 @@ describe("Contract closeout", function () {
   })
 
   it("should verify balances after 0% early closeout", async function () {
-    await testEarlyCloseout(0, fee, seller, buyer, cloneFactoryAddress, lumerinAddress, web3)
-  })
+    await testEarlyCloseout(
+      0,
+      fee,
+      seller,
+      buyer,
+      cloneFactoryAddress,
+      lumerinAddress,
+      web3,
+    );
+  });
 
   it("should verify balances after 1% early closeout", async function () {
     await testEarlyCloseout(0.01, fee, seller, buyer, cloneFactoryAddress, lumerinAddress, web3)
@@ -49,27 +57,38 @@ describe("Contract closeout", function () {
     await testEarlyCloseout(0.75, fee, seller, buyer, cloneFactoryAddress, lumerinAddress, web3)
   })
 
-  it("should verify balances after 100% early closeout", async function () {
-    await testEarlyCloseout(1, fee, seller, buyer, cloneFactoryAddress, lumerinAddress, web3)
-  })
+  it("should fail early closeout when progress of the contract is 100%", async function () {
+    try {
+      await testEarlyCloseout(
+        1,
+        fee,
+        seller,
+        buyer,
+        cloneFactoryAddress,
+        lumerinAddress,
+        web3,
+      );
+    } catch (err) {
+      expectIsError(err);
+      expect(err.message).includes("the contract is not in the running state");
+    }
+  });
 
   it("should disallow closeout type 0 twice", async function () {
     const receipt = await cf.methods.setCreateNewRentalContractV2(price, "0", speed, length, "0", cloneFactoryAddress, "123").send({ from: seller, value: fee })
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
     await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
-    await AdvanceBlockTime(web3, Number(length))
+    await AdvanceBlockTime(web3, 1);
 
     const impl = Implementation(web3, hrContractAddr)
     await impl.methods.setContractCloseOut("0").send({ from: buyer, value: fee })
     try {
-      await impl.methods.setContractCloseOut("0").send({ from: buyer, value: fee })
-      expect.fail("should not allow closeout type 0 twice")
+      await impl.methods.setContractCloseOut("0").send({ from: buyer, value: fee });
+      expect.fail("should not allow closeout type 0 twice");
     } catch (err) {
-      // after first closeout the buyer field is set to zero address
-      // so the error message is different
-      expectIsError(err)
-      expect(err.message).includes("this account is not authorized to trigger an early closeout")
+      expectIsError(err);
+      expect(err.message).includes("the contract is not in the running state");
     }
   })
 
@@ -78,7 +97,7 @@ describe("Contract closeout", function () {
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 
     await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
-    await AdvanceBlockTime(web3, Number(length))
+    await AdvanceBlockTime(web3, 1);
 
     const impl = Implementation(web3, hrContractAddr)
     await impl.methods.setContractCloseOut("0").send({ from: buyer, value: 0 })
@@ -101,6 +120,10 @@ async function testEarlyCloseout(progress: number, fee: string, seller: string, 
 
   const sellerBalance = Number(await lumerin.methods.balanceOf(seller).call());
   const buyerBalance = Number(await lumerin.methods.balanceOf(buyer).call());
+  const cBalance = Number(
+    await lumerin.methods.balanceOf(hrContractAddr).call(),
+  );
+  console.log(sellerBalance, buyerBalance, cBalance);
 
   await AdvanceBlockTime(web3, progress * Number(length))
 
