@@ -127,6 +127,7 @@ export const LocalTestnetAddresses = {
   owner: "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
   seller: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
   buyer: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+  account3: "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
   validatorAddr: "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
   deployerPrivateKey: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
   ownerPrivateKey: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
@@ -140,5 +141,12 @@ export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 export function noop(...args: any[]) { }
 
 export function expectIsError(err: unknown): asserts err is Error {
-  expect(err).to.be.instanceOf(Error)
+  expect(err).to.be.instanceOf(Error);
+}
+
+export enum CloseReason {
+  Unspecified = "0",
+  Underdelivery = "1",
+  DestinationUnavailable = "2",
+  ShareTimeout = "3",
 }

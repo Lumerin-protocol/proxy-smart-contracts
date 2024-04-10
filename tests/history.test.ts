@@ -50,13 +50,12 @@ describe("Contract history", function () {
     expect(data[0]?._goodCloseout).equal(false)
   })
 
-  it("should add history entry on good closeout", async function () {
+  it("should add a good history entry on purchase", async function () {
     const receipt = await cf.methods.setPurchaseRentalContract(hrContractAddr, "abc", "0").send({ from: buyer, value: fee })
     const { timestamp: purchaseTime } = await web3.eth.getBlock(receipt.blockNumber);
 
     await AdvanceBlockTime(web3, 3600)
     const impl = Implementation(web3, hrContractAddr)
-    await impl.methods.setContractCloseOut("2").send({ from: seller, value: fee })
 
     const data = await impl.methods.getHistory("0", "100").call()
     const entry = data.find(entry => entry._purchaseTime === purchaseTime.toString())
