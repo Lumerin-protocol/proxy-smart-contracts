@@ -10,8 +10,8 @@ stages:
   - deploy-contracts
 
 variables:
-  CI_GROUP_ID: "15533332" # id of the proxy group
-  CONTRACT_STATE_SUBGROUP: "gitlab.com/TitanInd/proxy/smart-contracts-state" 
+  # CI_GROUP_ID: moved to GitLab variables (4/16/2024)
+  # CONTRACT_STATE_SUBGROUP: moved to GitLab variables (4/16/2024)
   NODE_IMAGE: "node:20-buster"
 
 
@@ -52,6 +52,7 @@ variables:
 # Gitlab api has a bug: PUT is not working correctly with environment field
 # https://gitlab.com/gitlab-org/gitlab/-/issues/9912
 # DELETE+POST is used instead
+
 .set-env: &set-env
   - echo "Setting env variable $ENV_NAME=$ENV_VALUE in $ENV_ENV environment"
   - if [ -z "$ENV_ENV" ]; then export ENV_ENV="*"; fi
@@ -532,21 +533,22 @@ release-contracts-js:
     - make release-js
     - rm -f ~/.ssh/id_rsa
 
-release-contracts-audit:
-  stage: release-bindings
-  needs: ["release-contracts-js", "release-contracts-go"]
-  image: $NODE_IMAGE
-  # when: manual
-  tags: *tags-lmn
-  # only:
-  #   - main
-  before_script:
-    - apt-get -yq update && apt-get -yqq install openssh-client
-    - mkdir ~/.ssh
-    - ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
-  script:
-    - cp $SSH_KEY_SMART_CONTRACTS ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - make update-public-contracts
-    - rm -f ~/.ssh/id_rsa
+# Removed 4/16/2024 - not required when root is in GitHub 
+# release-contracts-audit:
+#   stage: release-bindings
+#   needs: ["release-contracts-js", "release-contracts-go"]
+#   image: $NODE_IMAGE
+#   # when: manual
+#   tags: *tags-lmn
+#   # only:
+#   #   - main
+#   before_script:
+#     - apt-get -yq update && apt-get -yqq install openssh-client
+#     - mkdir ~/.ssh
+#     - ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
+#   script:
+#     - cp $SSH_KEY_SMART_CONTRACTS ~/.ssh/id_rsa
+#     - chmod 600 ~/.ssh/id_rsa
+#     - make update-public-contracts
+#     - rm -f ~/.ssh/id_rsa
 
