@@ -1,238 +1,269 @@
 //SPDX-License-Identifier: MIT
-pragma solidity >0.8.10;
+pragma solidity ^0.8.20;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {EC} from "./EC.sol";
+// openzeppelin v4 is required to work with solarity paginator
+import {Paginator} from "@solarity/solidity-lib/libs/arrays/Paginator.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+// following are openzeppelin v5 dependencies
+import {Initializable} from "@openzeppelin/contracts-upgradeable-v5/proxy/utils/Initializable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable-v5/access/OwnableUpgradeable.sol";
+import {IERC20} from "@openzeppelin/contracts-v5/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts-v5/token/ERC20/utils/SafeERC20.sol";
 
-contract ValidatorRegistry is Initializable, EC {
+contract ValidatorRegistry is OwnableUpgradeable {
+    using EnumerableSet for EnumerableSet.AddressSet;
+    using Paginator for EnumerableSet.AddressSet;
+    using SafeERC20 for IERC20;
 
     struct Validator {
+        uint256 stake;
         address addr;
-        bytes url;
-        uint last_seen;
-        uint stake;
-        uint index;
-        uint votes;
-        address last_punisher;
-        uint[2] pubkey;
-        uint[2][] sessionKeys;
-        bytes32 checksum;
+        address lastComplainer;
+        uint8 complains;
+        string host; // host:port of the validator
     }
 
-    struct Buyer {
-        address addr;
-        uint[2] pubkey;
+    event ValidatorRegisteredUpdated(address indexed validator);
+    event ValidatorDeregistered(address indexed validator);
+    event ValidatorComplain(
+        address indexed validator,
+        address indexed complainer
+    );
+    event ValidatorPunished(address indexed validator);
+
+    error Unauthorized(); // not authorized to perform this action
+    error HostTooLong(); // string is too long
+    error InsufficientStake(); // not enough stake to register
+    error ValidatorNotFound(); // validator not found
+    error AlreadyComplained(); // the last complain was made by the same address
+
+    uint8 constant hostLengthLimit = 255; // max length of url
+
+    IERC20 public token; // token used for staking
+    uint256 public totalStake; // total amount of all collected stakes, used to avoid withdrawing all funds by owners
+    uint256 public stakeMinimum; // minimum stake to be considered usable
+    uint256 public stakeRegister; // amount needed to register as a validator
+    uint256 public punishAmount; // how much to punish by
+    uint8 public punishThreshold; // how many votes before punishment
+
+    mapping(address => Validator) public validators;
+    EnumerableSet.AddressSet internal validatorAddresses;
+    EnumerableSet.AddressSet internal activeValidators;
+
+    function initialize(
+        IERC20 _token,
+        uint256 _stakeMinimun,
+        uint256 _stakeRegister,
+        uint256 _punishAmount,
+        uint8 _punishThreshold
+    ) public initializer {
+        __Ownable_init(_msgSender());
+
+        token = _token;
+        setStakeMinimum(_stakeMinimun);
+        setStakeRegister(_stakeRegister);
+        setPunishAmount(_punishAmount);
+        setPunishThreshold(_punishThreshold);
     }
 
-    address public owner;
-    Buyer private buyer;
-    uint public stake_minimum = 1; // minimum stake to be considered usable
-    uint public stake_register = 10; // amount needed to register as a validator
-    uint public punish_amount = 1; // how much to punish by
-    uint public punish_threshold = 3; // how many votes before punishment
-    bool public use_encryption = false; // whether or not to encrypt
-    Validator[] public validators; // our list of validators
-
-    modifier onlyOwner()
-    {
-        require(msg.sender == owner, "you are not authorized");
-        _;
-    }
-
-    modifier onlyOwnerOrValidator()
-    {
-        bool found = false;
-        for (uint i=0; i<validators.length; i++) {
-            if (msg.sender == validators[i].addr) {
-                found = true;
-                break;
-            }
-        }
-        require(found || msg.sender == owner, "you are not authorized");
-        _;
-    }
-
-    modifier onlyOwnerOrSelf(address addr)
-    {
-        require(msg.sender == owner || msg.sender == addr, "you are not authorized");
-        _;
-    }
-
-    event ValidatorRegistered(Validator v);
-    event ValidatorDeregistered(Validator v);
-
-    function initialize(uint stakeMin, uint stakeReg, uint punishAmount, uint punishThreshold, bool enc)
-        public initializer
-    {
-        owner = msg.sender;
-        stake_minimum = stakeMin;
-        stake_register = stakeReg;
-        punish_amount = punishAmount;
-        punish_threshold = punishThreshold;
-        use_encryption = enc;
-    }
-
-    function setStakeMinimum(uint val) public onlyOwner
-    {
-        stake_minimum = val;
-    }
-
-    function setStakeRegister(uint val) public onlyOwner
-    {
-        stake_register = val;
-    }
-
-    function setPunishAmount(uint val) public onlyOwner
-    {
-        punish_amount = val;
-    }
-
-    function setPunishThreshold(uint val) public onlyOwner
-    {
-        punish_threshold = val;
-    }
-
-    function setUseEncryption(bool val) public onlyOwner
-    {
-        use_encryption = val;
-    }
-
-    function setBuyer(Buyer calldata val) public onlyOwner
-    {
-        buyer = val;
-    }
-
-    function validator_register(bytes calldata url, address addr, uint[2] calldata pubkey)
-        public payable onlyOwnerOrSelf(addr)
-    {
-        // add to list of validators and escrow the stake
-        (Validator memory v, bool found) = validator_find(url, addr);
-        uint[2][] memory sks;
+    /// @notice Registers validator or updates their stake and/or url
+    /// @param stake amount of tokens to stake
+    /// @param host the url of the validator
+    function validatorRegister(uint256 stake, string calldata host) public {
+        address addr = _msgSender();
+        (Validator storage v, bool found) = validatorByAddress(addr);
         if (!found) {
-            require(msg.value >= stake_register, "not staking enough");
-            v = Validator(addr, url, block.timestamp, 0, validators.length, 0, address(0), pubkey, sks, 0);
-            validators.push(v);
+            if (stake < stakeRegister) {
+                revert InsufficientStake();
+            }
+            v.addr = addr;
+            validatorAddresses.add(addr);
         }
-        v.stake += msg.value;
-        v.last_seen = block.timestamp;
-        validators[v.index] = v;
-        if (use_encryption) {
-            encrypt(url, v);
-        } else {
-            v.url = url;
+
+        if (bytes(host).length > hostLengthLimit) {
+            revert HostTooLong();
         }
-        emit ValidatorRegistered(v);
-        // ^^ exisitng validators should listen for this and call encrypt to reencrypt their url
+        v.host = host;
+
+        v.stake += stake;
+        totalStake += stake;
+
+        if (v.stake >= stakeMinimum) {
+            activeValidators.add(v.addr);
+        }
+
+        emit ValidatorRegisteredUpdated(v.addr);
+
+        if (stake > 0) {
+            token.safeTransferFrom(_msgSender(), address(this), stake);
+        }
     }
 
-    function validator_deregister(bytes calldata url, address addr)
-        public onlyOwnerOrSelf(addr)
-    {
-        // remove validator from registry
-        (Validator memory v, bool found) = validator_find(url, addr);
-        require(found, "cannot find validator");
-        // send all of v.stake to v.addr...
-        require(v.stake > 0, "no funds staked");
-        payable(v.addr).call{value: v.stake};
+    /// @notice Deregister a validator and return their stake
+    function validatorDeregister() public {
+        address addr = _msgSender();
+        (Validator storage v, bool found) = validatorByAddress(addr);
+        if (!found) {
+            revert ValidatorNotFound();
+        }
+        validatorAddresses.remove(addr);
+        activeValidators.remove(addr);
+
+        uint256 stake = v.stake;
+        totalStake -= stake;
+
         v.stake = 0;
-        v.last_seen = block.timestamp;
-        validators[v.index] = v;
-        emit ValidatorDeregistered(v);
+        v.addr = address(0);
+        v.complains = 0;
+        v.host = "";
+        v.lastComplainer = address(0);
+
+        emit ValidatorDeregistered(addr);
+
+        token.safeTransfer(_msgSender(), stake);
     }
 
-    function validator_find(bytes calldata url, address addr)
-        public view returns (Validator memory, bool)
-    {
-        // find validator by url and address...
-        Validator memory v;
-        bool found;
-        for (uint i=0; i<validators.length; i++) {
-            Validator storage e = validators[i];
-            if (keccak256(abi.encodePacked(e.url)) == keccak256(abi.encodePacked(url))
-                && e.addr == addr) {
-                v = e;
-                found = true;
-                break;
-            }
+    /// @notice Complain about a validator not doing their job
+    /// @dev If complaints amount reach a threshold, the validator will be punished by removing their stake
+    /// @param addr validator address
+    function validatorComplain(address addr) public {
+        (, bool ok) = validatorByAddress(_msgSender());
+        if (!ok) {
+            revert Unauthorized();
         }
-        return (v, found);
-    }
-
-    function validator_random_staked()
-        public view returns(Validator memory, bool)
-    {
-        // select a pseudo random validator from all validators that have a remaining stake
-        require(validators.length > 0, "no validators registered");
-        Validator memory v;
-        int trys = int(validators.length);
-        bool found = false;
-        while (trys-- > 0) {
-            uint r = (block.timestamp + uint(trys)) % validators.length;
-            v = validators[r];
-            if (v.stake >= stake_minimum) {
-                found = true;
-                break;
-            }
+        if (_msgSender() == addr) {
+            revert Unauthorized();
         }
+        (Validator storage v, bool found) = validatorByAddress(addr);
         if (!found) {
-            uint[2] memory pk;
-            uint[2][] memory sks;
-            v = Validator(address(0), "", 0, 0, 0, 0, address(0), pk, sks, 0);
+            revert ValidatorNotFound();
         }
-        return (v, found);
-    }
+        if (v.lastComplainer == _msgSender()) {
+            revert AlreadyComplained();
+        }
 
-    function validator_punish(bytes calldata url, address addr)
-        public onlyOwnerOrValidator
-    {
-        // reduce validators stake (when votes reach threshold)
-        (Validator memory v, bool found) = validator_find(url, addr);
-        require(found, "cannot find validator");
-        require(msg.sender != v.last_punisher, "already punished");
-        v.votes += 1;
-        v.last_punisher = msg.sender;
-        if (v.votes >= punish_threshold) {
-            if (int(v.stake) - int(punish_amount) < 0)
+        v.lastComplainer = _msgSender();
+        v.complains += 1;
+        if (v.complains >= punishThreshold) {
+            if (punishAmount > v.stake) {
+                totalStake -= v.stake;
                 v.stake = 0;
-            else
-                v.stake -= punish_amount;
-            v.votes = 0;
-        }
-        validators[v.index] = v;
-    }
-
-    function exor(bytes memory data, bytes32 key)
-        internal pure returns (bytes memory edata)
-    {
-        edata = data;
-        for (uint i=0; i<data.length; i++) {
-            edata[i] = data[i] ^ key[i % 32];
-        }
-    }
-
-    function encrypt(bytes calldata url, Validator memory v)
-        public onlyOwnerOrValidator
-    {
-        require(msg.sender == v.addr, "not authorized");
-        require(url.length > 0, "empty url, cannot encrypt");
-        uint r = uint(keccak256(abi.encodePacked(url, block.timestamp, block.prevrandao)));
-        (uint rx,) = publicKey(r);
-        uint[2][] memory sessionKeys;
-        for (uint i=0; i<validators.length; i++) {
-            Validator storage w = validators[i];
-            if (w.pubkey[0] == 0 || w.pubkey[1] == 0)
-                continue;
-            (uint sx, uint sy) = ecmul(w.pubkey[0], w.pubkey[1], r);
-            sessionKeys[i] = [sx, sy];
-            if (i == validators.length-1 && buyer.pubkey[0] != 0 && buyer.pubkey[1] != 0) {
-                (uint bx, uint by) = ecmul(buyer.pubkey[0], buyer.pubkey[1], r);
-                sessionKeys[validators.length] = [bx, by];
+            } else {
+                totalStake -= punishAmount;
+                v.stake -= punishAmount;
             }
+
+            if (v.stake < stakeMinimum) {
+                activeValidators.remove(v.addr);
+            }
+            v.complains = 0;
+            emit ValidatorPunished(v.addr);
         }
-        v.sessionKeys = sessionKeys;
-        v.url = exor(url, bytes32(rx));
-        v.checksum = keccak256(url);
-        validators[v.index]= v;
+
+        emit ValidatorComplain(v.addr, _msgSender());
+    }
+
+    /// @notice Force update of validator's active state
+    /// @dev Use this function to update active state of a validator after changing minStake
+    /// @dev It should be called on validators which state became inconsistent after changing minStake
+    /// @param validator validator address
+    function forceUpdateActive(address validator) public {
+        (Validator storage v, ) = validatorByAddress(validator);
+        if (v.stake >= stakeMinimum && !activeValidators.contains(v.addr)) {
+            activeValidators.add(v.addr);
+        } else if (activeValidators.contains(v.addr)) {
+            activeValidators.remove(v.addr);
+        }
+    }
+
+    // Public getter functions
+
+    /// @notice Get validator by index
+    /// @param addr validator address
+    /// @return validator Validator record
+    function getValidator(address addr) public view returns (Validator memory) {
+        (Validator storage v, bool ok) = validatorByAddress(addr);
+        if (!ok) {
+            revert ValidatorNotFound();
+        }
+        return v;
+    }
+
+    /// @notice Get total amount of all validators
+    /// @return total amount of validators
+    function validatorsLength() public view returns (uint) {
+        return validatorAddresses.length();
+    }
+
+    /// @notice Get amount of active validators
+    /// @return total amount of active validators
+    function activeValidatorsLength() public view returns (uint) {
+        return activeValidators.length();
+    }
+
+    /// @notice Get validator addresses with pagination
+    /// @param offset skip this many validators
+    /// @param limit amount of validators to return
+    /// @return addresses array of validator addresses
+    function getValidators(
+        uint offset,
+        uint8 limit
+    ) public view returns (address[] memory) {
+        // return Paginator.part(validatorAddresses, offset, limit);
+        return validatorAddresses.part(uint256(offset), uint256(limit));
+    }
+
+    /// @notice Get active validator addresses with pagination
+    /// @param offset skip this many validators
+    /// @param limit amount of validators to return
+    /// @return addresses array of active validator addresses
+    function getActiveValidators(
+        uint offset,
+        uint8 limit
+    ) public view returns (address[] memory) {
+        return activeValidators.part(uint256(offset), uint256(limit));
+    }
+
+    // Private getter functions
+    function validatorByAddress(
+        address addr
+    ) private view returns (Validator storage, bool) {
+        Validator storage v = validators[addr];
+        return (v, v.addr != address(0));
+    }
+
+    // Managing functions
+
+    /// @notice Set minimum stake to be considered as active validator
+    /// @dev Applies only to new validators or when updating stake. To update active state of all validators, use "forceUpdateActive"
+    /// @param val new minimum stake
+    function setStakeMinimum(uint256 val) public onlyOwner {
+        stakeMinimum = val;
+    }
+
+    /// @notice Set amount needed to register as a validator
+    /// @param val new register stake
+    function setStakeRegister(uint256 val) public onlyOwner {
+        stakeRegister = val;
+    }
+
+    /// @notice Set amount of complains needed to punish a validator
+    /// @param val new amount of complains needed to reach threshold
+    function setPunishThreshold(uint8 val) public onlyOwner {
+        punishThreshold = val;
+    }
+
+    /// @notice Set amount of tokens to punish by
+    /// @param val new punish amount
+    function setPunishAmount(uint256 val) public onlyOwner {
+        punishAmount = val;
+    }
+
+    /// @notice withdraw rewards collected by punishing validators
+    function withdraw() public onlyOwner {
+        uint256 withdrawable = token.balanceOf(address(this)) - totalStake;
+        token.safeTransfer(owner(), withdrawable);
     }
 }
 
+// should we punish an inactive validator?
