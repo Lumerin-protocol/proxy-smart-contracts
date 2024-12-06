@@ -14,7 +14,6 @@ variables:
   # CONTRACT_STATE_SUBGROUP: moved to GitLab variables (4/16/2024)
   NODE_IMAGE: "node:20-buster"
 
-
 #####################################
 #           Misc Templates          #
 #####################################
@@ -95,7 +94,6 @@ variables:
   - rm -f ~/.ssh/id_rsa
   - echo "Uploading completed"
 
-
 #####################################
 #         Deploy Templates          #
 #####################################
@@ -105,7 +103,7 @@ variables:
   needs: ["compile-contracts", "test", "build-contracts-js"]
   image: $NODE_IMAGE
   when: manual
-  script: 
+  script:
     - make deploy-lumerin
     - export ENV_NAME="LUMERIN_TOKEN_ADDRESS" ENV_VALUE=$(cat lumerin-addr.tmp)
     - *set-env
@@ -115,7 +113,7 @@ variables:
 # Deploys clonefactory to the blockchain using env variables from the corresponding environment
 # Updates the environment url to the etherscan url of the contract
 # Requires the following variables to be set:
-# - EXPLORER_URL = "https://sepolia.arbiscan.io/address" - the explorer url of the corresponding network 
+# - EXPLORER_URL = "https://sepolia.arbiscan.io/address" - the explorer url of the corresponding network
 .deploy_clonefactory_template: &deploy_clonefactory_template
   stage: deploy-contracts
   needs: ["compile-contracts", "test", "build-contracts-js"]
@@ -160,6 +158,27 @@ variables:
   script:
     - make populate-contracts
 
+.deploy_validator_registry_template: &deploy_validator_registry_template
+  stage: deploy-contracts
+  needs: ["compile-contracts", "test", "build-contracts-js"]
+  image: $NODE_IMAGE
+  when: manual
+  artifacts:
+    paths:
+      - .openzeppelin
+    reports:
+      dotenv: deploy.env
+  environment:
+    name: dev # The environment.name should be overriden
+    url: $DYNAMIC_ENVIRONMENT_URL
+  script:
+    - make deploy-validator-registry
+    - export ENV_NAME="CLONE_FACTORY_ADDRESS" ENV_VALUE=$(cat validator-registry-addr.tmp) ENV_ENV=$CI_ENVIRONMENT_SLUG
+    - *set-env
+    - export DYNAMIC_ENVIRONMENT_URL="$EXPLORER_URL/address/$(cat validator-registry-addr.tmp)"
+    - echo "DYNAMIC_ENVIRONMENT_URL=$DYNAMIC_ENVIRONMENT_URL" >> deploy.env
+    - *upload-state
+
 .whitelist_clonefactory_template: &whitelist_clonefactory_template
   stage: whitelist-clonefactory
   needs: ["compile-contracts", "test", "build-contracts-js"]
@@ -170,7 +189,6 @@ variables:
     action: prepare
   script:
     - make whitelist-clonefactory
-
 
 #####################################
 #         Update Templates          #
@@ -239,7 +257,7 @@ build-contracts-go:
   tags: *tags-lmn
   before_script:
     - apk --no-cache add jq
-  script: 
+  script:
     - ./build-go.sh
   artifacts:
     untracked: true
@@ -265,7 +283,7 @@ test:
   allow_failure: false
   needs: ["build-contracts-js", "compile-contracts"]
   only:
-    - branches    
+    - branches
   script:
     - yarn install
     - make test
@@ -287,7 +305,6 @@ test:
 #     - make compile
 #     - make build-js
 #     - BRANCH_TO_TEST_AGAINST=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME make test-upgrade
-
 
 #####################################
 #           Deploy Jobs             #
@@ -372,8 +389,13 @@ deploy-faucet-lmn:
   # only:
   #   - lmn
 
-
-
+deploy-validator-registry-dev:
+  <<: *deploy_validator_registry_template
+  environment:
+    name: dev
+  tags: *tags-dev
+  # only:
+  #   - dev
 
 #####################################
 #           Update Jobs             #
@@ -532,8 +554,7 @@ release-contracts-js:
     - chmod 600 ~/.ssh/id_rsa
     - make release-js
     - rm -f ~/.ssh/id_rsa
-
-# Removed 4/16/2024 - not required when root is in GitHub 
+# Removed 4/16/2024 - not required when root is in GitHub
 # release-contracts-audit:
 #   stage: release-bindings
 #   needs: ["release-contracts-js", "release-contracts-go"]

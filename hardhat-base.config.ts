@@ -72,7 +72,7 @@ const config: HardhatUserConfig = {
       "Implementation",
       "Escrow",
       "LumerinToken",
-      "ValidationRegistry",
+      "ValidatorRegistry",
     ],
   },
   mocha: {

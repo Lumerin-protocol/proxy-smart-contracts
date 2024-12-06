@@ -209,7 +209,6 @@ contract ValidatorRegistry is OwnableUpgradeable {
         uint offset,
         uint8 limit
     ) public view returns (address[] memory) {
-        // return Paginator.part(validatorAddresses, offset, limit);
         return validatorAddresses.part(uint256(offset), uint256(limit));
     }
 

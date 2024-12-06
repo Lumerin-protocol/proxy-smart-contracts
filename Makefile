@@ -25,6 +25,9 @@ deploy-clonefactory:
 deploy-faucet:
 	yarn hardhat run --network default ./scripts/deploy-faucet.ts
 
+deploy-validator-registry:
+	yarn hardhat run --network default ./scripts/deploy-validator-registry.ts
+
 update-clonefactory:
 	yarn hardhat run --network default ./scripts/update-clonefactory.ts
 
