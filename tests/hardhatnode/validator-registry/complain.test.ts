@@ -4,7 +4,7 @@ import { add3ValidatorsFixture } from "./utils/fixtures";
 import { catchError } from "./utils/utils";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { complain } from "./utils/actions";
-import { RandomEthAddress } from "../utils";
+import { RandomEthAddress } from "../../utils";
 
 describe("Validator registry - complain", () => {
   it("should complain about a validator", async () => {
