@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >0.8.0;
 
-import {Escrow} from "./Escrow.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {ReentrancyGuardUpgradeable, Initializable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {FeeRecipient} from "./Shared.sol";
 import {CloneFactory} from "./CloneFactory.sol";
+import {Lumerin} from "./LumerinToken.sol";
 
 //MyToken is place holder for actual lumerin token, purely for testing purposes
-contract Implementation is Initializable, Escrow {
-    ContractState public emptySlot1; // not used anywhere, do not delete
+contract Implementation is Initializable, ReentrancyGuardUpgradeable {
+    // empty slots to align with the proxy contract, do not remove
+    uint256[3] private __gap;
+    Lumerin public lumerin;
+    uint8 private __gap2;
+
     Terms public terms;
     uint256 public startingBlockTimestamp; // the timestamp of the block when the contract was purchased
     address public buyer; // address of the current purchaser of the contract
@@ -21,6 +25,11 @@ contract Implementation is Initializable, Escrow {
     HistoryEntry[] public history; // TODO: replace this struct with querying logs from a blockchain node
     Terms public futureTerms;
     string public encrDestURL; // where to redirect the hashrate after validation (for both third-party validator and buyer-node) If empty, then the hashrate will be redirected to the default pool of the buyer node
+    uint16 public validatorFeeRateScaled; // the fee rate for the validator, scaled by VALIDATOR_FEE_MULT
+    mapping(address => uint256) public validatorFee; // validator address => validator fee
+    uint256 public totalValidatorFee; // total amount of validator fee collected
+
+    uint16 public constant VALIDATOR_FEE_MULT = 10000;
 
     enum ContractState {
         Available,
@@ -47,7 +56,7 @@ contract Implementation is Initializable, Escrow {
         bool _goodCloseout; // consider dropping and use instead _purchaseTime + _length >= _endTime
         uint256 _purchaseTime;
         uint256 _endTime;
-        uint256 _price;
+        uint256 _price; // includes validator fee
         uint256 _speed;
         uint256 _length;
         address _buyer;
@@ -60,6 +69,7 @@ contract Implementation is Initializable, Escrow {
     event cipherTextUpdated(string newCipherText); // Deprecated, use event destinationUpdated
     event destinationUpdated(string newValidatorURL, string newDestURL);
     event fundsClaimed();
+    event fundsClaimedValidator(address indexed _validator);
 
     function initialize(
         uint256 _price,
@@ -78,7 +88,8 @@ contract Implementation is Initializable, Escrow {
         cloneFactory = _cloneFactory;
         pubKey = _pubKey;
         validator = _validator;
-        Escrow.initialize(_lmrAddress);
+        lumerin = Lumerin(_lmrAddress);
+        __ReentrancyGuard_init();
     }
 
     function contractState() public view returns (ContractState) {
@@ -197,7 +208,8 @@ contract Implementation is Initializable, Escrow {
         string calldata _encrValidatorURL,
         string calldata _encrDestURL,
         address _buyer,
-        address _validator
+        address _validator,
+        uint16 _validatorFeeRateScaled
     ) public {
         require(
             msg.sender == cloneFactory,
@@ -207,7 +219,7 @@ contract Implementation is Initializable, Escrow {
             contractState() == ContractState.Available,
             "contract is not in an available state"
         );
-        
+
         maybeApplyFutureTerms();
 
         history.push(
@@ -227,7 +239,12 @@ contract Implementation is Initializable, Escrow {
         buyer = _buyer;
         validator = _validator;
         startingBlockTimestamp = block.timestamp;
-        createEscrow(seller, buyer, terms._price);
+        validatorFeeRateScaled = _validatorFeeRateScaled;
+
+        uint256 ongoingValidatorFee = getOngoingContractValidatorFee();
+        validatorFee[_validator] += ongoingValidatorFee; // assuming contract will reach the end of its term
+        totalValidatorFee += ongoingValidatorFee;
+
         emit contractPurchased(msg.sender);
     }
 
@@ -317,17 +334,29 @@ contract Implementation is Initializable, Escrow {
         }
     }
 
-    function getBuyerPayout() internal view returns (uint256) {
+    /// @dev Returns the amount of funds that should be paid for the service from now till the current time
+    function getRealizedPayout() internal view returns (uint256) {
         uint256 elapsedContractTime = (block.timestamp -
             startingBlockTimestamp);
         if (elapsedContractTime <= terms._length) {
-            // order of operations is important as we are dealing with uint256!
-            return
-                terms._price -
-                (terms._price * elapsedContractTime) /
-                terms._length;
+            return (terms._price * elapsedContractTime) / terms._length;
         }
-        return 0;
+        return terms._price;
+    }
+
+    /// @dev Returns the amount of funds that will be paid for the service from now till the end of the contract
+    function getUnrealizedPayout() internal view returns (uint256) {
+        return terms._price - getRealizedPayout();
+    }
+
+    function getOngoingContractValidatorFee() internal view returns (uint256) {
+        if (validator == address(0)) {
+            return 0;
+        }
+        if (contractState() != ContractState.Running) {
+            return 0;
+        }
+        return (terms._price * validatorFeeRateScaled) / VALIDATOR_FEE_MULT;
     }
 
     // DEPRECATED, use closeEarly or claimFunds instead
@@ -348,7 +377,10 @@ contract Implementation is Initializable, Escrow {
         } else if (closeOutType == 3) {
             // this closeoutType is only for the seller to closeout after contract ended
             // and claim all funds collected in the escrow
-            require(msg.sender == seller, "only the seller can closeout AND withdraw after contract term");
+            require(
+                msg.sender == seller,
+                "only the seller can closeout AND withdraw after contract term"
+            );
             // no need to closeout after implementing auto-closeout
             claimFunds();
         } else {
@@ -380,17 +412,28 @@ contract Implementation is Initializable, Escrow {
         if (contractState() == ContractState.Running) {
             // if contract is running we need to keep some funds
             // in the escrow for refund if seller cancels contract
-            amountToKeepInEscrow = getBuyerPayout();
+            amountToKeepInEscrow = getUnrealizedPayout();
         }
 
         emit fundsClaimed();
         maybeApplyFutureTerms();
 
-        CloneFactory(cloneFactory).payMarketplaceFee{
-            value: msg.value
-        }();
+        CloneFactory(cloneFactory).payMarketplaceFee{value: msg.value}();
+        withdrawAllFundsSeller(amountToKeepInEscrow + totalValidatorFee);
+    }
 
-        withdrawAllFundsSeller(amountToKeepInEscrow);
+    function claimFundsValidator() public {
+        uint256 amountToWithdraw = validatorFee[msg.sender];
+        if (msg.sender == validator) {
+            // if contract is currently running by the same validator we lock current contract validator fee
+            uint256 ongoingContractValidatorFee = getOngoingContractValidatorFee();
+            amountToWithdraw -= ongoingContractValidatorFee;
+        }
+        require(amountToWithdraw > 0, "no funds to withdraw");
+        validatorFee[msg.sender] -= amountToWithdraw;
+        totalValidatorFee -= amountToWithdraw;
+        emit fundsClaimedValidator(msg.sender);
+        lumerin.transfer(msg.sender, amountToWithdraw);
     }
 
     function closeEarly(CloseReason reason) public {
@@ -407,13 +450,46 @@ contract Implementation is Initializable, Escrow {
         historyEntry._goodCloseout = false;
         historyEntry._endTime = block.timestamp;
 
-        uint256 buyerPayout = getBuyerPayout();
+        // how much to return to buyer (base price)
+        uint256 buyerPayout = getUnrealizedPayout();
+        uint256 validatorPayout = 0;
+        if (validator != address(0)) {
+            // how much to pay to validator
+            validatorPayout =
+                (getRealizedPayout() * validatorFeeRateScaled) /
+                VALIDATOR_FEE_MULT;
+
+            // how much validator fee to refund to buyer
+            uint256 buyerValidatorFeeRefund = (buyerPayout *
+                validatorFeeRateScaled) / VALIDATOR_FEE_MULT;
+
+            // total validator refund
+            buyerPayout = buyerPayout + buyerValidatorFeeRefund;
+        }
+
+        // since validator is paid, reset stored fees
+        uint256 totalContractValidatorFee = getOngoingContractValidatorFee();
+        validatorFee[validator] -= totalContractValidatorFee;
+        totalValidatorFee -= totalContractValidatorFee;
+
         startingBlockTimestamp = 0;
         maybeApplyFutureTerms();
 
         emit contractClosed(buyer); // Deprecated, use closedEarly instead
         emit closedEarly(reason);
 
-        withdrawFundsBuyer(buyerPayout);
+        lumerin.transfer(buyer, buyerPayout);
+        if (validatorPayout > 0) {
+            lumerin.transfer(validator, validatorPayout);
+        }
+    }
+
+    function withdrawAllFundsSeller(
+        uint256 remaining
+    ) internal nonReentrant returns (bool) {
+        uint256 balance = lumerin.balanceOf(address(this)) -
+            remaining -
+            getOngoingContractValidatorFee();
+        return lumerin.transfer(seller, balance);
     }
 }

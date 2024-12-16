@@ -23,9 +23,21 @@ contract CloneFactory is Initializable {
 
     mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
     mapping(address => bool) public isContractDead; // keeps track of contracts that are no longer valid
-    
+
+    /// @notice The fee rate paid to a validator, expressed as a fraction of the total amount.
+    /// @dev Stored as an integer scaled by VALIDATOR_FEE_MULT to represent a float ratio.
+    /// @dev For example, if VALIDATOR_FEE_MULT=10000:
+    /// @dev  - 1% (0.01) = 0.01 * 10000 = 100
+    /// @dev  - 0.1% (0.001) = 0.001 * 10000 = 10
+    uint16 public validatorFeeRateScaled;
+
+    uint16 public constant VALIDATOR_FEE_MULT = 10000;
+
     event contractCreated(address indexed _address, string _pubkey); //emitted whenever a contract is created
-    event clonefactoryContractPurchased(address indexed _address); //emitted whenever a contract is purchased
+    event clonefactoryContractPurchased(
+        address indexed _address,
+        address indexed _validator
+    ); //emitted whenever a contract is purchased
     event contractDeleteUpdated(address _address, bool _isDeleted); //emitted whenever a contract is deleted/restored
     event purchaseInfoUpdated(address indexed _address);
 
@@ -35,7 +47,10 @@ contract CloneFactory is Initializable {
     }
 
     modifier sufficientFee() {
-        require(msg.value >= feeRecipient.fee, "Insufficient ETH provided for marketplace fee");
+        require(
+            msg.value >= feeRecipient.fee,
+            "Insufficient ETH provided for marketplace fee"
+        );
         _;
     }
 
@@ -47,24 +62,30 @@ contract CloneFactory is Initializable {
         _;
     }
 
-    function initialize(address _baseImplementation, address _lumerin, address _feeRecipient) public initializer {
+    function initialize(
+        address _baseImplementation,
+        address _lumerin,
+        address _feeRecipient,
+        uint16 _validatorFeeRateScaled
+    ) public initializer {
         lumerin = Lumerin(_lumerin);
         baseImplementation = _baseImplementation;
         owner = msg.sender;
         feeRecipient.fee = 0.0002 ether;
         feeRecipient.recipient = _feeRecipient;
+        validatorFeeRateScaled = _validatorFeeRateScaled;
     }
 
     // TODO: remove return value and just use require
-    function payMarketplaceFee()
-        public payable sufficientFee returns (bool) {
-        (bool sent,) = payable(feeRecipient.recipient).call{value: feeRecipient.fee}("");
+    function payMarketplaceFee() public payable sufficientFee returns (bool) {
+        (bool sent, ) = payable(feeRecipient.recipient).call{
+            value: feeRecipient.fee
+        }("");
         require(sent, "Failed to pay marketplace listing fee");
         return sent;
     }
 
-    function marketplaceFee()
-        external view  returns (uint256) {
+    function marketplaceFee() external view returns (uint256) {
         return feeRecipient.fee;
     }
 
@@ -77,7 +98,16 @@ contract CloneFactory is Initializable {
         address _validator,
         string calldata _pubKey
     ) external payable onlyInWhitelist sufficientFee returns (address) {
-        return createContract(_price, _limit, _speed, _length, 0, _validator, _pubKey);
+        return
+            createContract(
+                _price,
+                _limit,
+                _speed,
+                _length,
+                0,
+                _validator,
+                _pubKey
+            );
     }
 
     function setCreateNewRentalContractV2(
@@ -89,7 +119,16 @@ contract CloneFactory is Initializable {
         address _validator,
         string calldata _pubKey
     ) public payable onlyInWhitelist sufficientFee returns (address) {
-        return createContract(_price, _limit, _speed, _length, _profitTarget, _validator, _pubKey);
+        return
+            createContract(
+                _price,
+                _limit,
+                _speed,
+                _length,
+                _profitTarget,
+                _validator,
+                _pubKey
+            );
     }
 
     function createContract(
@@ -100,7 +139,7 @@ contract CloneFactory is Initializable {
         int8 _profitTarget,
         address _validator,
         string calldata _pubKey
-    ) internal returns (address){
+    ) internal returns (address) {
         bool sent = payMarketplaceFee();
         require(sent, "Failed to pay marketplace listing fee");
 
@@ -133,20 +172,20 @@ contract CloneFactory is Initializable {
         string calldata _cipherText,
         uint32 termsVersion
     ) external payable sufficientFee {
-        purchaseContract(_contractAddress, address(0), _cipherText, "", termsVersion);
+        purchaseContract(
+            _contractAddress,
+            address(0),
+            _cipherText,
+            "",
+            termsVersion
+        );
     }
 
-    // function to purchase a hashrate contract
-    //
-    // for using self-hosted validator (buyer-node) set
-    //   _validatorAddress to address(0)
-    //   _encrValidatorURL to node public address encrypted with seller pubkey
-    //   _encrDestURL to your target pool encrypted with buyer pubkey, if empty, default buyer pool should be used
-    //
-    // for using lumerin validator set
-    //   _validatorAddress to lumerin validator address
-    //   _encrValidatorURL to lumerin validator public url encrypted with seller pubkey
-    //   _encrDestURL to your target pool encrypted with validator pubkey
+    /// @notice purchase a hashrate contract
+    /// @param _contractAddress the address of the contract to purchase
+    /// @param _validatorAddress set to the address of the external validator, or address(0) for self-hosted validator
+    /// @param _encrValidatorURL the publicly available URL of the external validator, or the self-hosted validator (encrypted with the seller's pubkey)
+    /// @param _encrDestURL the URL of the destination pool (encrypted with the validator pubkey or buyer pubkey if self-hosted validator is used)
     function setPurchaseRentalContractV2(
         address _contractAddress,
         address _validatorAddress,
@@ -154,7 +193,13 @@ contract CloneFactory is Initializable {
         string calldata _encrDestURL,
         uint32 termsVersion
     ) external payable sufficientFee {
-        purchaseContract(_contractAddress, _validatorAddress, _encrValidatorURL, _encrDestURL, termsVersion);
+        purchaseContract(
+            _contractAddress,
+            _validatorAddress,
+            _encrValidatorURL,
+            _encrDestURL,
+            termsVersion
+        );
     }
 
     function purchaseContract(
@@ -165,10 +210,15 @@ contract CloneFactory is Initializable {
         uint32 termsVersion
     ) internal {
         // TODO: add a test case so any third-party implementations will be discarded
-        require(rentalContractsMap[_contractAddress], "unknown contract address");
+        require(
+            rentalContractsMap[_contractAddress],
+            "unknown contract address"
+        );
         Implementation targetContract = Implementation(_contractAddress);
         require(
-            !targetContract.isDeleted(), "cannot purchase deleted contract");
+            !targetContract.isDeleted(),
+            "cannot purchase deleted contract"
+        );
         require(
             targetContract.seller() != msg.sender,
             "cannot purchase your own contract"
@@ -177,9 +227,9 @@ contract CloneFactory is Initializable {
         uint256 _price;
         uint32 _version;
 
-        (_price,,,,_version,) = targetContract.futureTerms();
+        (_price, , , , _version, ) = targetContract.futureTerms();
         if (_version == 0) {
-            (_price,,,,_version,) = targetContract.terms();
+            (_price, , , , _version, ) = targetContract.terms();
         }
         require(
             _version == termsVersion,
@@ -189,25 +239,26 @@ contract CloneFactory is Initializable {
         /* ETH buyer marketplace purchase fee */
         payMarketplaceFee();
 
+        /* Validator fee */
+        if (_validatorAddress != address(0)) {
+            _price += (_price * validatorFeeRateScaled) / VALIDATOR_FEE_MULT;
+        }
         uint256 actualAllowance = lumerin.allowance(msg.sender, address(this));
         require(
             actualAllowance >= _price,
             "not authorized to spend required funds"
         );
 
-        lumerin.transferFrom(
-            msg.sender,
-            _contractAddress,
-            _price
-        );
+        lumerin.transferFrom(msg.sender, _contractAddress, _price);
         targetContract.setPurchaseContract(
             _encrValidatorURL,
             _encrDestURL,
             msg.sender,
-            _validatorAddress
+            _validatorAddress,
+            validatorFeeRateScaled
         );
 
-        emit clonefactoryContractPurchased(_contractAddress);
+        emit clonefactoryContractPurchased(_contractAddress, _validatorAddress);
     }
 
     function getContractList() external view returns (address[] memory) {
@@ -236,21 +287,41 @@ contract CloneFactory is Initializable {
         noMoreWhitelist = true;
     }
 
-    function setMarketplaceFeeRecipient(uint256 fee, address recipient) external onlyOwner {
+    function setMarketplaceFeeRecipient(
+        uint256 fee,
+        address recipient
+    ) external onlyOwner {
         feeRecipient.fee = fee;
         feeRecipient.recipient = recipient;
     }
 
-    function setContractDeleted(address _contractAddress, bool _isDeleted) public {
-        require(rentalContractsMap[_contractAddress], "unknown contract address");
+    /// @notice Set the fee rate paid to a validator
+    /// @param _validatorFeeRateScaled fraction multiplied by VALIDATOR_FEE_MULT
+    function setValidatorFeeRate(
+        uint16 _validatorFeeRateScaled
+    ) external onlyOwner {
+        validatorFeeRateScaled = _validatorFeeRateScaled;
+    }
+
+    function setContractDeleted(
+        address _contractAddress,
+        bool _isDeleted
+    ) public {
+        require(
+            rentalContractsMap[_contractAddress],
+            "unknown contract address"
+        );
         Implementation _contract = Implementation(_contractAddress);
-        require(msg.sender == _contract.seller() || msg.sender == owner, "you are not authorized");
+        require(
+            msg.sender == _contract.seller() || msg.sender == owner,
+            "you are not authorized"
+        );
         Implementation(_contractAddress).setContractDeleted(_isDeleted);
         emit contractDeleteUpdated(_contractAddress, _isDeleted);
     }
 
     function setUpdateContractInformation(
-        address _contractAddress,      
+        address _contractAddress,
         uint256 _price,
         uint256 _limit,
         uint256 _speed,
@@ -260,29 +331,45 @@ contract CloneFactory is Initializable {
     }
 
     function setUpdateContractInformationV2(
-        address _contractAddress,      
+        address _contractAddress,
         uint256 _price,
         uint256 _limit,
         uint256 _speed,
         uint256 _length,
         int8 _profitTarget
     ) external {
-        updateContract(_contractAddress, _price, _limit, _speed, _length, _profitTarget);
+        updateContract(
+            _contractAddress,
+            _price,
+            _limit,
+            _speed,
+            _length,
+            _profitTarget
+        );
     }
 
     function updateContract(
-        address _contractAddress,      
+        address _contractAddress,
         uint256 _price,
         uint256 _limit,
         uint256 _speed,
         uint256 _length,
         int8 _profitTarget
     ) internal {
-        require(rentalContractsMap[_contractAddress], "unknown contract address");
+        require(
+            rentalContractsMap[_contractAddress],
+            "unknown contract address"
+        );
         Implementation _contract = Implementation(_contractAddress);
         require(msg.sender == _contract.seller(), "you are not authorized");
 
-        Implementation(_contractAddress).setUpdatePurchaseInformation(_price, _limit, _speed, _length, _profitTarget);
+        Implementation(_contractAddress).setUpdatePurchaseInformation(
+            _price,
+            _limit,
+            _speed,
+            _length,
+            _profitTarget
+        );
         emit purchaseInfoUpdated(address(this));
     }
 }

@@ -1,9 +1,11 @@
 import type { HardhatUserConfig } from "hardhat/config";
 
-import '@nomiclabs/hardhat-ethers';
+import "@nomiclabs/hardhat-ethers";
 import "@openzeppelin/hardhat-upgrades";
 import "hardhat-abi-exporter";
 import "dotenv/config";
+import "@nomicfoundation/hardhat-viem";
+import "hardhat-storage-layout";
 
 // TODO: integrate the rest of the plugins if needed
 //
@@ -19,17 +21,31 @@ import "dotenv/config";
 // Base config is used for local deployment and/or contract build
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.18",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200,
+    compilers: [
+      // for older contracts
+      {
+        version: "0.8.18",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
       },
-    },
+      // for validation regitry
+      {
+        version: "0.8.20",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
+      },
+    ],
   },
   networks: {
     hardhat: {
-      initialBaseFeePerGas: 0,
       mining: {
         auto: true,
       },
@@ -51,6 +67,14 @@ const config: HardhatUserConfig = {
     clear: true,
     flat: true,
     spacing: 2,
+    only: [
+      "CloneFactory",
+      "Faucet",
+      "Implementation",
+      "Escrow",
+      "LumerinToken",
+      "ValidatorRegistry",
+    ],
   },
   mocha: {
     timeout: 5 * 60 * 1000, // 5 minutes

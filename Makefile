@@ -1,14 +1,22 @@
 version := $(shell cat ./VERSION)
 
 clean:
-	rm -rf abi artifacts cache build-go build-js
+	rm -rf abi artifacts cache build-go build-js abi
 
 test:
 	kill "$$(lsof -t -i:8545)" || true
+	yarn hardhat node --config hardhat-base.config.ts & ./node-local-deploy.sh && yarn hardhat test --network localhost --config hardhat-base.config.ts tests/localnode/*.ts
+	kill "$$(lsof -t -i:8545)" || true
+
+test-old:
+	kill "$$(lsof -t -i:8545)" || true
 	make compile
 	make -B build-js 
-	yarn hardhat node --config hardhat-base.config.ts & ./node-local-deploy.sh && yarn hardhat test --network localhost --config hardhat-base.config.ts tests/*.ts
+	yarn hardhat node --config hardhat-base.config.ts & ./node-local-deploy.sh && yarn hardhat test --network localhost --config hardhat-base.config.ts tests/localnode/*.ts
 	kill "$$(lsof -t -i:8545)" || true
+
+test-hardhat:
+	yarn hardhat --network hardhat --config hardhat-base.config.ts test tests/hardhatnode/**/*.test.ts
 
 test-upgrade:
 	yarn hardhat --network localhost --config hardhat-base.config.ts test --bail tests/upgrades/*.ts 
@@ -24,6 +32,9 @@ deploy-clonefactory:
 
 deploy-faucet:
 	yarn hardhat run --network default ./scripts/deploy-faucet.ts
+
+deploy-validator-registry:
+	yarn hardhat run --network default ./scripts/deploy-validator-registry.ts
 
 update-clonefactory:
 	yarn hardhat run --network default ./scripts/update-clonefactory.ts
