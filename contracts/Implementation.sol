@@ -1,18 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >0.8.0;
 
-import {Escrow} from "./Escrow.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {ReentrancyGuardUpgradeable, Initializable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {FeeRecipient} from "./Shared.sol";
 import {CloneFactory} from "./CloneFactory.sol";
+import {Lumerin} from "./LumerinToken.sol";
 
 //MyToken is place holder for actual lumerin token, purely for testing purposes
-contract Implementation is Escrow {
+contract Implementation is Initializable, ReentrancyGuardUpgradeable {
     // empty slots to align with the proxy contract, do not remove
-    // address public emptySlot1;
-    // address public emptySlot2;
-    // uint256 public emptySlot3;
-    ContractState public emptySlot4;
+    uint256[3] private __gap;
+    Lumerin public lumerin;
+    uint8 private __gap2;
 
     Terms public terms;
     uint256 public startingBlockTimestamp; // the timestamp of the block when the contract was purchased
@@ -89,7 +88,8 @@ contract Implementation is Escrow {
         cloneFactory = _cloneFactory;
         pubKey = _pubKey;
         validator = _validator;
-        Escrow.initialize(_lmrAddress);
+        lumerin = Lumerin(_lmrAddress);
+        __ReentrancyGuard_init();
     }
 
     function contractState() public view returns (ContractState) {

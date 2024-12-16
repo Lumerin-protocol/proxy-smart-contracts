@@ -181,17 +181,11 @@ contract CloneFactory is Initializable {
         );
     }
 
-    // function to purchase a hashrate contract
-    //
-    // for using self-hosted validator (buyer-node) set
-    //   _validatorAddress to address(0)
-    //   _encrValidatorURL to node public address encrypted with seller pubkey
-    //   _encrDestURL to your target pool encrypted with buyer pubkey, if empty, default buyer pool should be used
-    //
-    // for using lumerin validator set
-    //   _validatorAddress to lumerin validator address
-    //   _encrValidatorURL to lumerin validator public url encrypted with seller pubkey
-    //   _encrDestURL to your target pool encrypted with validator pubkey
+    /// @notice purchase a hashrate contract
+    /// @param _contractAddress the address of the contract to purchase
+    /// @param _validatorAddress set to the address of the external validator, or address(0) for self-hosted validator
+    /// @param _encrValidatorURL the publicly available URL of the external validator, or the self-hosted validator (encrypted with the seller's pubkey)
+    /// @param _encrDestURL the URL of the destination pool (encrypted with the validator pubkey or buyer pubkey if self-hosted validator is used)
     function setPurchaseRentalContractV2(
         address _contractAddress,
         address _validatorAddress,
@@ -299,6 +293,14 @@ contract CloneFactory is Initializable {
     ) external onlyOwner {
         feeRecipient.fee = fee;
         feeRecipient.recipient = recipient;
+    }
+
+    /// @notice Set the fee rate paid to a validator
+    /// @param _validatorFeeRateScaled fraction multiplied by VALIDATOR_FEE_MULT
+    function setValidatorFeeRate(
+        uint16 _validatorFeeRateScaled
+    ) external onlyOwner {
+        validatorFeeRateScaled = _validatorFeeRateScaled;
     }
 
     function setContractDeleted(

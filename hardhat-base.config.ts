@@ -5,6 +5,7 @@ import "@openzeppelin/hardhat-upgrades";
 import "hardhat-abi-exporter";
 import "dotenv/config";
 import "@nomicfoundation/hardhat-viem";
+import "hardhat-storage-layout";
 
 // TODO: integrate the rest of the plugins if needed
 //

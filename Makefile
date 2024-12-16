@@ -1,7 +1,7 @@
 version := $(shell cat ./VERSION)
 
 clean:
-	rm -rf abi artifacts cache build-go build-js
+	rm -rf abi artifacts cache build-go build-js abi
 
 test:
 	kill "$$(lsof -t -i:8545)" || true
