@@ -95,7 +95,7 @@ contract CloneFactory is Initializable {
         uint256 _limit,
         uint256 _speed,
         uint256 _length,
-        address _validator,
+        address,
         string calldata _pubKey
     ) external payable onlyInWhitelist sufficientFee returns (address) {
         return
@@ -105,7 +105,7 @@ contract CloneFactory is Initializable {
                 _speed,
                 _length,
                 0,
-                _validator,
+                address(0),
                 _pubKey
             );
     }
@@ -116,7 +116,7 @@ contract CloneFactory is Initializable {
         uint256 _speed,
         uint256 _length,
         int8 _profitTarget,
-        address _validator,
+        address,
         string calldata _pubKey
     ) public payable onlyInWhitelist sufficientFee returns (address) {
         return
@@ -126,7 +126,7 @@ contract CloneFactory is Initializable {
                 _speed,
                 _length,
                 _profitTarget,
-                _validator,
+                address(0),
                 _pubKey
             );
     }

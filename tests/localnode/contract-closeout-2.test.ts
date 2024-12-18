@@ -2,7 +2,7 @@ import { expect } from "chai";
 import ethers from "hardhat";
 import Web3 from "web3";
 import { Lumerin, CloneFactory, Implementation } from "../../build-js/dist";
-import { AdvanceBlockTime, LocalTestnetAddresses } from "../utils";
+import { AdvanceBlockTime, LocalTestnetAddresses, ZERO_ADDRESS } from "../utils";
 
 describe("Contract closeout", function () {
   const { lumerinAddress, cloneFactoryAddress, owner, seller, buyer } = LocalTestnetAddresses;
@@ -25,7 +25,7 @@ describe("Contract closeout", function () {
 
   it("should verify closeout type 2 for 100% completion", async function () {
     const receipt = await cf.methods
-      .setCreateNewRentalContractV2(price, "0", speed, length, "0", cloneFactoryAddress, "123")
+      .setCreateNewRentalContractV2(price, "0", speed, length, "0", ZERO_ADDRESS, "123")
       .send({ from: seller, value: fee });
     const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
 

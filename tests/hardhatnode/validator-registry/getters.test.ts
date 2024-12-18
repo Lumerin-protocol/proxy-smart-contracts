@@ -40,7 +40,7 @@ describe("ValidatorRegistry - getters", () => {
     expect(l).to.equal(3n);
   });
 
-  it("should get length correctly when 1 validator becing inactive", async () => {
+  it("should get length correctly when 1 validator being inactive", async () => {
     const {
       validators: { alice, bob, carol },
       config,
@@ -56,7 +56,7 @@ describe("ValidatorRegistry - getters", () => {
     expect(allLength).to.equal(3n);
   });
 
-  it("should query validators correctly when 1 validator becing inactive", async () => {
+  it("should query validators correctly when 1 validator being inactive", async () => {
     const {
       validators: { alice, bob, carol },
       config,
