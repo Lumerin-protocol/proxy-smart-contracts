@@ -1126,17 +1126,17 @@
   dependencies:
     ethereumjs-util "^7.1.4"
 
-"@nomicfoundation/hardhat-verify@^2.0.0":
-  version "2.0.3"
-  resolved "https://registry.yarnpkg.com/@nomicfoundation/hardhat-verify/-/hardhat-verify-2.0.3.tgz#173557f8cfa53c8c9da23a326f54d24fe459ae68"
-  integrity sha512-ESbRu9by53wu6VvgwtMtm108RSmuNsVqXtzg061D+/4R7jaWh/Wl/8ve+p6SdDX7vA1Z3L02hDO1Q3BY4luLXQ==
+"@nomicfoundation/hardhat-verify@^2.0.12":
+  version "2.0.12"
+  resolved "https://registry.yarnpkg.com/@nomicfoundation/hardhat-verify/-/hardhat-verify-2.0.12.tgz#480819a245a2db0b127e473c62079f7b4f16daa8"
+  integrity sha512-Lg3Nu7DCXASQRVI/YysjuAX2z8jwOCbS0w5tz2HalWGSTZThqA0v9N0v0psHbKNqzPJa8bNOeapIVSziyJTnAg==
   dependencies:
     "@ethersproject/abi" "^5.1.2"
     "@ethersproject/address" "^5.0.2"
     cbor "^8.1.0"
-    chalk "^2.4.2"
     debug "^4.1.1"
     lodash.clonedeep "^4.5.0"
+    picocolors "^1.1.0"
     semver "^6.3.0"
     table "^6.8.0"
     undici "^5.14.0"
@@ -4950,6 +4950,11 @@ performance-now@^2.1.0:
   version "2.1.0"
   resolved "https://registry.yarnpkg.com/performance-now/-/performance-now-2.1.0.tgz#6309f4e0e5fa913ec1c69307ae364b4b377c9e7b"
   integrity sha512-7EAHlyLHI56VEIdK57uwHdHKIaAGbnXPiw0yWbarQZOKaKpvUIgW0jWRVLiatnM+XXlSwsanIBH/hzGMJulMow==
+
+picocolors@^1.1.0:
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/picocolors/-/picocolors-1.1.1.tgz#3d321af3eab939b083c8f929a1d12cda81c26b6b"
+  integrity sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==
 
 picomatch@^2.0.4, picomatch@^2.2.1, picomatch@^2.3.1:
   version "2.3.1"

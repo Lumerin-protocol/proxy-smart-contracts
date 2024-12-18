@@ -5,18 +5,8 @@ import "@openzeppelin/hardhat-upgrades";
 import "hardhat-abi-exporter";
 import "dotenv/config";
 import "@nomicfoundation/hardhat-viem";
+import "@nomicfoundation/hardhat-verify";
 import "hardhat-storage-layout";
-
-// TODO: integrate the rest of the plugins if needed
-//
-// import "@nomicfoundation/hardhat-chai-matchers";
-// import "@nomicfoundation/hardhat-ethers";
-// import "@nomicfoundation/hardhat-verify";
-// import "@typechain/hardhat";
-// import "hardhat-gas-reporter";
-// import "solidity-coverage";
-// import "@nomicfoundation/hardhat-network-helpers";
-// import "@nomicfoundation/hardhat-toolbox"
 
 // Base config is used for local deployment and/or contract build
 const config: HardhatUserConfig = {
