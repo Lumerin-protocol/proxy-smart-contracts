@@ -94,6 +94,8 @@ export async function UpdateCloneFactory(
   } else {
     log("CLONEFACTORY implementation updated");
   }
+
+  return { logicAddress: newCloneFactoryImpl };
 }
 
 export async function UpdateImplementation(
@@ -140,6 +142,7 @@ export async function UpdateImplementation(
   log();
 
   log("SUCCESS. Base implementation contract updated.");
+  return { logicAddress: newLogicAddr };
 }
 
 export async function ApproveSeller(
