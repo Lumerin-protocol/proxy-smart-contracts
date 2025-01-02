@@ -37,3 +37,6 @@ yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/w
 
 # populate contracts
 yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/populate-contracts.ts
+
+# validator registry
+yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/deploy-validator-registry.ts

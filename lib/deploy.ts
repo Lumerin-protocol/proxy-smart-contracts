@@ -4,7 +4,6 @@ import { ethers, upgrades } from "hardhat";
 const Wallet = ethers.Wallet;
 
 export async function DeployLumerin(deployerPkey: string, log = noop) {
-  log("herer");
   const deployer = new Wallet(deployerPkey).connect(ethers.provider);
 
   log("Deploying LUMERIN with the account:", deployer.address);
