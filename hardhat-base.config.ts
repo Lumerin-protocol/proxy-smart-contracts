@@ -1,11 +1,11 @@
 import type { HardhatUserConfig } from "hardhat/config";
 
 import "@nomiclabs/hardhat-ethers";
+import "@nomicfoundation/hardhat-verify";
 import "@openzeppelin/hardhat-upgrades";
 import "hardhat-abi-exporter";
 import "dotenv/config";
 import "@nomicfoundation/hardhat-viem";
-import "@nomicfoundation/hardhat-verify";
 import "hardhat-storage-layout";
 
 // Base config is used for local deployment and/or contract build

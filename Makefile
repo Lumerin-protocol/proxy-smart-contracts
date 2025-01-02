@@ -5,18 +5,13 @@ clean:
 
 test:
 	kill "$$(lsof -t -i:8545)" || true
-	yarn hardhat node --config hardhat-base.config.ts & ./node-local-deploy.sh && yarn hardhat test --network localhost --config hardhat-base.config.ts tests/localnode/*.ts
-	kill "$$(lsof -t -i:8545)" || true
-
-test-old:
-	kill "$$(lsof -t -i:8545)" || true
 	make compile
 	make -B build-js 
 	yarn hardhat node --config hardhat-base.config.ts & ./node-local-deploy.sh && yarn hardhat test --network localhost --config hardhat-base.config.ts tests/localnode/*.ts
 	kill "$$(lsof -t -i:8545)" || true
 
 test-hardhat:
-	yarn hardhat --network hardhat --config hardhat-base.config.ts test tests/hardhatnode/**/*.test.ts
+	yarn hardhat --network hardhat --config hardhat-base.config.ts test $$(find ./tests/hardhatnode/ -type f -iname "*.test.ts")
 
 test-upgrade:
 	yarn hardhat --network localhost --config hardhat-base.config.ts test --bail tests/upgrades/*.ts 

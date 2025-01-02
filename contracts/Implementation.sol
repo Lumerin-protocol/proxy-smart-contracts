@@ -2,7 +2,6 @@
 pragma solidity >0.8.0;
 
 import {ReentrancyGuardUpgradeable, Initializable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import {FeeRecipient} from "./Shared.sol";
 import {CloneFactory} from "./CloneFactory.sol";
 import {Lumerin} from "./LumerinToken.sol";
 
@@ -26,8 +25,7 @@ contract Implementation is Initializable, ReentrancyGuardUpgradeable {
     Terms public futureTerms;
     string public encrDestURL; // where to redirect the hashrate after validation (for both third-party validator and buyer-node) If empty, then the hashrate will be redirected to the default pool of the buyer node
     uint16 public validatorFeeRateScaled; // the fee rate for the validator, scaled by VALIDATOR_FEE_MULT
-    mapping(address => uint256) public validatorFee; // validator address => validator fee
-    uint256 public totalValidatorFee; // total amount of validator fee collected
+    bool public isLastValidatorNotPaid; // flag to track if the last validator has been paid
 
     uint16 public constant VALIDATOR_FEE_MULT = 10000;
 
@@ -220,6 +218,7 @@ contract Implementation is Initializable, ReentrancyGuardUpgradeable {
             "contract is not in an available state"
         );
 
+        maybePayLastValidator();
         maybeApplyFutureTerms();
 
         history.push(
@@ -241,9 +240,9 @@ contract Implementation is Initializable, ReentrancyGuardUpgradeable {
         startingBlockTimestamp = block.timestamp;
         validatorFeeRateScaled = _validatorFeeRateScaled;
 
-        uint256 ongoingValidatorFee = getOngoingContractValidatorFee();
-        validatorFee[_validator] += ongoingValidatorFee; // assuming contract will reach the end of its term
-        totalValidatorFee += ongoingValidatorFee;
+        isLastValidatorNotPaid =
+            _validatorFeeRateScaled > 0 &&
+            _validator != address(0);
 
         emit contractPurchased(msg.sender);
     }
@@ -334,6 +333,23 @@ contract Implementation is Initializable, ReentrancyGuardUpgradeable {
         }
     }
 
+    function maybePayLastValidator() internal returns (bool) {
+        if (
+            contractState() == ContractState.Available &&
+            validator != address(0) &&
+            isLastValidatorNotPaid
+        ) {
+            lumerin.transfer(
+                validator,
+                (terms._price * validatorFeeRateScaled) / VALIDATOR_FEE_MULT
+            );
+            isLastValidatorNotPaid = false;
+            emit fundsClaimedValidator(msg.sender);
+            return true;
+        }
+        return false;
+    }
+
     /// @dev Returns the amount of funds that should be paid for the service from now till the current time
     function getRealizedPayout() internal view returns (uint256) {
         uint256 elapsedContractTime = (block.timestamp -
@@ -347,16 +363,6 @@ contract Implementation is Initializable, ReentrancyGuardUpgradeable {
     /// @dev Returns the amount of funds that will be paid for the service from now till the end of the contract
     function getUnrealizedPayout() internal view returns (uint256) {
         return terms._price - getRealizedPayout();
-    }
-
-    function getOngoingContractValidatorFee() internal view returns (uint256) {
-        if (validator == address(0)) {
-            return 0;
-        }
-        if (contractState() != ContractState.Running) {
-            return 0;
-        }
-        return (terms._price * validatorFeeRateScaled) / VALIDATOR_FEE_MULT;
     }
 
     // DEPRECATED, use closeEarly or claimFunds instead
@@ -416,24 +422,23 @@ contract Implementation is Initializable, ReentrancyGuardUpgradeable {
         }
 
         emit fundsClaimed();
+
+        maybePayLastValidator();
+        uint256 unpaidValidatorFee = isLastValidatorNotPaid
+            ? (terms._price * validatorFeeRateScaled) / VALIDATOR_FEE_MULT
+            : 0;
+
         maybeApplyFutureTerms();
 
         CloneFactory(cloneFactory).payMarketplaceFee{value: msg.value}();
-        withdrawAllFundsSeller(amountToKeepInEscrow + totalValidatorFee);
+        withdrawAllFundsSeller(amountToKeepInEscrow + unpaidValidatorFee);
     }
 
+    /// @notice Sends the validator fee to the validator
+    /// @dev Can be called from any address, but the validator fee will be sent to the validator
     function claimFundsValidator() public {
-        uint256 amountToWithdraw = validatorFee[msg.sender];
-        if (msg.sender == validator) {
-            // if contract is currently running by the same validator we lock current contract validator fee
-            uint256 ongoingContractValidatorFee = getOngoingContractValidatorFee();
-            amountToWithdraw -= ongoingContractValidatorFee;
-        }
-        require(amountToWithdraw > 0, "no funds to withdraw");
-        validatorFee[msg.sender] -= amountToWithdraw;
-        totalValidatorFee -= amountToWithdraw;
-        emit fundsClaimedValidator(msg.sender);
-        lumerin.transfer(msg.sender, amountToWithdraw);
+        bool paid = maybePayLastValidator();
+        require(paid, "no funds to withdraw");
     }
 
     function closeEarly(CloseReason reason) public {
@@ -467,11 +472,7 @@ contract Implementation is Initializable, ReentrancyGuardUpgradeable {
             buyerPayout = buyerPayout + buyerValidatorFeeRefund;
         }
 
-        // since validator is paid, reset stored fees
-        uint256 totalContractValidatorFee = getOngoingContractValidatorFee();
-        validatorFee[validator] -= totalContractValidatorFee;
-        totalValidatorFee -= totalContractValidatorFee;
-
+        isLastValidatorNotPaid = false;
         startingBlockTimestamp = 0;
         maybeApplyFutureTerms();
 
@@ -487,9 +488,7 @@ contract Implementation is Initializable, ReentrancyGuardUpgradeable {
     function withdrawAllFundsSeller(
         uint256 remaining
     ) internal nonReentrant returns (bool) {
-        uint256 balance = lumerin.balanceOf(address(this)) -
-            remaining -
-            getOngoingContractValidatorFee();
+        uint256 balance = lumerin.balanceOf(address(this)) - remaining;
         return lumerin.transfer(seller, balance);
     }
 }

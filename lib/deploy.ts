@@ -4,7 +4,6 @@ import { ethers, upgrades } from "hardhat";
 const Wallet = ethers.Wallet;
 
 export async function DeployLumerin(deployerPkey: string, log = noop) {
-  log("herer");
   const deployer = new Wallet(deployerPkey).connect(ethers.provider);
 
   log("Deploying LUMERIN with the account:", deployer.address);
@@ -94,6 +93,8 @@ export async function UpdateCloneFactory(
   } else {
     log("CLONEFACTORY implementation updated");
   }
+
+  return { logicAddress: newCloneFactoryImpl };
 }
 
 export async function UpdateImplementation(
@@ -140,6 +141,7 @@ export async function UpdateImplementation(
   log();
 
   log("SUCCESS. Base implementation contract updated.");
+  return { logicAddress: newLogicAddr };
 }
 
 export async function ApproveSeller(

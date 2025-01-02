@@ -85,6 +85,13 @@ describe("Validator fee", function () {
     const hrContractData2 = await impl.methods.getPublicVariablesV2().call();
     expect(hrContractData2._state).to.equal("0");
 
+    // claim funds by validator
+    const validatorBalanceBefore = Number(await lmr.methods.balanceOf(validatorAddr).call());
+    await impl.methods.claimFundsValidator().send({ from: validatorAddr });
+    const validatorBalanceAfter = Number(await lmr.methods.balanceOf(validatorAddr).call());
+    const deltaValidatorBalance = validatorBalanceAfter - validatorBalanceBefore;
+    expect(deltaValidatorBalance).to.equal(validatorFee);
+
     // claim funds by seller
     const sellerBalanceBefore = Number(await lmr.methods.balanceOf(cfg.sellerAddr).call());
     await impl.methods
@@ -94,19 +101,12 @@ describe("Validator fee", function () {
     const deltaSellerBalance = sellerBalanceAfter - sellerBalanceBefore;
     expect(deltaSellerBalance).to.equal(Number(hrContractData._terms._price));
 
-    // claim funds by validator
-    const validatorBalanceBefore = Number(await lmr.methods.balanceOf(validatorAddr).call());
-    await impl.methods.claimFundsValidator().send({ from: validatorAddr });
-    const validatorBalanceAfter = Number(await lmr.methods.balanceOf(validatorAddr).call());
-    const deltaValidatorBalance = validatorBalanceAfter - validatorBalanceBefore;
-    expect(deltaValidatorBalance).to.equal(validatorFee);
-
     // check lmr balance of the contract
     const contractBalance = Number(await lmr.methods.balanceOf(hrContractAddr).call());
     expect(contractBalance).to.equal(0);
   });
 
-  it("claimFundsValidator - should not withdraw validator fee for ongoing contracts", async function () {
+  it("should auto claim validator fee on the next purchase", async function () {
     const { web3, cloneFactoryAddr, lumerinTokenAddr, hrContracts, cfg } = await loadFixture(
       deployAllFixture
     );
@@ -144,6 +144,8 @@ describe("Validator fee", function () {
     expect(hrContractData2._state).to.equal("0");
 
     // PURCHASE 2
+    const validatorBalanceBefore = Number(await lmr.methods.balanceOf(validatorAddr).call());
+
     await lmr.methods
       .approve(cloneFactoryAddr, String(priceWithValidatorFee))
       .send({ from: buyer });
@@ -157,9 +159,6 @@ describe("Validator fee", function () {
       )
       .send({ from: buyer, value: cfg.marketplaceFee.toString() });
 
-    // claim funds by validator
-    const validatorBalanceBefore = Number(await lmr.methods.balanceOf(validatorAddr).call());
-    await impl.methods.claimFundsValidator().send({ from: validatorAddr });
     const validatorBalanceAfter = Number(await lmr.methods.balanceOf(validatorAddr).call());
     const deltaValidatorBalance = validatorBalanceAfter - validatorBalanceBefore;
 
@@ -179,11 +178,12 @@ describe("Validator fee", function () {
       expect.fail("should not allow to claim funds if no funds");
     } catch (err) {
       expectIsError(err);
+      console.log(err.message);
       expect(err.message).includes("no funds to withdraw");
     }
   });
 
-  it("claimFundsValidator - should account for multiple validators", async function () {
+  it("claimFundsValidator - should correctly claim for multiple contracts", async function () {
     const { web3, cloneFactoryAddr, lumerinTokenAddr, hrContracts, cfg } = await loadFixture(
       deployAllFixture
     );
@@ -216,6 +216,15 @@ describe("Validator fee", function () {
     // wait for completion
     await time.increase(Number(hrContractData._terms._length));
 
+    // claim funds by validator 1
+    const validatorBalanceBefore = Number(await lmr.methods.balanceOf(validatorAddr).call());
+    await Implementation(web3, hrContractAddr)
+      .methods.claimFundsValidator()
+      .send({ from: validatorAddr });
+    const validatorBalanceAfter = Number(await lmr.methods.balanceOf(validatorAddr).call());
+    const deltaValidatorBalance = validatorBalanceAfter - validatorBalanceBefore;
+    expect(deltaValidatorBalance).to.equal(validatorFee);
+
     // purchase 2 with validator 2
     await lmr.methods
       .approve(cloneFactoryAddr, String(priceWithValidatorFee))
@@ -232,15 +241,6 @@ describe("Validator fee", function () {
 
     // wait for completion
     await time.increase(Number(hrContractData._terms._length));
-
-    // claim funds by validator 1
-    const validatorBalanceBefore = Number(await lmr.methods.balanceOf(validatorAddr).call());
-    await Implementation(web3, hrContractAddr)
-      .methods.claimFundsValidator()
-      .send({ from: validatorAddr });
-    const validatorBalanceAfter = Number(await lmr.methods.balanceOf(validatorAddr).call());
-    const deltaValidatorBalance = validatorBalanceAfter - validatorBalanceBefore;
-    expect(deltaValidatorBalance).to.equal(validatorFee);
 
     // claim funds by validator 2
     const validator2BalanceBefore = Number(await lmr.methods.balanceOf(validator2Addr).call());
