@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { getAddress, parseUnits } from "viem";
 import { add3ValidatorsFixture, addValidatorFixture, deployFixture } from "./utils/fixtures";
-import { catchError } from "./utils/utils";
+import { catchError, compressPublicKey } from "./utils/utils";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { complain } from "./utils/actions";
 
@@ -114,12 +114,14 @@ describe("Validator registry - configure", () => {
 
     // verify the new value
     expect(await registry.read.stakeRegister()).to.equal(newStakeRegister);
+    const pubKey = compressPublicKey(accounts.bob.account.publicKey!);
 
     // verify it is effective
     await catchError(registry.abi, "InsufficientStake", () =>
-      registry.write.validatorRegister([config.stakeRegister, "localhost:3000"], {
-        account: accounts.bob.account,
-      })
+      registry.write.validatorRegister(
+        [config.stakeRegister, pubKey.yParity, pubKey.x, "localhost:3000"],
+        { account: accounts.bob.account }
+      )
     );
   });
 

@@ -28,9 +28,11 @@ contract ValidatorRegistryEC is ValidatorRegistry, EC {
     function validator_register(
         string calldata url,
         uint256 stake,
+        bool pubKeyYparity,
+        bytes32 pubKeyX,
         uint[2] calldata pubkey
     ) public {
-        super.validatorRegister(stake, url);
+        super.validatorRegister(stake, pubKeyYparity, pubKeyX, url);
         // emits ValidatorRegistered(addr, url, pubkey);
         // ^^ exisitng validators should listen for this event and call encrypt to reencrypt their url
 

@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { getAddress, parseUnits, zeroAddress } from "viem";
 import { addValidatorFixture, deployFixture } from "./utils/fixtures";
-import { catchError, getTxDeltaBalance } from "./utils/utils";
+import { catchError, compressPublicKey, getTxDeltaBalance } from "./utils/utils";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
 describe("ValidatorRegistry - register", () => {
@@ -45,8 +45,10 @@ describe("ValidatorRegistry - register", () => {
       addr: getAddress(alice.account.address),
     };
 
+    const pubKey = compressPublicKey(accounts.bob.account.publicKey!);
+
     await catchError(registry.abi, "InsufficientStake", () =>
-      registry.simulate.validatorRegister([exp.stake, exp.host], {
+      registry.simulate.validatorRegister([exp.stake, pubKey.yParity, pubKey.x, exp.host], {
         account: alice.account.address,
       })
     );
@@ -60,12 +62,13 @@ describe("ValidatorRegistry - register", () => {
       stake: config.stakeRegister,
       addr: getAddress(alice.account.address),
     };
+    const pubKey = compressPublicKey(accounts.alice.account.publicKey!);
 
     await token.write.approve([registry.address, config.stakeRegister - 1n], {
       account: alice.account,
     });
     await catchError(token.abi, "ERC20InsufficientAllowance", () =>
-      registry.simulate.validatorRegister([exp.stake, exp.host], {
+      registry.simulate.validatorRegister([exp.stake, pubKey.yParity, pubKey.x, exp.host], {
         account: alice.account.address,
       })
     );
@@ -79,9 +82,10 @@ describe("ValidatorRegistry - register", () => {
       stake: config.stakeRegister,
       addr: getAddress(alice.account.address),
     };
+    const pubKey = compressPublicKey(accounts.alice.account.publicKey!);
 
     await catchError(registry.abi, "HostTooLong", () =>
-      registry.simulate.validatorRegister([exp.stake, exp.host], {
+      registry.simulate.validatorRegister([exp.stake, pubKey.yParity, pubKey.x, exp.host], {
         account: alice.account.address,
       })
     );
@@ -95,9 +99,14 @@ describe("ValidatorRegistry - register", () => {
     const newHost = "localhost:3001";
     const addStake = parseUnits("2", 8);
     const newStake = exp.stake + addStake;
-    const hash = await registry.write.validatorRegister([addStake, newHost], {
-      account: alice.account,
-    });
+    const pubKey = compressPublicKey(accounts.alice.account.publicKey!);
+
+    const hash = await registry.write.validatorRegister(
+      [addStake, pubKey.yParity, pubKey.x, newHost],
+      {
+        account: alice.account,
+      }
+    );
 
     // check the event
     const events2 = await registry.getEvents.ValidatorRegisteredUpdated({ validator: exp.addr });

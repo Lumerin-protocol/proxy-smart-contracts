@@ -73,8 +73,8 @@ contract ValidatorRegistry is OwnableUpgradeable {
     /// @param host the url of the validator
     function validatorRegister(
         uint256 stake,
-        bytes32 pubKeyX,
         bool pubKeyYparity,
+        bytes32 pubKeyX,
         string calldata host
     ) public {
         address addr = _msgSender();
