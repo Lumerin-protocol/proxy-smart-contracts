@@ -18,9 +18,11 @@ contract ValidatorRegistry is OwnableUpgradeable {
     struct Validator {
         uint256 stake;
         address addr;
+        bool pubKeyYparity; // true - even, false - odd
         address lastComplainer;
         uint8 complains;
         string host; // host:port of the validator
+        bytes32 pubKeyX;
     }
 
     event ValidatorRegisteredUpdated(address indexed validator);
@@ -69,7 +71,12 @@ contract ValidatorRegistry is OwnableUpgradeable {
     /// @notice Registers validator or updates their stake and/or url
     /// @param stake amount of tokens to stake
     /// @param host the url of the validator
-    function validatorRegister(uint256 stake, string calldata host) public {
+    function validatorRegister(
+        uint256 stake,
+        bytes32 pubKeyX,
+        bool pubKeyYparity,
+        string calldata host
+    ) public {
         address addr = _msgSender();
         (Validator storage v, bool found) = validatorByAddress(addr);
         if (!found) {
@@ -84,6 +91,8 @@ contract ValidatorRegistry is OwnableUpgradeable {
             revert HostTooLong();
         }
         v.host = host;
+        v.pubKeyX = pubKeyX;
+        v.pubKeyYparity = pubKeyYparity;
 
         v.stake += stake;
         totalStake += stake;
