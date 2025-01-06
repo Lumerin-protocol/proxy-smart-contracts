@@ -16,13 +16,17 @@ async function main() {
   );
 
   const vr = await ethers.getContractFactory("ValidatorRegistry");
-  const proxy = await upgrades.deployProxy(vr, [
-    env.LUMERIN_TOKEN_ADDRESS,
-    env.VALIDATOR_STAKE_MINIMUM,
-    env.VALIDATOR_STAKE_REGISTER,
-    env.VALIDATOR_PUNISH_AMOUNT,
-    env.VALIDATOR_PUNISH_THRESHOLD,
-  ]);
+  const proxy = await upgrades.deployProxy(
+    vr,
+    [
+      env.LUMERIN_TOKEN_ADDRESS,
+      env.VALIDATOR_STAKE_MINIMUM,
+      env.VALIDATOR_STAKE_REGISTER,
+      env.VALIDATOR_PUNISH_AMOUNT,
+      env.VALIDATOR_PUNISH_THRESHOLD,
+    ],
+    { unsafeAllow: ["constructor"] }
+  );
 
   await proxy.deployed();
 
@@ -35,7 +39,7 @@ async function main() {
   console.log("VALIDATOR REGISTRY implementation address:", implAddr);
 
   console.log("Verifying contracts on Etherscan...");
-  await run("verify:verify", { address: proxy.address });
+  // await run("verify:verify", { address: proxy.address });
   await run("verify:verify", { address: implAddr });
   console.log("Contracts verified on Etherscan");
 }
