@@ -1,8 +1,15 @@
 import { viem } from "hardhat";
 import { getAddress, parseUnits } from "viem";
+import { compressPublicKey, getPublicKey } from "./utils";
 
 export async function deployFixture() {
   const [owner, alice, bob, carol] = await viem.getWalletClients();
+
+  owner.account.publicKey = await getPublicKey(owner);
+  alice.account.publicKey = await getPublicKey(alice);
+  bob.account.publicKey = await getPublicKey(bob);
+  carol.account.publicKey = await getPublicKey(alice);
+
   const token = await viem.deployContract(
     "contracts/validator-registry/LumerinTokenMock.sol:LumerinToken",
     []
@@ -50,9 +57,15 @@ export async function addValidatorFixture() {
     addr: getAddress(alice.account.address),
   };
 
-  const hash = await registry.write.validatorRegister([exp.stake, exp.host], {
-    account: alice.account,
-  });
+  console.log("=================", accounts.alice.account.publicKey);
+  const pubKey = compressPublicKey(accounts.alice.account.publicKey!);
+
+  const hash = await registry.write.validatorRegister(
+    [exp.stake, pubKey.yParity, pubKey.x, exp.host],
+    {
+      account: alice.account,
+    }
+  );
 
   return { registry, accounts, pc, token, config, validators: { alice: { ...exp, hash } } };
 }
@@ -64,29 +77,35 @@ export async function add3ValidatorsFixture() {
     stake: parseUnits("1", 8),
     addr: getAddress(accounts.alice.account.address),
     hash: "0x0" as `0x${string}`,
+    pubKey: compressPublicKey(accounts.alice.account.publicKey!),
   };
   const bob = {
     host: "localhost:3001",
     stake: parseUnits("2", 8),
     addr: getAddress(accounts.bob.account.address),
     hash: "0x0" as `0x${string}`,
+    pubKey: compressPublicKey(accounts.bob.account.publicKey!),
   };
   const carol = {
     host: "localhost:3002",
     stake: parseUnits("3", 8),
     addr: getAddress(accounts.carol.account.address),
     hash: "0x0" as `0x${string}`,
+    pubKey: compressPublicKey(accounts.carol.account.publicKey!),
   };
 
-  alice.hash = await registry.write.validatorRegister([alice.stake, alice.host], {
-    account: alice.addr,
-  });
-  bob.hash = await registry.write.validatorRegister([bob.stake, bob.host], {
-    account: bob.addr,
-  });
-  carol.hash = await registry.write.validatorRegister([carol.stake, carol.host], {
-    account: carol.addr,
-  });
+  alice.hash = await registry.write.validatorRegister(
+    [alice.stake, alice.pubKey.yParity, alice.pubKey.x, alice.host],
+    { account: alice.addr }
+  );
+  bob.hash = await registry.write.validatorRegister(
+    [bob.stake, bob.pubKey.yParity, bob.pubKey.x, bob.host],
+    { account: bob.addr }
+  );
+  carol.hash = await registry.write.validatorRegister(
+    [carol.stake, carol.pubKey.yParity, carol.pubKey.x, carol.host],
+    { account: carol.addr }
+  );
 
   return { registry, accounts, pc, token, validators: { alice, bob, carol }, config };
 }
