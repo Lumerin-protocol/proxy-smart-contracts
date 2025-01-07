@@ -230,6 +230,24 @@ variables:
     - make update-implementation
     - *upload-state
 
+.update_validator_registry_template: &update_validator_registry_template
+  stage: update-contracts
+  needs: ["compile-contracts", "test", "build-contracts-js"]
+  image: $NODE_IMAGE
+  when: manual
+  artifacts:
+    paths:
+      - .openzeppelin
+  environment:
+    name: dev
+    url: $EXPLORER_URL/$CLONE_FACTORY_ADDRESS
+  before_script:
+    - *install-ssh
+  script:
+    - *download-state
+    - make update-validator-registry
+    - *upload-state
+
 #####################################
 #       Contracts libs jobs         #
 #####################################
@@ -433,6 +451,24 @@ update-implementation-stg:
 
 update-implementation-lmn:
   <<: *update_implementation_template
+  environment:
+    name: lmn
+  tags: *tags-lmn
+
+update-validator-registry-dev:
+  <<: *update_validator_registry_template
+  environment:
+    name: dev
+  tags: *tags-dev
+
+update-validator-registry-stg:
+  <<: *update_validator_registry_template
+  environment:
+    name: stg
+  tags: *tags-stg
+
+update-validator-registry-lmn:
+  <<: *update_validator_registry_template
   environment:
     name: lmn
   tags: *tags-lmn

@@ -37,6 +37,9 @@ update-clonefactory:
 update-implementation:
 	yarn hardhat run --network default ./scripts/update-implementation.ts
 
+update-validator-registry:
+	yarn hardhat run --network default ./scripts/update-validator-registry.ts
+
 populate-contracts:
 	yarn hardhat run --network default ./scripts/populate-contracts.ts
 
