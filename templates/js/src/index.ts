@@ -1,5 +1,6 @@
 import Web3 from "web3";
 import { AbiItem } from "ethereum-abi-types-generator";
+import * as abi from "./abi/abi";
 import { bytecode as CloneFactoryBC, abi as CloneFactoryAbi } from "./abi/CloneFactory.json";
 import { bytecode as ImplementationBC, abi as ImplementationAbi } from "./abi/Implementation.json";
 import { bytecode as LumerinBC, abi as LumerinAbi } from "./abi/Lumerin.json";
@@ -83,4 +84,5 @@ export {
   LumerinContext,
   FaucetContext,
   ValidatorRegistryContext,
+  abi,
 };
