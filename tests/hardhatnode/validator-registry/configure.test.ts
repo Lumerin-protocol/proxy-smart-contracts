@@ -1,9 +1,10 @@
 import { expect } from "chai";
 import { getAddress, parseUnits } from "viem";
 import { add3ValidatorsFixture, addValidatorFixture, deployFixture } from "./utils/fixtures";
-import { catchError, compressPublicKey } from "./utils/utils";
+import { compressPublicKey } from "../../../lib/pubkey";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { complain } from "./utils/actions";
+import { catchError } from "./utils/utils";
 
 describe("Validator registry - configure", () => {
   it("should deploy the ValidatorRegistry contract", async () => {

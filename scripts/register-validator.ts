@@ -1,6 +1,7 @@
 import { viem } from "hardhat";
 import { requireEnvsSet } from "../lib/utils";
 import { privateKeyToAccount } from "viem/accounts";
+import { compressPublicKey } from "../lib/pubkey";
 
 async function main() {
   const env = requireEnvsSet(
@@ -31,15 +32,17 @@ async function main() {
   const ethbalance = await pc.getBalance({ address: account.address });
   console.log("balan", ethbalance);
 
-  // await token.write.approve(
-  //   [env.VALIDATOR_REGISTRY_ADDRESS as `0x${string}`, BigInt(env.VALIDATOR_STAKE)],
-  //   { account }
-  // );
+  await token.write.approve(
+    [env.VALIDATOR_REGISTRY_ADDRESS as `0x${string}`, BigInt(env.VALIDATOR_STAKE)],
+    { account }
+  );
   console.log("approved");
-  const tx = await vr.write.validatorRegister([BigInt(env.VALIDATOR_STAKE), env.VALIDATOR_HOST], {
-    account: account,
-    // gas: 50000n,
-  });
+  const pubkey = compressPublicKey(account.publicKey);
+  console.log(pubkey);
+  const tx = await vr.write.validatorRegister(
+    [BigInt(env.VALIDATOR_STAKE), pubkey.yParity, pubkey.x, env.VALIDATOR_HOST],
+    { account: account }
+  );
   console.log(tx);
 }
 

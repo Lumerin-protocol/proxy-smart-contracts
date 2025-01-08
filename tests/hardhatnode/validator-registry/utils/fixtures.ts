@@ -1,6 +1,7 @@
 import { viem } from "hardhat";
 import { getAddress, parseUnits } from "viem";
-import { compressPublicKey, getPublicKey } from "./utils";
+import { getPublicKey } from "./utils";
+import { compressPublicKey } from "../../../../lib/pubkey";
 
 export async function deployFixture() {
   const [owner, alice, bob, carol] = await viem.getWalletClients();
