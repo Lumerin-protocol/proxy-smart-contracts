@@ -1,14 +1,17 @@
 version := $(shell cat ./VERSION)
 
 clean:
-	rm -rf abi artifacts cache build-go build-js
+	rm -rf abi artifacts cache build-go build-js abi
 
 test:
 	kill "$$(lsof -t -i:8545)" || true
 	make compile
 	make -B build-js 
-	yarn hardhat node --config hardhat-base.config.ts & ./node-local-deploy.sh && yarn hardhat test --network localhost --config hardhat-base.config.ts tests/*.ts
+	yarn hardhat node --config hardhat-base.config.ts & ./node-local-deploy.sh && yarn hardhat test --network localhost --config hardhat-base.config.ts tests/localnode/*.ts
 	kill "$$(lsof -t -i:8545)" || true
+
+test-hardhat:
+	yarn hardhat --network hardhat --config hardhat-base.config.ts test $$(find ./tests/hardhatnode/ -type f -iname "*.test.ts")
 
 test-upgrade:
 	yarn hardhat --network localhost --config hardhat-base.config.ts test --bail tests/upgrades/*.ts 
@@ -25,11 +28,17 @@ deploy-clonefactory:
 deploy-faucet:
 	yarn hardhat run --network default ./scripts/deploy-faucet.ts
 
+deploy-validator-registry:
+	yarn hardhat run --network default ./scripts/deploy-validator-registry.ts
+
 update-clonefactory:
 	yarn hardhat run --network default ./scripts/update-clonefactory.ts
 
 update-implementation:
 	yarn hardhat run --network default ./scripts/update-implementation.ts
+
+update-validator-registry:
+	yarn hardhat run --network default ./scripts/update-validator-registry.ts
 
 populate-contracts:
 	yarn hardhat run --network default ./scripts/populate-contracts.ts

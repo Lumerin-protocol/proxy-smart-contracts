@@ -1,40 +1,10 @@
 node_modules
-.env
+*.env
+.DS_Store
 
 # Hardhat files
 /cache
 /artifacts
-
-# TypeChain files
-/typechain
-/typechain-types
-
-# solidity-coverage files
-/coverage
-/coverage.json
-
-node_modules
-.env
-
-# Hardhat files
-/cache
-/artifacts
-
-# TypeChain files
-/typechain
-/typechain-types
-
-# solidity-coverage files
-/coverage
-/coverage.json
-
-node_modules
-.env
-
-# Hardhat files
-/cache
-/artifacts
-/abi
 
 # TypeChain files
 /typechain
@@ -48,6 +18,7 @@ node_modules
 /build-go
 /build-js
 *.tmp
+/abi
 
 # tests
 /test-temp
