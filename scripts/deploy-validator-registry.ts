@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { requireEnvsSet } from "../lib/utils";
-import { ethers, upgrades, run } from "hardhat";
+import { ethers, upgrades, run, viem } from "hardhat";
+import { privateKeyToAddress } from "viem/accounts";
 
 async function main() {
   console.log("Validation registry deployment script");
@@ -14,6 +15,13 @@ async function main() {
     "VALIDATOR_PUNISH_AMOUNT",
     "VALIDATOR_PUNISH_THRESHOLD"
   );
+
+  const ownerAddr = privateKeyToAddress(`0x${env.OWNER_PRIVATEKEY}`);
+  console.log("OWNER address:", ownerAddr);
+  const pc = await viem.getPublicClient();
+
+  console.log("chainId:", await pc.getChainId());
+  console.log(await pc.getBalance({ address: ownerAddr }));
 
   const vr = await ethers.getContractFactory("ValidatorRegistry");
   const proxy = await upgrades.deployProxy(
@@ -39,9 +47,14 @@ async function main() {
   console.log("VALIDATOR REGISTRY implementation address:", implAddr);
 
   console.log("Verifying contracts on Etherscan...");
-  // await run("verify:verify", { address: proxy.address });
-  await run("verify:verify", { address: implAddr });
-  console.log("Contracts verified on Etherscan");
+
+  await run("verify:verify", { address: implAddr })
+    .then(() => {
+      console.log("Contracts verified on Etherscan");
+    })
+    .catch((error) => {
+      console.error("Error verifying contracts on Etherscan:", error);
+    });
 }
 
 main()
