@@ -16,7 +16,8 @@ async function main() {
     "VALIDATOR_PUNISH_THRESHOLD"
   );
 
-  const ownerAddr = privateKeyToAddress(`0x${env.OWNER_PRIVATEKEY}`);
+  const normalizedPrivateKey: `0x${string}` = `0x${env.OWNER_PRIVATEKEY.replace("0x", "")}`;
+  const ownerAddr = privateKeyToAddress(normalizedPrivateKey);
   console.log("OWNER address:", ownerAddr);
   const pc = await viem.getPublicClient();
 
