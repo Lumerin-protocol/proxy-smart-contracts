@@ -17,7 +17,12 @@ export FEE_RECIPIENT_ADDRESS="0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 export FAUCET_DAILY_MAX_LMR=80000000000 # 800 LMR
 export FAUCET_LMR_PAYOUT=200000000 # 2 LMR
 export FAUCET_ETH_PAYOUT=10000000000000000 # 0.01 ETH
+export VALIDATOR_FEE_RATE="0.01"
 export BUILD_FULL_MARKETPLACE=false
+export VALIDATOR_STAKE_MINIMUM=100000000000
+export VALIDATOR_STAKE_REGISTER=1000000000000
+export VALIDATOR_PUNISH_AMOUNT=100000000000
+export VALIDATOR_PUNISH_THRESHOLD=3
 
 # deploy lumerin token
 yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/deploy-lumerin.ts
@@ -36,3 +41,6 @@ yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/w
 
 # populate contracts
 yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/populate-contracts.ts
+
+# validator registry
+yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/deploy-validator-registry.ts

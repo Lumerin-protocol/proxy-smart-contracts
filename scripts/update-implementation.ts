@@ -1,13 +1,21 @@
 import { UpdateImplementation } from "../lib/deploy";
 import { requireEnvsSet } from "../lib/utils";
+import { run } from "hardhat";
 
 async function main() {
-  console.log("Implementation update script")
+  console.log("Implementation update script");
 
-  const env = requireEnvsSet("OWNER_PRIVATEKEY", "CLONE_FACTORY_ADDRESS")
-  await UpdateImplementation("Implementation", env.CLONE_FACTORY_ADDRESS, env.OWNER_PRIVATEKEY, console.log)
+  const env = requireEnvsSet("OWNER_PRIVATEKEY", "CLONE_FACTORY_ADDRESS");
+  const { logicAddress } = await UpdateImplementation(
+    "Implementation",
+    env.CLONE_FACTORY_ADDRESS,
+    env.OWNER_PRIVATEKEY,
+    console.log
+  );
 
-  console.log("SUCCESS. Implementation updated.")
+  await run("verify:verify", { address: logicAddress });
+
+  console.log("SUCCESS. Implementation updated.");
 }
 
 main()
