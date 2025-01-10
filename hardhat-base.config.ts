@@ -1,35 +1,41 @@
 import type { HardhatUserConfig } from "hardhat/config";
 
-import '@nomiclabs/hardhat-ethers';
+import "@nomiclabs/hardhat-ethers";
+import "@nomicfoundation/hardhat-verify";
 import "@openzeppelin/hardhat-upgrades";
 import "hardhat-abi-exporter";
 import "dotenv/config";
-
-// TODO: integrate the rest of the plugins if needed
-//
-// import "@nomicfoundation/hardhat-chai-matchers";
-// import "@nomicfoundation/hardhat-ethers";
-// import "@nomicfoundation/hardhat-verify";
-// import "@typechain/hardhat";
-// import "hardhat-gas-reporter";
-// import "solidity-coverage";
-// import "@nomicfoundation/hardhat-network-helpers";
-// import "@nomicfoundation/hardhat-toolbox"
+import "@nomicfoundation/hardhat-viem";
+import "hardhat-storage-layout";
 
 // Base config is used for local deployment and/or contract build
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.18",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200,
+    compilers: [
+      // for older contracts
+      {
+        version: "0.8.18",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
       },
-    },
+      // for validation regitry
+      {
+        version: "0.8.20",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
+      },
+    ],
   },
   networks: {
     hardhat: {
-      initialBaseFeePerGas: 0,
       mining: {
         auto: true,
       },
@@ -51,6 +57,14 @@ const config: HardhatUserConfig = {
     clear: true,
     flat: true,
     spacing: 2,
+    only: [
+      "CloneFactory",
+      "Faucet",
+      "Implementation",
+      "Escrow",
+      "LumerinToken",
+      "ValidatorRegistry",
+    ],
   },
   mocha: {
     timeout: 5 * 60 * 1000, // 5 minutes

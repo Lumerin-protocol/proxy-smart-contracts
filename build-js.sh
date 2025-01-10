@@ -9,11 +9,16 @@ mv "$PTH/.gitignore-template" "$PTH/.gitignore"
 
 # copy abi's
 mkdir -p "$PTH/src/abi"
+
+#copy viem abi (as const)
+yarn wagmi generate
+
 #TODO: copy abi's from artifacts/contracts to get the bytecode
 cp ./artifacts/contracts/CloneFactory.sol/CloneFactory.json $PTH/src/abi
 cp ./artifacts/contracts/Implementation.sol/Implementation.json $PTH/src/abi
 cp ./artifacts/contracts/LumerinToken.sol/Lumerin.json $PTH/src/abi
 cp ./artifacts/contracts/Faucet.sol/Faucet.json $PTH/src/abi
+cp ./artifacts/contracts/validator-registry/ValidatorRegistry.sol/ValidatorRegistry.json $PTH/src/abi
 
 cd $PTH
 
