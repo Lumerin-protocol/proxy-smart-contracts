@@ -15,7 +15,13 @@ async function main() {
     console.log
   );
 
-  await run("verify:verify", { address: logicAddress });
+  await run("verify:verify", { address: logicAddress })
+    .then(() => {
+      console.log("Contracts verified on Etherscan");
+    })
+    .catch((error) => {
+      console.error("Error verifying contracts on Etherscan:", error);
+    });
 
   fs.writeFileSync("clonefactory-addr.tmp", env.CLONE_FACTORY_ADDRESS);
 }
