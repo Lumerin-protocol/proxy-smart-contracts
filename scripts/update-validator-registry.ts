@@ -16,7 +16,13 @@ async function main() {
   console.log("new implementation is at:", validatorImpl.address);
 
   console.log("Verifying implementation...");
-  await run("verify:verify", { address: validatorImpl.address }).catch(console.error);
+  await run("verify:verify", { address: validatorImpl.address })
+    .then(() => {
+      console.log("Contracts verified on Etherscan");
+    })
+    .catch((error) => {
+      console.error("Error verifying contracts on Etherscan:", error);
+    });
 }
 
 main()
