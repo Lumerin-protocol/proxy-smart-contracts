@@ -98,14 +98,6 @@ contract Implementation is Initializable, ReentrancyGuardUpgradeable {
         return ContractState.Available;
     }
 
-    function contractState() public view returns (ContractState) {
-        uint256 expirationTime = startingBlockTimestamp + terms._length;
-        if (block.timestamp < expirationTime) {
-            return ContractState.Running;
-        }
-        return ContractState.Available;
-    }
-
     function getPublicVariables()
         public
         view
