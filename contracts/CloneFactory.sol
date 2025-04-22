@@ -6,6 +6,8 @@ import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol"
 import {Implementation} from "./Implementation.sol";
 import {Lumerin} from "./LumerinToken.sol";
 import {FeeRecipient} from "./Shared.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title CloneFactory
 /// @author Josh Kean (Lumerin)
@@ -13,31 +15,32 @@ import {FeeRecipient} from "./Shared.sol";
 
 //CloneFactory now responsible for minting, purchasing, and tracking contracts
 contract CloneFactory is Initializable {
-    Lumerin public lumerin;
-    address public baseImplementation;
+    IERC20 public paymentToken;
+    IERC20 public feeToken;
+    address public baseImplementation; // This is now the beacon address
     address public owner;
+    address public hashrateOracle;
     bool public noMoreWhitelist;
     address[] public rentalContracts; //dynamically allocated list of rental contracts
     mapping(address => bool) rentalContractsMap; //mapping of rental contracts to verify cheaply if implementation was created by this clonefactory
-    FeeRecipient feeRecipient;
 
     mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
     mapping(address => bool) public isContractDead; // keeps track of contracts that are no longer valid
 
     /// @notice The fee rate paid to a validator, expressed as a fraction of the total amount.
-    /// @dev Stored as an integer scaled by VALIDATOR_FEE_MULT to represent a float ratio.
-    /// @dev For example, if VALIDATOR_FEE_MULT=10000:
-    /// @dev  - 1% (0.01) = 0.01 * 10000 = 100
-    /// @dev  - 0.1% (0.001) = 0.001 * 10000 = 10
-    uint16 public validatorFeeRateScaled;
+    /// @dev Stored as an integer scaled by VALIDATOR_FEE_DECIMALS to represent a float ratio.
+    /// @dev This value should consider the decimals of the tokens.
+    /// @dev For example, for USDC(6 decimals) and LMR(8 decimals) and VALIDATOR_FEE_DECIMALS=18:
+    /// @dev  Price: 100 USDC, Fee: 10 LMR
+    /// @dev  validatorFeeRateScaled = priceWithDecimals / feeWithDecimals * 10**VALIDATOR_FEE_DECIMALS
+    /// @dev  validatorFeeRateScaled = 10 00000000 / 100 000000 * 10**18 = 10 * 10**18
+    uint256 public validatorFeeRateScaled;
+    uint8 public constant VALIDATOR_FEE_DECIMALS = 18;
 
-    uint16 public constant VALIDATOR_FEE_MULT = 10000;
+    using SafeERC20 for IERC20;
 
     event contractCreated(address indexed _address, string _pubkey); //emitted whenever a contract is created
-    event clonefactoryContractPurchased(
-        address indexed _address,
-        address indexed _validator
-    ); //emitted whenever a contract is purchased
+    event clonefactoryContractPurchased(address indexed _address, address indexed _validator); //emitted whenever a contract is purchased
     event contractDeleteUpdated(address _address, bool _isDeleted); //emitted whenever a contract is deleted/restored
     event purchaseInfoUpdated(address indexed _address);
 
@@ -46,115 +49,56 @@ contract CloneFactory is Initializable {
         _;
     }
 
-    modifier sufficientFee() {
-        require(
-            msg.value >= feeRecipient.fee,
-            "Insufficient ETH provided for marketplace fee"
-        );
-        _;
-    }
-
     modifier onlyInWhitelist() {
-        require(
-            whitelist[msg.sender] || noMoreWhitelist,
-            "you are not an approved seller on this marketplace"
-        );
+        require(whitelist[msg.sender] || noMoreWhitelist, "you are not an approved seller on this marketplace");
         _;
     }
 
     function initialize(
-        address _baseImplementation,
-        address _lumerin,
-        address _feeRecipient,
-        uint16 _validatorFeeRateScaled
+        address _baseImplementation, // This should be the beacon address
+        address _hashrateOracle,
+        address _paymentToken,
+        address _feeToken,
+        uint256 _validatorFeeRateScaled
     ) public initializer {
-        lumerin = Lumerin(_lumerin);
-        baseImplementation = _baseImplementation;
+        paymentToken = IERC20(_paymentToken);
+        feeToken = IERC20(_feeToken);
+        hashrateOracle = _hashrateOracle;
+        baseImplementation = _baseImplementation; // Store the beacon address
         owner = msg.sender;
-        feeRecipient.fee = 0.0002 ether;
-        feeRecipient.recipient = _feeRecipient;
         validatorFeeRateScaled = _validatorFeeRateScaled;
     }
 
-    // TODO: remove return value and just use require
-    function payMarketplaceFee() public payable sufficientFee returns (bool) {
-        (bool sent, ) = payable(feeRecipient.recipient).call{
-            value: feeRecipient.fee
-        }("");
-        require(sent, "Failed to pay marketplace listing fee");
-        return sent;
-    }
-
-    function marketplaceFee() external view returns (uint256) {
-        return feeRecipient.fee;
-    }
-
-    //function to create a new Implementation contract
-    function setCreateNewRentalContract(
-        uint256 _price,
-        uint256 _limit,
-        uint256 _speed,
-        uint256 _length,
-        address,
-        string calldata _pubKey
-    ) external payable onlyInWhitelist sufficientFee returns (address) {
-        return
-            createContract(
-                _price,
-                _limit,
-                _speed,
-                _length,
-                0,
-                address(0),
-                _pubKey
-            );
-    }
-
     function setCreateNewRentalContractV2(
-        uint256 _price,
-        uint256 _limit,
+        uint256,
+        uint256,
         uint256 _speed,
         uint256 _length,
         int8 _profitTarget,
         address,
         string calldata _pubKey
-    ) public payable onlyInWhitelist sufficientFee returns (address) {
-        return
-            createContract(
-                _price,
-                _limit,
-                _speed,
-                _length,
-                _profitTarget,
-                address(0),
-                _pubKey
-            );
+    ) public payable onlyInWhitelist returns (address) {
+        return createContract(_speed, _length, _profitTarget, address(0), _pubKey);
     }
 
     function createContract(
-        uint256 _price,
-        uint256 _limit,
         uint256 _speed,
         uint256 _length,
         int8 _profitTarget,
-        address _validator,
+        address, // unused
         string calldata _pubKey
     ) internal returns (address) {
-        bool sent = payMarketplaceFee();
-        require(sent, "Failed to pay marketplace listing fee");
-
         bytes memory data = abi.encodeWithSelector(
             Implementation(address(0)).initialize.selector,
-            _price,
-            _limit,
+            address(this),
+            hashrateOracle,
+            address(paymentToken),
+            address(feeToken),
+            msg.sender,
+            _pubKey,
             _speed,
             _length,
-            _profitTarget,
-            msg.sender,
-            address(lumerin),
-            address(this),
-            _validator,
-            _pubKey
+            _profitTarget
         );
 
         BeaconProxy beaconProxy = new BeaconProxy(baseImplementation, data);
@@ -163,22 +107,6 @@ contract CloneFactory is Initializable {
         rentalContractsMap[newContractAddr] = true;
         emit contractCreated(newContractAddr, _pubKey);
         return newContractAddr;
-    }
-
-    //function to purchase a hashrate contract
-    //requires the clonefactory to be able to spend tokens on behalf of the purchaser
-    function setPurchaseRentalContract(
-        address _contractAddress,
-        string calldata _cipherText,
-        uint32 termsVersion
-    ) external payable sufficientFee {
-        purchaseContract(
-            _contractAddress,
-            address(0),
-            _cipherText,
-            "",
-            termsVersion
-        );
     }
 
     /// @notice purchase a hashrate contract
@@ -192,14 +120,8 @@ contract CloneFactory is Initializable {
         string calldata _encrValidatorURL,
         string calldata _encrDestURL,
         uint32 termsVersion
-    ) external payable sufficientFee {
-        purchaseContract(
-            _contractAddress,
-            _validatorAddress,
-            _encrValidatorURL,
-            _encrDestURL,
-            termsVersion
-        );
+    ) external payable {
+        purchaseContract(_contractAddress, _validatorAddress, _encrValidatorURL, _encrDestURL, termsVersion);
     }
 
     function purchaseContract(
@@ -210,60 +132,35 @@ contract CloneFactory is Initializable {
         uint32 termsVersion
     ) internal {
         // TODO: add a test case so any third-party implementations will be discarded
-        require(
-            rentalContractsMap[_contractAddress],
-            "unknown contract address"
-        );
+        require(rentalContractsMap[_contractAddress], "unknown contract address");
         Implementation targetContract = Implementation(_contractAddress);
-        require(
-            !targetContract.isDeleted(),
-            "cannot purchase deleted contract"
-        );
-        require(
-            targetContract.seller() != msg.sender,
-            "cannot purchase your own contract"
-        );
+        require(!targetContract.isDeleted(), "cannot purchase deleted contract");
+        require(targetContract.seller() != msg.sender, "cannot purchase your own contract");
 
-        uint256 _price;
         uint32 _version;
 
-        (_price, , , , _version, ) = targetContract.futureTerms();
+        (,,,, _version,) = targetContract.futureTerms();
         if (_version == 0) {
-            (_price, , , , _version, ) = targetContract.terms();
+            (,,,, _version,) = targetContract.terms();
         }
-        require(
-            _version == termsVersion,
-            "cannot purchase, contract terms were updated"
-        );
+        require(_version == termsVersion, "cannot purchase, contract terms were updated");
 
-        /* ETH buyer marketplace purchase fee */
-        payMarketplaceFee();
+        (uint256 _price, uint256 _fee) = targetContract.priceAndFee();
 
-        /* Validator fee */
+        paymentToken.safeTransferFrom(msg.sender, _contractAddress, _price);
         if (_validatorAddress != address(0)) {
-            _price += (_price * validatorFeeRateScaled) / VALIDATOR_FEE_MULT;
+            feeToken.safeTransferFrom(msg.sender, _contractAddress, _fee);
         }
-        uint256 actualAllowance = lumerin.allowance(msg.sender, address(this));
-        require(
-            actualAllowance >= _price,
-            "not authorized to spend required funds"
-        );
 
-        lumerin.transferFrom(msg.sender, _contractAddress, _price);
         targetContract.setPurchaseContract(
-            _encrValidatorURL,
-            _encrDestURL,
-            msg.sender,
-            _validatorAddress,
-            validatorFeeRateScaled
+            _encrValidatorURL, _encrDestURL, _price, msg.sender, _validatorAddress, validatorFeeRateScaled
         );
 
         emit clonefactoryContractPurchased(_contractAddress, _validatorAddress);
     }
 
     function getContractList() external view returns (address[] memory) {
-        address[] memory _rentalContracts = rentalContracts;
-        return _rentalContracts;
+        return rentalContracts;
     }
 
     //adds an address to the whitelist
@@ -287,89 +184,37 @@ contract CloneFactory is Initializable {
         noMoreWhitelist = true;
     }
 
-    function setMarketplaceFeeRecipient(
-        uint256 fee,
-        address recipient
-    ) external onlyOwner {
-        feeRecipient.fee = fee;
-        feeRecipient.recipient = recipient;
-    }
-
     /// @notice Set the fee rate paid to a validator
     /// @param _validatorFeeRateScaled fraction multiplied by VALIDATOR_FEE_MULT
-    function setValidatorFeeRate(
-        uint16 _validatorFeeRateScaled
-    ) external onlyOwner {
+    function setValidatorFeeRate(uint256 _validatorFeeRateScaled) external onlyOwner {
         validatorFeeRateScaled = _validatorFeeRateScaled;
     }
 
-    function setContractDeleted(
-        address _contractAddress,
-        bool _isDeleted
-    ) public {
-        require(
-            rentalContractsMap[_contractAddress],
-            "unknown contract address"
-        );
+    function setContractDeleted(address _contractAddress, bool _isDeleted) public {
+        require(rentalContractsMap[_contractAddress], "unknown contract address");
         Implementation _contract = Implementation(_contractAddress);
-        require(
-            msg.sender == _contract.seller() || msg.sender == owner,
-            "you are not authorized"
-        );
+        require(msg.sender == _contract.seller() || msg.sender == owner, "you are not authorized");
         Implementation(_contractAddress).setContractDeleted(_isDeleted);
         emit contractDeleteUpdated(_contractAddress, _isDeleted);
     }
 
-    function setUpdateContractInformation(
-        address _contractAddress,
-        uint256 _price,
-        uint256 _limit,
-        uint256 _speed,
-        uint256 _length
-    ) external payable {
-        updateContract(_contractAddress, _price, _limit, _speed, _length, 0);
-    }
-
     function setUpdateContractInformationV2(
         address _contractAddress,
-        uint256 _price,
-        uint256 _limit,
+        uint256,
+        uint256,
         uint256 _speed,
         uint256 _length,
         int8 _profitTarget
     ) external {
-        updateContract(
-            _contractAddress,
-            _price,
-            _limit,
-            _speed,
-            _length,
-            _profitTarget
-        );
+        updateContract(_contractAddress, _speed, _length, _profitTarget);
     }
 
-    function updateContract(
-        address _contractAddress,
-        uint256 _price,
-        uint256 _limit,
-        uint256 _speed,
-        uint256 _length,
-        int8 _profitTarget
-    ) internal {
-        require(
-            rentalContractsMap[_contractAddress],
-            "unknown contract address"
-        );
+    function updateContract(address _contractAddress, uint256 _speed, uint256 _length, int8 _profitTarget) internal {
+        require(rentalContractsMap[_contractAddress], "unknown contract address");
         Implementation _contract = Implementation(_contractAddress);
         require(msg.sender == _contract.seller(), "you are not authorized");
 
-        Implementation(_contractAddress).setUpdatePurchaseInformation(
-            _price,
-            _limit,
-            _speed,
-            _length,
-            _profitTarget
-        );
+        Implementation(_contractAddress).setUpdatePurchaseInformation(_speed, _length, _profitTarget);
         emit purchaseInfoUpdated(address(this));
     }
 }

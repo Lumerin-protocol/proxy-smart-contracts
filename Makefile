@@ -7,17 +7,17 @@ test:
 	kill "$$(lsof -t -i:8545)" || true
 	make compile
 	make -B build-js 
-	yarn hardhat node --config hardhat-base.config.ts & ./node-local-deploy.sh && yarn hardhat test --network localhost --config hardhat-base.config.ts tests/localnode/*.ts
+	yarn hardhat node & ./node-local-deploy.sh && yarn hardhat test --network localhost tests/localnode/*.ts
 	kill "$$(lsof -t -i:8545)" || true
 
 test-hardhat:
-	yarn hardhat --network hardhat --config hardhat-base.config.ts test $$(find ./tests/hardhatnode/ -type f -iname "*.test.ts")
+	yarn hardhat --network hardhat test $$(find ./tests/hardhatnode/ -type f -iname "*.test.ts")
 
 test-upgrade:
-	yarn hardhat --network localhost --config hardhat-base.config.ts test --bail tests/upgrades/*.ts 
+	yarn hardhat --network localhost test --bail tests/upgrades/*.ts 
 
 compile:
-	yarn hardhat compile --config hardhat-base.config.ts
+	yarn hardhat compile
 
 deploy-lumerin:
 	yarn hardhat run --network default ./scripts/deploy-lumerin.ts
@@ -88,6 +88,9 @@ release-git:
 	
 node-local:
 	yarn hardhat node --config hardhat-base.config.ts
+
+deploy-local:
+	yarn hardhat run ./scripts/deploy-local.ts
 
 node-local-deploy:
 	./node-local-deploy.sh

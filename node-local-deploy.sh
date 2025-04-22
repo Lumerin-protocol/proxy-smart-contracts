@@ -24,10 +24,13 @@ export VALIDATOR_STAKE_REGISTER=1000000000000
 export VALIDATOR_PUNISH_AMOUNT=100000000000
 export VALIDATOR_PUNISH_THRESHOLD=3
 
-# deploy lumerin token
+# deploy fee token
 yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/deploy-lumerin.ts
 export LUMERIN_TOKEN_ADDRESS="$(cat lumerin-addr.tmp)"
-export VALIDATOR_ADDRESS="$(cat lumerin-addr.tmp)" # currently unused
+
+# deploy payment token
+yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/deploy-lumerin.ts
+export LUMERIN_TOKEN_ADDRESS="$(cat lumerin-addr.tmp)"
 
 # deploy faucet
 yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/deploy-faucet.ts 

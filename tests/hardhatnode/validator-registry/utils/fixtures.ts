@@ -1,7 +1,6 @@
 import { viem } from "hardhat";
 import { getAddress, parseUnits } from "viem";
-import { getPublicKey } from "./utils";
-import { compressPublicKey } from "../../../../lib/pubkey";
+import { compressPublicKey, getPublicKey } from "../../../../lib/pubkey";
 
 export async function deployFixture() {
   const [owner, alice, bob, carol] = await viem.getWalletClients();
@@ -58,7 +57,6 @@ export async function addValidatorFixture() {
     addr: getAddress(alice.account.address),
   };
 
-  console.log("=================", accounts.alice.account.publicKey);
   const pubKey = compressPublicKey(accounts.alice.account.publicKey!);
 
   const hash = await registry.write.validatorRegister(
