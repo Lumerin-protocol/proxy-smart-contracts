@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >0.8.10;
 
-import {CloneFactory} from "./CloneFactory.sol";
+import { CloneFactory } from "../CloneFactory.sol";
 
 /// @title CloneFactoryTest
 /// @notice This contract is used to test Clonefactory update

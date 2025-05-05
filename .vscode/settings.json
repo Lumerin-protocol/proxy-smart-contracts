@@ -3,5 +3,8 @@
   "solidity.remappingsUnix": [
     "@uniswap/=node_modules/@uniswap/",
     "@openzeppelin/=node_modules/@openzeppelin/"
-  ]
+  ],
+  "solidity.packageDefaultDependenciesContractsDirectory": "contracts",
+  "solidity.packageDefaultDependenciesDirectory": "node_modules",
+  "solidity.formatter": "forge"
 }

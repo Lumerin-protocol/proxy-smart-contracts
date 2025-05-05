@@ -1,30 +1,30 @@
 //SPDX-License-Identifier: MIT
-pragma solidity >0.8.10;
+pragma solidity ^0.8.20;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
-import {Implementation} from "./Implementation.sol";
-import {Lumerin} from "./LumerinToken.sol";
-import {FeeRecipient} from "./Shared.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable-v5/access/OwnableUpgradeable.sol";
+import { IERC20 } from "@openzeppelin/contracts-v5/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts-v5/token/ERC20/utils/SafeERC20.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable-v5/proxy/utils/UUPSUpgradeable.sol";
+import { BeaconProxy } from "@openzeppelin/contracts-v5/proxy/beacon/BeaconProxy.sol";
+import { Implementation } from "./Implementation.sol";
+import { Versionable } from "../util/versionable.sol";
 
 /// @title CloneFactory
-/// @author Josh Kean (Lumerin)
-/// @notice Variables passed into contract initializer are subject to change based on the design of the hashrate contract
-
-//CloneFactory now responsible for minting, purchasing, and tracking contracts
-contract CloneFactory is Initializable {
+/// @author Josh Kean (Lumerin), Oleksandr (Shev) Shevchuk
+/// @notice A factory contract that creates and manages hashrate rental contracts using a beacon proxy pattern.
+/// @dev This contract serves:
+///      - Central entry point for creating, tracking, managing all hashrate rental contracts
+///      - Whitelisting of approved sellers
+///      - Handling contract purchases and payments
+/// @dev The contract uses UUPS upgradeable pattern and is owned by a designated address.
+/// @dev All rental contracts are created as beacon proxies pointing to a common implementation.
+contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     IERC20 public paymentToken;
     IERC20 public feeToken;
     address public baseImplementation; // This is now the beacon address
-    address public owner;
     address public hashrateOracle;
-    bool public noMoreWhitelist;
     address[] public rentalContracts; //dynamically allocated list of rental contracts
     mapping(address => bool) rentalContractsMap; //mapping of rental contracts to verify cheaply if implementation was created by this clonefactory
-
-    mapping(address => bool) public whitelist; //whitelisting of seller addresses //temp public for testing
     mapping(address => bool) public isContractDead; // keeps track of contracts that are no longer valid
 
     /// @notice The fee rate paid to a validator, expressed as a fraction of the total amount.
@@ -33,24 +33,20 @@ contract CloneFactory is Initializable {
     /// @dev For example, for USDC(6 decimals) and LMR(8 decimals) and VALIDATOR_FEE_DECIMALS=18:
     /// @dev  Price: 100 USDC, Fee: 10 LMR
     /// @dev  validatorFeeRateScaled = priceWithDecimals / feeWithDecimals * 10**VALIDATOR_FEE_DECIMALS
-    /// @dev  validatorFeeRateScaled = 10 00000000 / 100 000000 * 10**18 = 10 * 10**18
+    /// @dev  validatorFeeRateScaled = 10 * 10**8 / 100 * 10**6 * 10**18 = 10 * 10**18
     uint256 public validatorFeeRateScaled;
     uint8 public constant VALIDATOR_FEE_DECIMALS = 18;
+    string public constant VERSION = "2.0.2"; // This will be replaced during build time
 
     using SafeERC20 for IERC20;
 
-    event contractCreated(address indexed _address, string _pubkey); //emitted whenever a contract is created
-    event clonefactoryContractPurchased(address indexed _address, address indexed _validator); //emitted whenever a contract is purchased
-    event contractDeleteUpdated(address _address, bool _isDeleted); //emitted whenever a contract is deleted/restored
-    event purchaseInfoUpdated(address indexed _address);
+    event contractCreated(address indexed _address, string _pubkey);
+    event clonefactoryContractPurchased(address indexed _address, address indexed _validator);
+    event contractDeleteUpdated(address _address, bool _isDeleted); // emitted whenever a contract is deleted/restored
+    event purchaseInfoUpdated(address indexed _address); // emitted whenever contract data updated
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "you are not authorized");
-        _;
-    }
-
-    modifier onlyInWhitelist() {
-        require(whitelist[msg.sender] || noMoreWhitelist, "you are not an approved seller on this marketplace");
+    modifier _onlyOwner() {
+        require(msg.sender == owner(), "you are not authorized");
         _;
     }
 
@@ -60,15 +56,26 @@ contract CloneFactory is Initializable {
         address _paymentToken,
         address _feeToken,
         uint256 _validatorFeeRateScaled
-    ) public initializer {
+    ) external initializer {
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
         paymentToken = IERC20(_paymentToken);
         feeToken = IERC20(_feeToken);
         hashrateOracle = _hashrateOracle;
         baseImplementation = _baseImplementation; // Store the beacon address
-        owner = msg.sender;
         validatorFeeRateScaled = _validatorFeeRateScaled;
     }
 
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        // Only the owner can upgrade the contract
+    }
+
+    /// @notice Create a new rental contract
+    /// @param _speed The speed of the contract in hashes per second
+    /// @param _length The length of the contract in seconds
+    /// @param _profitTarget The profit target of the contract in percent
+    /// @param _pubKey The public key of the contract
+    /// @return address The address of the new contract
     function setCreateNewRentalContractV2(
         uint256,
         uint256,
@@ -77,17 +84,14 @@ contract CloneFactory is Initializable {
         int8 _profitTarget,
         address,
         string calldata _pubKey
-    ) public payable onlyInWhitelist returns (address) {
-        return createContract(_speed, _length, _profitTarget, address(0), _pubKey);
+    ) external payable returns (address) {
+        return createContract(_speed, _length, _profitTarget, _pubKey);
     }
 
-    function createContract(
-        uint256 _speed,
-        uint256 _length,
-        int8 _profitTarget,
-        address, // unused
-        string calldata _pubKey
-    ) internal returns (address) {
+    function createContract(uint256 _speed, uint256 _length, int8 _profitTarget, string calldata _pubKey)
+        private
+        returns (address)
+    {
         bytes memory data = abi.encodeWithSelector(
             Implementation(address(0)).initialize.selector,
             address(this),
@@ -130,8 +134,7 @@ contract CloneFactory is Initializable {
         string memory _encrValidatorURL,
         string memory _encrDestURL,
         uint32 termsVersion
-    ) internal {
-        // TODO: add a test case so any third-party implementations will be discarded
+    ) private {
         require(rentalContractsMap[_contractAddress], "unknown contract address");
         Implementation targetContract = Implementation(_contractAddress);
         require(!targetContract.isDeleted(), "cannot purchase deleted contract");
@@ -159,45 +162,34 @@ contract CloneFactory is Initializable {
         emit clonefactoryContractPurchased(_contractAddress, _validatorAddress);
     }
 
+    /// @notice Returns the list of all rental contracts
+    /// @return An array of contract addresses
     function getContractList() external view returns (address[] memory) {
         return rentalContracts;
     }
 
-    //adds an address to the whitelist
-    function setAddToWhitelist(address _address) external onlyOwner {
-        whitelist[_address] = true;
-    }
-
-    //remove an address from the whitelist
-    function setRemoveFromWhitelist(address _address) external onlyOwner {
-        whitelist[_address] = false;
-    }
-
-    function checkWhitelist(address _address) external view returns (bool) {
-        if (noMoreWhitelist) {
-            return true;
-        }
-        return whitelist[_address];
-    }
-
-    function setDisableWhitelist() external onlyOwner {
-        noMoreWhitelist = true;
-    }
-
     /// @notice Set the fee rate paid to a validator
-    /// @param _validatorFeeRateScaled fraction multiplied by VALIDATOR_FEE_MULT
-    function setValidatorFeeRate(uint256 _validatorFeeRateScaled) external onlyOwner {
+    /// @param _validatorFeeRateScaled fraction with VALIDATOR_FEE_MULT decimals
+    function setValidatorFeeRate(uint256 _validatorFeeRateScaled) external _onlyOwner {
         validatorFeeRateScaled = _validatorFeeRateScaled;
     }
 
-    function setContractDeleted(address _contractAddress, bool _isDeleted) public {
+    /// @notice Delete or restore a contract
+    /// @param _contractAddress The address of the hashrate contract to delete or restore
+    /// @param _isDeleted true if delete, false if restore the contract
+    function setContractDeleted(address _contractAddress, bool _isDeleted) external {
         require(rentalContractsMap[_contractAddress], "unknown contract address");
         Implementation _contract = Implementation(_contractAddress);
-        require(msg.sender == _contract.seller() || msg.sender == owner, "you are not authorized");
+        require(msg.sender == _contract.seller() || msg.sender == owner(), "you are not authorized");
         Implementation(_contractAddress).setContractDeleted(_isDeleted);
         emit contractDeleteUpdated(_contractAddress, _isDeleted);
     }
 
+    /// @notice Updates the contract information for a rental contract
+    /// @param _contractAddress The address of the contract to update
+    /// @param _speed The new speed value
+    /// @param _length The new length value
+    /// @param _profitTarget The new profit target value
     function setUpdateContractInformationV2(
         address _contractAddress,
         uint256,

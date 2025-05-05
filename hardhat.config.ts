@@ -24,7 +24,7 @@ const config: HardhatUserConfig = {
       },
       // for validation regitry
       {
-        version: "0.8.20",
+        version: "0.8.26",
         settings: {
           optimizer: {
             enabled: true,
@@ -65,6 +65,7 @@ const config: HardhatUserConfig = {
       "LumerinToken",
       "ValidatorRegistry",
       "@openzeppelin/contracts/token/ERC20/IERC20",
+      "multicall/Multicall3",
     ],
   },
   mocha: {

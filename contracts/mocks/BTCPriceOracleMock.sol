@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >0.8.10;
 
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 contract BTCPriceOracleMock is AggregatorV3Interface {
     uint8 _decimals = 8;
@@ -37,7 +37,8 @@ contract BTCPriceOracleMock is AggregatorV3Interface {
         return (0, _price, 0, 0, 0);
     }
 
-    function setPrice(int256 price) external {
+    function setPrice(int256 price, uint8 ndecimals) external {
         _price = price;
+        _decimals = ndecimals;
     }
 }
