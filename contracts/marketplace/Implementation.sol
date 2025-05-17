@@ -63,7 +63,7 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
 
     struct Terms {
         uint256 _price; // price of the current running contract at the time of purchase
-        uint256 _limit; // Not used anywhere
+        uint256 _fee; // fee of the current running contract at the time of purchase
         uint256 _speed; // th/s of contract
         uint256 _length; // how long the contract will last in seconds
         uint32 _version;
@@ -155,6 +155,7 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
             address _buyer,
             address _seller,
             string memory _encryptedPoolData,
+            // TODO: add this in the next release string memory _encryptedDestURL,
             bool _isDeleted,
             uint256 _balance,
             bool _hasFutureTerms
@@ -163,6 +164,7 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
         bool hasFutureTerms = futureTerms._length != 0;
         Terms memory __terms = terms;
         __terms._price = price();
+        __terms._fee = getValidatorFee(__terms._price);
         return (
             contractState(),
             __terms,
@@ -280,14 +282,8 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
 
     function maybeApplyFutureTerms() private {
         if (futureTerms._version != 0) {
-            terms = Terms(
-                futureTerms._price,
-                futureTerms._limit,
-                futureTerms._speed,
-                futureTerms._length,
-                futureTerms._version,
-                futureTerms._profitTarget
-            );
+            terms =
+                Terms(0, 0, futureTerms._speed, futureTerms._length, futureTerms._version, futureTerms._profitTarget);
             futureTerms = Terms(0, 0, 0, 0, 0, 0);
             emit purchaseInfoUpdated(address(this));
         }

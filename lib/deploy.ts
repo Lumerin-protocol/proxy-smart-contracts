@@ -71,14 +71,6 @@ export async function DeployCloneFactory(
   await impl.deployed();
   log("Beacon deployed at address:", impl.address);
 
-  const beaconProxy = await upgrades.deployBeaconProxy(impl.address, Implementation, [], {
-    unsafeAllow: ["constructor"],
-    initializer: false,
-  } as any);
-  await beaconProxy.deployed();
-  log("Beacon proxy deployed at address", beaconProxy.address);
-  log();
-
   log("2. Deploying upgradeable CLONEFACTORY");
   const CloneFactory = await ethers.getContractFactory("CloneFactory", deployer);
   const cloneFactory = await upgrades.deployProxy(

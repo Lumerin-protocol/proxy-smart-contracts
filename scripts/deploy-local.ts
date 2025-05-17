@@ -18,6 +18,7 @@ async function main() {
   console.log("Implementation:", contracts.implementation.address);
   console.log("CloneFactory:", contracts.cloneFactory.address);
   console.log("ValidatorRegistry:", contracts.validatorRegistry.address);
+  console.log("Multicall3:", contracts.multicall3.address);
 
   await runPromise;
 }

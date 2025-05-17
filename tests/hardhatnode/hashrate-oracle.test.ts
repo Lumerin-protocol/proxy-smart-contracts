@@ -110,8 +110,8 @@ describe("Hashrate oracle", function () {
     await hashrateOracle.write.setBlockReward([blockReward], { account: owner.account });
 
     // Get reward in token
-    const rewardInToken = await hashrateOracle.read.getRewardPerTHinToken();
-    const rewardInBTC = await hashrateOracle.read.getRewardPerTHinBTC();
+    const rewardInToken = await hashrateOracle.read.getRewardPerEHinToken();
+    const rewardInBTC = await hashrateOracle.read.getRewardPerEHinBTC();
 
     // The reward in token should be reward in BTC multiplied by BTC price
     // Since we're using a mock oracle with price 100, the reward should be 100x

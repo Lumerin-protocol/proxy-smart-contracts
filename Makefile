@@ -17,6 +17,7 @@ test-upgrade:
 	yarn hardhat --network localhost test --bail tests/upgrades/*.ts 
 
 compile:
+	yarn ts-node ./scripts/replace-version.ts
 	yarn hardhat compile
 
 deploy-lumerin:
@@ -87,7 +88,7 @@ release-git:
 		&& git push -u --tags --set-upstream origin main
 	
 node-local:
-	yarn hardhat node --config hardhat-base.config.ts
+	yarn hardhat node
 
 deploy-local:
 	yarn hardhat run ./scripts/deploy-local.ts

@@ -44,6 +44,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     event clonefactoryContractPurchased(address indexed _address, address indexed _validator);
     event contractDeleteUpdated(address _address, bool _isDeleted); // emitted whenever a contract is deleted/restored
     event purchaseInfoUpdated(address indexed _address); // emitted whenever contract data updated
+    event validatorFeeRateUpdated(uint256 _validatorFeeRateScaled);
 
     modifier _onlyOwner() {
         require(msg.sender == owner(), "you are not authorized");
@@ -171,7 +172,10 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     /// @notice Set the fee rate paid to a validator
     /// @param _validatorFeeRateScaled fraction with VALIDATOR_FEE_MULT decimals
     function setValidatorFeeRate(uint256 _validatorFeeRateScaled) external _onlyOwner {
-        validatorFeeRateScaled = _validatorFeeRateScaled;
+        if (validatorFeeRateScaled != _validatorFeeRateScaled) {
+            validatorFeeRateScaled = _validatorFeeRateScaled;
+            emit validatorFeeRateUpdated(_validatorFeeRateScaled);
+        }
     }
 
     /// @notice Delete or restore a contract
@@ -207,6 +211,6 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         require(msg.sender == _contract.seller(), "you are not authorized");
 
         Implementation(_contractAddress).setUpdatePurchaseInformation(_speed, _length, _profitTarget);
-        emit purchaseInfoUpdated(address(this));
+        emit purchaseInfoUpdated(_contractAddress);
     }
 }
