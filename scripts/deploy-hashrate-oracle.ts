@@ -24,7 +24,7 @@ async function main() {
 
   console.log("Getting payment token decimals...");
   const paymentToken = await viem.getContractAt(
-    "@openzeppelin/contracts-v5/token/ERC20/extensions/IERC20Metadata.sol:IERC20Metadata",
+    "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol:IERC20Metadata",
     env.USDC_TOKEN_ADDRESS
   );
   const tokenDecimals = await paymentToken.read.decimals();
@@ -69,7 +69,7 @@ async function main() {
   });
 
   const proxy = await viem.deployContract(
-    "@openzeppelin/contracts-v5/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy",
+    "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy",
     [hashrateOracleImpl.address, encodedInitFn]
   );
   console.log("Deployed at:", proxy.address);

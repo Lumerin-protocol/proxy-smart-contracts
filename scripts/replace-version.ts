@@ -6,9 +6,11 @@ const rootDir = process.cwd();
 const VERSION_FILE = join(rootDir, "VERSION");
 const CONTRACTS_DIR = join(rootDir, "contracts");
 const EXTENSIONS = [".sol"];
-const REPLACE_FROM = '"{{VERSION}}"';
+
+const REPLACE_FROM = /string public constant VERSION = "\d+\.\d+\.\d+";/;
 // Read version from VERSION file
-const REPLACE_TO = readFileSync(VERSION_FILE, "utf-8").trim();
+const version = readFileSync(VERSION_FILE, "utf-8").trim();
+const REPLACE_TO = `string public constant VERSION = "${version}";`;
 
 console.log("🔧 Patching solidity files...");
 console.log(`📁 Scanning folder: ${path.relative(rootDir, CONTRACTS_DIR)}`);
@@ -18,7 +20,7 @@ console.log("---");
 
 const updatedFilesCount = replaceInFiles(
   CONTRACTS_DIR,
-  [{ from: '"{{VERSION}}"', to: `"${REPLACE_TO}"` }],
+  [{ from: REPLACE_FROM, to: REPLACE_TO }],
   EXTENSIONS
 );
 

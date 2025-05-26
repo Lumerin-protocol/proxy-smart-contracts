@@ -2,8 +2,8 @@
 pragma solidity >=0.8.0;
 
 import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable-v5/proxy/utils/UUPSUpgradeable.sol";
-import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable-v5/access/OwnableUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import { Versionable } from "../util/versionable.sol";
 
 /// @title HashrateOracle
@@ -12,6 +12,7 @@ import { Versionable } from "../util/versionable.sol";
 /// @dev This contract provides functions to calculate hashrate requirements based on BTC price and mining difficulty
 contract HashrateOracle is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     AggregatorV3Interface public immutable btcTokenOracle;
+    // TODO: replace decimals with uint8
     uint256 public immutable oracleDecimals;
     uint256 public immutable tokenDecimals;
 
@@ -20,7 +21,7 @@ contract HashrateOracle is UUPSUpgradeable, OwnableUpgradeable, Versionable {
 
     uint256 private constant DIFFICULTY_TO_HASHRATE_FACTOR = 2 ** 32;
     uint256 private constant BTC_DECIMALS = 8;
-    string public constant VERSION = "2.0.2";
+    string public constant VERSION = "2.0.6";
 
     event DifficultyUpdated(uint256 newDifficulty);
     event BlockRewardUpdated(uint256 newBlockReward);
@@ -63,8 +64,8 @@ contract HashrateOracle is UUPSUpgradeable, OwnableUpgradeable, Versionable {
 
     /// @notice Returns the number of hashes required to mine BTC equivalent of 1 token minimum denomination
     function getHashesforToken() external view returns (uint256) {
-        (, int256 answer,,,) = btcTokenOracle.latestRoundData();
-        return getHashesForBTC() * (10 ** (BTC_DECIMALS + oracleDecimals - tokenDecimals)) / uint256(answer);
+        (, int256 btcPrice,,,) = btcTokenOracle.latestRoundData();
+        return getHashesForBTC() * (10 ** (BTC_DECIMALS + oracleDecimals - tokenDecimals)) / uint256(btcPrice);
     }
 
     /// @notice Updates the mining difficulty

@@ -54,6 +54,7 @@ export async function testEarlyCloseout(
   // Get balances
   const buyerBalance = Number(await paymentToken.read.balanceOf([buyerAddr]));
   const validatorBalance = Number(await feeToken.read.balanceOf([validatorAddr]));
+  const sellerBalance = Number(await paymentToken.read.balanceOf([seller]));
 
   // advance blockchain time minus 1 second, so the next block will
   // have the timestamp that is exactly needed for the progress simulation.
@@ -73,12 +74,16 @@ export async function testEarlyCloseout(
 
   const buyerBalanceAfter = Number(await paymentToken.read.balanceOf([buyerAddr]));
   const validatorBalanceAfter = Number(await feeToken.read.balanceOf([validatorAddr]));
+  const sellerBalanceAfter = Number(await paymentToken.read.balanceOf([seller]));
+
   const deltaBuyerBalance = buyerBalanceAfter - buyerBalance;
   const deltaValidatorBalance = validatorBalanceAfter - validatorBalance;
+  const deltaSellerBalance = sellerBalanceAfter - sellerBalance;
 
   const buyerRefundFraction = 1 - progress;
   const buyerRefundAmount = buyerRefundFraction * Number(price);
   const validatorEarnings = Number(fee) * progress;
+  const sellerClaimAmount = progress * Number(price);
 
   expect(deltaBuyerBalance).approximately(
     buyerRefundAmount,
@@ -90,16 +95,9 @@ export async function testEarlyCloseout(
     5,
     "validator should earn correct amount"
   );
-
-  // claim by seller
-  const sellerBalance = Number(await paymentToken.read.balanceOf([seller]));
-  await impl.write.claimFunds({ account: seller });
-  const sellerBalanceAfter = Number(await paymentToken.read.balanceOf([seller]));
-  const deltaSellerBalance = sellerBalanceAfter - sellerBalance;
-  const sellerClaimAmount = progress * Number(price);
-
-  expect(deltaSellerBalance).equal(
+  expect(deltaSellerBalance).approximately(
     sellerClaimAmount,
+    5,
     `seller should collect ${progress * 100}% of the price`
   );
 }

@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >0.8.0;
 
-import {
-    ReentrancyGuardUpgradeable,
-    Initializable
-} from "@openzeppelin/contracts-upgradeable-v5/utils/ReentrancyGuardUpgradeable.sol";
-import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable-v5/proxy/utils/UUPSUpgradeable.sol";
-import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable-v5/access/OwnableUpgradeable.sol";
-import { IERC20 } from "@openzeppelin/contracts-v5/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts-v5/token/ERC20/utils/SafeERC20.sol";
+import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { CloneFactory } from "./CloneFactory.sol";
 import { HashrateOracle } from "./HashrateOracle.sol";
 import { Versionable } from "../util/versionable.sol";
+
 /// @title Implementation
 /// @author Oleksandr (Shev) Shevchuk (Lumerin)
 /// @notice A smart contract implementation for managing hashrate rental agreements in a decentralized marketplace
@@ -21,7 +19,6 @@ import { Versionable } from "../util/versionable.sol";
 ///      - Dynamic pricing based on hashrate oracle
 ///      - Contract terms management and updates
 ///      - Historical record keeping
-
 contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableUpgradeable, Versionable {
     IERC20 public feeToken;
     IERC20 public paymentToken;
@@ -30,22 +27,25 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
 
     Terms public terms; // the terms of the contract
     Terms public futureTerms; // the terms of the contract to be applied after the current contract is closed
-    uint256 public startingBlockTimestamp; // the timestamp of the block when the contract was purchased
+    uint256 public startingBlockTimestamp; // time of last purchase, is set to 0 when payment is resolved
     uint256 public validatorFeeRateScaled; // the fee rate for the validator, scaled by VALIDATOR_FEE_MULT, considering decimals
     address public buyer; // buyer of the contract
     address public seller; // seller of the contract
     address public validator; // validator, can close out contract early, if empty - no validator (buyer node)
-    bool private isLastValidatorNotPaid; // flag to track if the last validator has been paid
+    bool private _gap; // not used
     bool public isDeleted; // used to track if the contract is deleted
 
     string public pubKey; // encrypted data for pool target info
     string public encrValidatorURL; // if using own validator (buyer-node) this will be the encrypted buyer address. Encrypted with the seller's public key
     string public encrDestURL; // where to redirect the hashrate after validation (for both third-party validator and buyer-node) If empty, then the hashrate will be redirected to the default pool of the buyer node
 
+    uint256 public gap; // TODO: remove this variable after fresh deployment
     HistoryEntry[] public history; // TODO: replace this struct with querying logs from a blockchain node
+    uint32 private successCount;
+    uint32 private failCount;
 
     uint8 public constant VALIDATOR_FEE_DECIMALS = 18;
-    string public constant VERSION = "2.0.2"; // This will be replaced during build time
+    string public constant VERSION = "2.0.6"; // This will be replaced during build time
 
     using SafeERC20 for IERC20;
 
@@ -62,16 +62,15 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
     }
 
     struct Terms {
-        uint256 _price; // price of the current running contract at the time of purchase
+        uint256 _price; // price of the current running contract at the time of purchase, 0 if contract is not running
         uint256 _fee; // fee of the current running contract at the time of purchase
-        uint256 _speed; // th/s of contract
-        uint256 _length; // how long the contract will last in seconds
+        uint256 _speed; // hashes/second
+        uint256 _length; // seconds
         uint32 _version;
         int8 _profitTarget; // profit target in percentage, 10 means the price will be 10% higher than the mining price
     }
 
     struct HistoryEntry {
-        bool _goodCloseout; // consider dropping and use instead _purchaseTime + _length >= _endTime
         uint256 _purchaseTime;
         uint256 _endTime;
         uint256 _price;
@@ -79,6 +78,7 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
         uint256 _speed;
         uint256 _length;
         address _buyer;
+        address _validator;
     }
 
     event contractPurchased(address indexed _buyer);
@@ -86,7 +86,6 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
     event purchaseInfoUpdated(address indexed _address); // emitted on either terms or futureTerms update
     event destinationUpdated(string newValidatorURL, string newDestURL);
     event fundsClaimed();
-    event fundsClaimedValidator(address indexed _validator);
 
     /// @notice Initializes the contract with basic parameters
     /// @param _cloneFactory Address of the clone factory for access control
@@ -121,9 +120,8 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
         __Ownable_init(msg.sender);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
-        // Only the owner can upgrade the contract
-    }
+    /// @dev Only the owner can upgrade the contract
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner { }
 
     /// @notice Returns the current state of the contract
     /// @return The current contract state (Available or Running)
@@ -164,7 +162,7 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
         bool hasFutureTerms = futureTerms._length != 0;
         Terms memory __terms = terms;
         __terms._price = price();
-        __terms._fee = getValidatorFee(__terms._price);
+        __terms._fee = getValidatorFee(__terms._price, getValidatorFeeRateScaled());
         return (
             contractState(),
             __terms,
@@ -203,19 +201,11 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
     /// @return _successCount Number of successful contracts
     /// @return _failCount Number of failed contracts
     function getStats() external view returns (uint256 _successCount, uint256 _failCount) {
-        uint256 successCount = 0;
-        uint256 failCount = 0;
-        for (uint256 i = 0; i < history.length; i++) {
-            if (history[i]._goodCloseout) {
-                successCount++;
-            } else {
-                failCount++;
-            }
-        }
         return (successCount, failCount);
     }
 
     /// @dev function that the clone factory calls to purchase the contract
+    /// @dev the payment should be transeferred after calling this function
     function setPurchaseContract(
         string calldata _encrValidatorURL,
         string calldata _encrDestURL,
@@ -226,32 +216,30 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
     ) external onlyCloneFactory {
         require(contractState() == ContractState.Available, "contract is not in an available state");
 
-        maybePayLastValidator();
+        maybePayParties();
         maybeApplyFutureTerms();
 
-        terms._price = _price;
-
-        history.push(
-            HistoryEntry(
-                true,
-                block.timestamp,
-                block.timestamp + terms._length,
-                terms._price,
-                _validatorFeeRateScaled,
-                terms._speed,
-                terms._length,
-                _buyer
-            )
-        );
-
-        encrValidatorURL = _encrValidatorURL;
-        encrDestURL = _encrDestURL;
         buyer = _buyer;
+        terms._price = _price;
         validator = _validator;
+        encrDestURL = _encrDestURL;
+        encrValidatorURL = _encrValidatorURL;
         startingBlockTimestamp = block.timestamp;
         validatorFeeRateScaled = _validatorFeeRateScaled;
 
-        isLastValidatorNotPaid = _validatorFeeRateScaled > 0 && _validator != address(0);
+        successCount++;
+        history.push(
+            HistoryEntry(
+                block.timestamp,
+                block.timestamp + terms._length,
+                terms._price,
+                getValidatorFee(_price, _validatorFeeRateScaled),
+                terms._speed,
+                terms._length,
+                _buyer,
+                _validator
+            )
+        );
 
         emit contractPurchased(msg.sender);
     }
@@ -280,28 +268,10 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
         emit purchaseInfoUpdated(address(this));
     }
 
-    function maybeApplyFutureTerms() private {
-        if (futureTerms._version != 0) {
-            terms =
-                Terms(0, 0, futureTerms._speed, futureTerms._length, futureTerms._version, futureTerms._profitTarget);
-            futureTerms = Terms(0, 0, 0, 0, 0, 0);
-            emit purchaseInfoUpdated(address(this));
-        }
-    }
-
-    function maybePayLastValidator() private returns (bool) {
-        if (contractState() == ContractState.Available && validator != address(0) && isLastValidatorNotPaid) {
-            feeToken.safeTransfer(validator, getValidatorFee(terms._price));
-            isLastValidatorNotPaid = false;
-            emit fundsClaimedValidator(msg.sender);
-            return true;
-        }
-        return false;
-    }
-
-    function getValidatorFee(uint256 _price) private view returns (uint256) {
+    /// @dev this function is used to calculate the validator fee for the contract
+    function getValidatorFee(uint256 _price, uint256 _validatorFeeRateScaled) private pure returns (uint256) {
         // fee is calculated as percentage of numerical value of contract price, that is why we need to adjust the decimals
-        return (_price * getValidatorFeeRateScaled()) / (10 ** VALIDATOR_FEE_DECIMALS);
+        return (_price * _validatorFeeRateScaled) / (10 ** VALIDATOR_FEE_DECIMALS);
     }
 
     function getValidatorFeeRateScaled() private view returns (uint256) {
@@ -314,93 +284,25 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
         return validatorFeeRateScaled;
     }
 
-    /// @dev Returns the amount of funds that should be paid for the service from now till the current time
-    function getRealizedPayout() private view returns (uint256) {
-        uint256 elapsedContractTime = (block.timestamp - startingBlockTimestamp);
-        if (elapsedContractTime <= terms._length) {
-            return (terms._price * elapsedContractTime) / terms._length;
-        }
-        return terms._price;
-    }
-
-    /// @dev Returns the amount of funds that will be paid for the service from now till the end of the contract
-    function getUnrealizedPayout() private view returns (uint256) {
-        return terms._price - getRealizedPayout();
-    }
-
     function setContractDeleted(bool _isDeleted) external onlyCloneFactory {
-        require(isDeleted != _isDeleted, "contract delete state is already set to this value");
         isDeleted = _isDeleted;
     }
 
+    /// @notice Resolves the payments for contract/validator that are due.
+    /// @notice Can be called during contract execution, then returns funds for elapsed time for current contract
+    /// @dev Can be called from any address, but the seller reward will be sent to the seller
     function claimFunds() external payable {
-        require(msg.sender == seller, "this account is not authorized to claim funds");
-
-        uint256 amountToKeepInEscrow = 0;
-        if (contractState() == ContractState.Running) {
-            // if contract is running we need to keep some funds
-            // in the escrow for refund if seller cancels contract
-            amountToKeepInEscrow = getUnrealizedPayout();
-        }
-
-        emit fundsClaimed();
-
-        maybePayLastValidator();
-        uint256 unpaidValidatorFee = isLastValidatorNotPaid ? getValidatorFee(terms._price) : 0;
-
-        maybeApplyFutureTerms();
-
-        withdrawAllFundsSeller(amountToKeepInEscrow + unpaidValidatorFee);
-    }
-
-    /// @notice Sends the validator fee to the validator
-    /// @dev Can be called from any address, but the validator fee will be sent to the validator
-    function claimFundsValidator() external {
-        bool paid = maybePayLastValidator();
+        bool paid = maybePayParties();
         require(paid, "no funds to withdraw");
+        emit fundsClaimed();
     }
 
-    function closeEarly(CloseReason reason) external {
-        require(
-            msg.sender == buyer || msg.sender == validator,
-            "this account is not authorized to trigger an early closeout"
-        );
-        require(contractState() == ContractState.Running, "the contract is not in the running state");
-
-        HistoryEntry storage historyEntry = history[history.length - 1];
-        historyEntry._goodCloseout = false;
-        historyEntry._endTime = block.timestamp;
-
-        // how much to return to buyer (base price)
-        uint256 buyerPayout = getUnrealizedPayout();
-        uint256 validatorPayout = 0;
-        if (validator != address(0)) {
-            // how much to pay to validator
-            validatorPayout = getValidatorFee(getRealizedPayout());
-
-            // how much validator fee to refund to buyer
-            uint256 buyerValidatorFeeRefund = getValidatorFee(buyerPayout);
-
-            // total validator refund
-            buyerPayout = buyerPayout + buyerValidatorFeeRefund;
-        }
-
-        isLastValidatorNotPaid = false;
-        startingBlockTimestamp = 0;
-        maybeApplyFutureTerms();
-        terms._price = 0;
-
-        emit closedEarly(reason);
-
-        paymentToken.safeTransfer(buyer, buyerPayout);
-        if (validatorPayout > 0) {
-            feeToken.safeTransfer(validator, validatorPayout);
-        }
-    }
-
-    function withdrawAllFundsSeller(uint256 remaining) private nonReentrant {
-        uint256 balance = feeToken.balanceOf(address(this)) - remaining;
-        paymentToken.safeTransfer(seller, balance);
+    /// @notice Resolves the payments for contract/validator that are due.
+    /// @dev same as claimFunds, kept for backwards compatibility
+    function claimFundsValidator() external {
+        bool paid = maybePayParties();
+        require(paid, "no funds to withdraw");
+        emit fundsClaimed();
     }
 
     /// @notice Returns the current price and validator fee for the contract
@@ -408,7 +310,7 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
     /// @return _fee The current validator fee for the contract
     function priceAndFee() external view returns (uint256, uint256) {
         uint256 _price = price();
-        uint256 _fee = getValidatorFee(_price);
+        uint256 _fee = getValidatorFee(_price, getValidatorFeeRateScaled());
         return (_price, _fee);
     }
 
@@ -420,6 +322,99 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
             int256(priceInToken) + (int256(priceInToken) * int256(terms._profitTarget)) / 100;
 
         return priceInTokenWithProfit < 0 ? 0 : uint256(priceInTokenWithProfit);
+    }
+
+    function maybeApplyFutureTerms() private {
+        if (futureTerms._version != 0) {
+            terms =
+                Terms(0, 0, futureTerms._speed, futureTerms._length, futureTerms._version, futureTerms._profitTarget);
+            futureTerms = Terms(0, 0, 0, 0, 0, 0);
+            emit purchaseInfoUpdated(address(this));
+        }
+    }
+
+    /// @notice Allows the buyer or validator to close out the contract early
+    /// @param reason The reason for the early closeout
+    function closeEarly(CloseReason reason) external {
+        require(
+            msg.sender == buyer || msg.sender == validator,
+            "this account is not authorized to trigger an early closeout"
+        );
+        require(contractState() == ContractState.Running, "the contract is not in the running state");
+
+        HistoryEntry storage historyEntry = history[history.length - 1];
+        historyEntry._endTime = block.timestamp;
+        successCount--;
+        failCount++;
+
+        maybePayParties();
+        setPaymentResolved();
+        maybeApplyFutureTerms();
+
+        emit closedEarly(reason);
+    }
+
+    /// @dev Pays the parties according to the payment struct
+    /// @dev Removed the events, cause Transfer events emitted anyway
+    function maybePayParties() private returns (bool isPaid) {
+        if (isPaymentResolved()) {
+            isPaid = false;
+            return isPaid;
+        }
+
+        bool hasValidator = validator != address(0);
+        uint256 deliveredPayment = getDeliveredPayment();
+
+        // total undelivered payment and fee for ongoing contract
+        uint256 undeliveredPayment = terms._price - deliveredPayment;
+        uint256 undeliveredFee = hasValidator ? getValidatorFee(undeliveredPayment, validatorFeeRateScaled) : 0;
+
+        // used to correctly calculate claim when contract is ongoing
+        // total balance of the contract is what seller/validator should have received
+        // we need to subtract the undelivered payment and fee so the buyer could be paid
+        // if they decide to close out the contract early
+        uint256 unpaidDeliveredPayment = paymentToken.balanceOf(address(this)) - undeliveredPayment;
+        uint256 unpaidDeliveredFee = feeToken.balanceOf(address(this)) - undeliveredFee;
+
+        if (unpaidDeliveredPayment > 0) {
+            isPaid = true;
+            paymentToken.safeTransfer(seller, unpaidDeliveredPayment);
+        }
+        if (unpaidDeliveredFee > 0) {
+            isPaid = true;
+            feeToken.safeTransfer(validator, unpaidDeliveredFee);
+        }
+        if (undeliveredPayment > 0) {
+            isPaid = true;
+            paymentToken.safeTransfer(buyer, undeliveredPayment);
+        }
+        if (undeliveredFee > 0) {
+            isPaid = true;
+            feeToken.safeTransfer(buyer, undeliveredFee);
+        }
+
+        return isPaid;
+    }
+
+    /// @dev Amount of payment token that should be paid seller from the start of the contract till the current time
+    function getDeliveredPayment() private view returns (uint256) {
+        uint256 elapsedContractTime = (block.timestamp - startingBlockTimestamp);
+        if (elapsedContractTime <= terms._length) {
+            return (terms._price * elapsedContractTime) / terms._length;
+        }
+        return terms._price;
+    }
+
+    /// @dev Returns true if the payment is due. That happens if the contract ran till completion
+    /// @dev but payment was not claimed.
+    function isPaymentResolved() private view returns (bool) {
+        return startingBlockTimestamp == 0;
+    }
+
+    /// @dev Indicates that the payment for the last contract run is resolved
+    function setPaymentResolved() private {
+        startingBlockTimestamp = 0;
+        terms._price = 0;
     }
 
     modifier onlyCloneFactory() {

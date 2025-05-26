@@ -23,7 +23,7 @@ async function main() {
   console.log("Deployer:", deployer.account.address);
 
   const paymentToken = await viem.getContractAt(
-    "@openzeppelin/contracts-v5/token/ERC20/extensions/IERC20Metadata.sol:IERC20Metadata",
+    "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol:IERC20Metadata",
     env.USDC_TOKEN_ADDRESS
   );
   console.log("Payment token:", paymentToken.address);
@@ -34,7 +34,7 @@ async function main() {
   console.log();
 
   const feeToken = await viem.getContractAt(
-    "@openzeppelin/contracts-v5/token/ERC20/extensions/IERC20Metadata.sol:IERC20Metadata",
+    "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol:IERC20Metadata",
     env.LUMERIN_TOKEN_ADDRESS as `0x${string}`
   );
   console.log("Fee token:", feeToken.address);
@@ -65,7 +65,7 @@ async function main() {
 
   console.log("Deploying Implementation Beacon...");
   const beacon = await viem.deployContract(
-    "@openzeppelin/contracts-v5/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon",
+    "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon",
     [impl.address, deployer.account.address]
   );
   console.log("Deployed at:", beacon.address);
@@ -96,7 +96,7 @@ async function main() {
     ],
   });
   const cloneFactoryProxy = await viem.deployContract(
-    "@openzeppelin/contracts-v5/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy",
+    "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy",
     [cloneFactory.address, encodedInitFn]
   );
   console.log("Deployed at:", cloneFactoryProxy.address);

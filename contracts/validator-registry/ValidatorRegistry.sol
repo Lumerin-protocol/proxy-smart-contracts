@@ -1,16 +1,17 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-// openzeppelin v4 is required to work with solarity paginator
 import { Paginator } from "@solarity/solidity-lib/libs/arrays/Paginator.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 // following are openzeppelin v5 dependencies
-import { Initializable } from "@openzeppelin/contracts-upgradeable-v5/proxy/utils/Initializable.sol";
-import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable-v5/access/OwnableUpgradeable.sol";
-import { IERC20 } from "@openzeppelin/contracts-v5/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts-v5/token/ERC20/utils/SafeERC20.sol";
+import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Versionable } from "../util/versionable.sol";
 
-contract ValidatorRegistry is OwnableUpgradeable {
+contract ValidatorRegistry is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using Paginator for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
@@ -37,6 +38,7 @@ contract ValidatorRegistry is OwnableUpgradeable {
     error AlreadyComplained(); // the last complain was made by the same address
 
     uint8 constant hostLengthLimit = 255; // max length of url
+    string public constant VERSION = "2.0.6"; // This will be replaced during build time
 
     IERC20 public token; // token used for staking
     uint256 public totalStake; // total amount of all collected stakes, used to avoid withdrawing all funds by owners
@@ -46,8 +48,8 @@ contract ValidatorRegistry is OwnableUpgradeable {
     uint8 public punishThreshold; // how many votes before punishment
 
     mapping(address => Validator) public validators;
-    EnumerableSet.AddressSet internal validatorAddresses;
-    EnumerableSet.AddressSet internal activeValidators;
+    EnumerableSet.AddressSet private validatorAddresses;
+    EnumerableSet.AddressSet private activeValidators;
 
     function initialize(
         IERC20 _token,
@@ -64,6 +66,8 @@ contract ValidatorRegistry is OwnableUpgradeable {
         setPunishAmount(_punishAmount);
         setPunishThreshold(_punishThreshold);
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner { }
 
     /// @notice Registers validator or updates their stake and/or url
     /// @param stake amount of tokens to stake
@@ -127,7 +131,7 @@ contract ValidatorRegistry is OwnableUpgradeable {
     /// @notice Complain about a validator not doing their job
     /// @dev If complaints amount reach a threshold, the validator will be punished by removing their stake
     /// @param addr validator address
-    function validatorComplain(address addr) public {
+    function validatorComplain(address addr) external {
         (, bool ok) = validatorByAddress(_msgSender());
         if (!ok) {
             revert Unauthorized();
@@ -168,7 +172,7 @@ contract ValidatorRegistry is OwnableUpgradeable {
     /// @dev Use this function to update active state of a validator after changing minStake
     /// @dev It should be called on validators which state became inconsistent after changing minStake
     /// @param validator validator address
-    function forceUpdateActive(address validator) public {
+    function forceUpdateActive(address validator) external {
         (Validator storage v,) = validatorByAddress(validator);
         if (v.stake >= stakeMinimum && !activeValidators.contains(v.addr)) {
             activeValidators.add(v.addr);
@@ -179,10 +183,10 @@ contract ValidatorRegistry is OwnableUpgradeable {
 
     // Public getter functions
 
-    /// @notice Get validator by index
+    /// @notice Get validator by address, throws if validator not found
     /// @param addr validator address
     /// @return validator Validator record
-    function getValidator(address addr) public view returns (Validator memory) {
+    function getValidator(address addr) external view returns (Validator memory) {
         (Validator storage v, bool ok) = validatorByAddress(addr);
         if (!ok) {
             revert ValidatorNotFound();
@@ -190,15 +194,29 @@ contract ValidatorRegistry is OwnableUpgradeable {
         return v;
     }
 
+    /// @notice Get validator by address, returns empty struct if validator not found
+    /// @param addr validator address
+    /// @return validator Validator record
+    function getValidatorV2(address addr)
+        external
+        view
+        returns (Validator memory validator, bool isActive, bool isRegistered)
+    {
+        validator = validators[addr];
+        isActive = validator.stake >= stakeMinimum;
+        isRegistered = validator.addr != address(0);
+        return (validator, isActive, isRegistered);
+    }
+
     /// @notice Get total amount of all validators
     /// @return total amount of validators
-    function validatorsLength() public view returns (uint256) {
+    function validatorsLength() external view returns (uint256) {
         return validatorAddresses.length();
     }
 
     /// @notice Get amount of active validators
     /// @return total amount of active validators
-    function activeValidatorsLength() public view returns (uint256) {
+    function activeValidatorsLength() external view returns (uint256) {
         return activeValidators.length();
     }
 
@@ -206,7 +224,7 @@ contract ValidatorRegistry is OwnableUpgradeable {
     /// @param offset skip this many validators
     /// @param limit amount of validators to return
     /// @return addresses array of validator addresses
-    function getValidators(uint256 offset, uint8 limit) public view returns (address[] memory) {
+    function getValidators(uint256 offset, uint8 limit) external view returns (address[] memory) {
         return validatorAddresses.part(uint256(offset), uint256(limit));
     }
 
@@ -214,11 +232,10 @@ contract ValidatorRegistry is OwnableUpgradeable {
     /// @param offset skip this many validators
     /// @param limit amount of validators to return
     /// @return addresses array of active validator addresses
-    function getActiveValidators(uint256 offset, uint8 limit) public view returns (address[] memory) {
+    function getActiveValidators(uint256 offset, uint8 limit) external view returns (address[] memory) {
         return activeValidators.part(uint256(offset), uint256(limit));
     }
 
-    // Private getter functions
     function validatorByAddress(address addr) private view returns (Validator storage, bool) {
         Validator storage v = validators[addr];
         return (v, v.addr != address(0));
@@ -252,10 +269,8 @@ contract ValidatorRegistry is OwnableUpgradeable {
     }
 
     /// @notice withdraw rewards collected by punishing validators
-    function withdraw() public onlyOwner {
+    function withdraw() external onlyOwner {
         uint256 withdrawable = token.balanceOf(address(this)) - totalStake;
         token.safeTransfer(owner(), withdrawable);
     }
 }
-
-// should we punish an inactive validator?

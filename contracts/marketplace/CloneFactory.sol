@@ -1,13 +1,15 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable-v5/access/OwnableUpgradeable.sol";
-import { IERC20 } from "@openzeppelin/contracts-v5/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts-v5/token/ERC20/utils/SafeERC20.sol";
-import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable-v5/proxy/utils/UUPSUpgradeable.sol";
-import { BeaconProxy } from "@openzeppelin/contracts-v5/proxy/beacon/BeaconProxy.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { BeaconProxy } from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import { Implementation } from "./Implementation.sol";
 import { Versionable } from "../util/versionable.sol";
+import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import { Paginator } from "@solarity/solidity-lib/libs/arrays/Paginator.sol";
 
 /// @title CloneFactory
 /// @author Josh Kean (Lumerin), Oleksandr (Shev) Shevchuk
@@ -36,9 +38,11 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     /// @dev  validatorFeeRateScaled = 10 * 10**8 / 100 * 10**6 * 10**18 = 10 * 10**18
     uint256 public validatorFeeRateScaled;
     uint8 public constant VALIDATOR_FEE_DECIMALS = 18;
-    string public constant VERSION = "2.0.2"; // This will be replaced during build time
+    string public constant VERSION = "2.0.6"; // This will be replaced during build time
 
     using SafeERC20 for IERC20;
+    using EnumerableSet for EnumerableSet.AddressSet;
+    using Paginator for EnumerableSet.AddressSet;
 
     event contractCreated(address indexed _address, string _pubkey);
     event clonefactoryContractPurchased(address indexed _address, address indexed _validator);
@@ -51,12 +55,23 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         _;
     }
 
+    struct Seller {
+        uint256 stake;
+    }
+
+    mapping(address => Seller) private sellers;
+    mapping(address => EnumerableSet.AddressSet) private sellerContracts;
+    EnumerableSet.AddressSet private sellerAddresses;
+
+    uint256 public minSellerStake;
+
     function initialize(
         address _baseImplementation, // This should be the beacon address
         address _hashrateOracle,
         address _paymentToken,
         address _feeToken,
-        uint256 _validatorFeeRateScaled
+        uint256 _validatorFeeRateScaled,
+        uint256 _minSellerStake
     ) external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
@@ -65,6 +80,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         hashrateOracle = _hashrateOracle;
         baseImplementation = _baseImplementation; // Store the beacon address
         validatorFeeRateScaled = _validatorFeeRateScaled;
+        minSellerStake = _minSellerStake;
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
@@ -99,7 +115,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
             hashrateOracle,
             address(paymentToken),
             address(feeToken),
-            msg.sender,
+            _msgSender(),
             _pubKey,
             _speed,
             _length,
@@ -111,6 +127,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         rentalContracts.push(newContractAddr);
         rentalContractsMap[newContractAddr] = true;
         emit contractCreated(newContractAddr, _pubKey);
+        addSellerContract(_msgSender(), newContractAddr);
         return newContractAddr;
     }
 
@@ -140,6 +157,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         Implementation targetContract = Implementation(_contractAddress);
         require(!targetContract.isDeleted(), "cannot purchase deleted contract");
         require(targetContract.seller() != msg.sender, "cannot purchase your own contract");
+        ensureActiveSeller(targetContract.seller());
 
         uint32 _version;
 
@@ -151,14 +169,14 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
 
         (uint256 _price, uint256 _fee) = targetContract.priceAndFee();
 
-        paymentToken.safeTransferFrom(msg.sender, _contractAddress, _price);
-        if (_validatorAddress != address(0)) {
-            feeToken.safeTransferFrom(msg.sender, _contractAddress, _fee);
-        }
-
         targetContract.setPurchaseContract(
             _encrValidatorURL, _encrDestURL, _price, msg.sender, _validatorAddress, validatorFeeRateScaled
         );
+
+        paymentToken.safeTransferFrom(msg.sender, _contractAddress, _price);
+        if (_validatorAddress != address(0) && _fee > 0) {
+            feeToken.safeTransferFrom(msg.sender, _contractAddress, _fee);
+        }
 
         emit clonefactoryContractPurchased(_contractAddress, _validatorAddress);
     }
@@ -179,14 +197,24 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     }
 
     /// @notice Delete or restore a contract
-    /// @param _contractAddress The address of the hashrate contract to delete or restore
+    /// @param _contractAddresses The addresses of the hashrate contracts to delete or restore
     /// @param _isDeleted true if delete, false if restore the contract
-    function setContractDeleted(address _contractAddress, bool _isDeleted) external {
-        require(rentalContractsMap[_contractAddress], "unknown contract address");
-        Implementation _contract = Implementation(_contractAddress);
-        require(msg.sender == _contract.seller() || msg.sender == owner(), "you are not authorized");
-        Implementation(_contractAddress).setContractDeleted(_isDeleted);
-        emit contractDeleteUpdated(_contractAddress, _isDeleted);
+    function setContractsDeleted(address[] calldata _contractAddresses, bool _isDeleted) external {
+        for (uint256 i = 0; i < _contractAddresses.length; i++) {
+            address _contractAddress = _contractAddresses[i];
+            require(rentalContractsMap[_contractAddress], "unknown contract address");
+
+            Implementation _contract = Implementation(_contractAddress);
+            require(_msgSender() == _contract.seller() || _msgSender() == owner(), "you are not authorized");
+
+            _contract.setContractDeleted(_isDeleted);
+            if (_isDeleted) {
+                removeSellerContract(_msgSender(), _contractAddress);
+            } else {
+                addSellerContract(_msgSender(), _contractAddress);
+            }
+            emit contractDeleteUpdated(_contractAddress, _isDeleted);
+        }
     }
 
     /// @notice Updates the contract information for a rental contract
@@ -212,5 +240,81 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
 
         Implementation(_contractAddress).setUpdatePurchaseInformation(_speed, _length, _profitTarget);
         emit purchaseInfoUpdated(_contractAddress);
+    }
+
+    function sellerByAddress(address _seller)
+        public
+        view
+        returns (Seller memory seller, bool isActive, bool isRegistered)
+    {
+        return (sellers[_seller], sellers[_seller].stake >= minSellerStake, sellerAddresses.contains(_seller));
+    }
+
+    function sellerRegister(uint256 _stake) external {
+        address _seller = _msgSender();
+        sellers[_seller].stake += _stake;
+        if (sellers[_seller].stake < minSellerStake) {
+            revert("stake is less than required minimum");
+        }
+
+        sellerAddresses.add(_seller);
+        feeToken.safeTransferFrom(_seller, address(this), _stake);
+    }
+
+    function sellerDeregister() external {
+        address _seller = _msgSender();
+        (,, bool isRegistered) = sellerByAddress(_seller);
+        if (!isRegistered) {
+            revert("seller not found");
+        }
+        if (sellerContracts[_seller].length() > 0) {
+            revert("seller has contracts");
+        }
+        uint256 stakeToReturn = sellers[_seller].stake;
+        sellers[_seller].stake = 0;
+        sellerAddresses.remove(_seller);
+        feeToken.safeTransfer(_seller, stakeToReturn);
+    }
+
+    function addSellerContract(address _seller, address _contract) private {
+        (,, bool isRegistered) = sellerByAddress(_seller);
+        if (!isRegistered) {
+            revert("seller not found");
+        }
+        sellerContracts[_seller].add(_contract);
+    }
+
+    function removeSellerContract(address _seller, address _contract) private {
+        (,, bool isRegistered) = sellerByAddress(_seller);
+        if (!isRegistered) {
+            revert("seller not found");
+        }
+        sellerContracts[_seller].remove(_contract);
+    }
+
+    function ensureActiveSeller(address _seller) private view {
+        (, bool isActive, bool isRegistered) = sellerByAddress(_seller);
+        if (!isRegistered) {
+            revert("seller is not registered");
+        }
+        if (!isActive) {
+            revert("seller is not active");
+        }
+    }
+
+    function setMinSellerStake(uint256 _minSellerStake) external _onlyOwner {
+        minSellerStake = _minSellerStake;
+    }
+
+    // function getSellerContracts(address _seller, uint256 _offset, uint8 _limit)
+    //     external
+    //     view
+    //     returns (address[] memory)
+    // {
+    //     return sellerContracts[_seller].part(_offset, _limit);
+    // }
+
+    function getSellers(uint256 _offset, uint8 _limit) external view returns (address[] memory) {
+        return sellerAddresses.part(_offset, _limit);
     }
 }

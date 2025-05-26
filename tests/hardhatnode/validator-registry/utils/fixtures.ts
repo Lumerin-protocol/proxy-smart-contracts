@@ -10,10 +10,7 @@ export async function deployFixture() {
   bob.account.publicKey = await getPublicKey(bob);
   carol.account.publicKey = await getPublicKey(alice);
 
-  const token = await viem.deployContract(
-    "contracts/validator-registry/LumerinTokenMock.sol:LumerinToken",
-    []
-  );
+  const token = await viem.deployContract("contracts/mocks/LumerinTokenMock.sol:LumerinToken", []);
   const registry = await viem.deployContract(
     "contracts/validator-registry/ValidatorRegistry.sol:ValidatorRegistry",
     []

@@ -5,7 +5,7 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { deployLocalFixture } from "./fixtures-2";
 import { viem } from "hardhat";
 import { CloseReason } from "../utils";
-import { getEventSelector, parseEventLogs } from "viem";
+import { parseEventLogs } from "viem";
 
 describe("Contract close early", function () {
   it("should disallow early closeout called second time", async function () {
@@ -203,7 +203,7 @@ describe("Contract close early", function () {
 
     // Check history before closeout
     const [historyEntryBefore] = await impl.read.getHistory([0n, 1n]);
-    expect(historyEntryBefore._goodCloseout).to.be.true;
+    expect(historyEntryBefore._endTime > 0n).is.true;
 
     // Close early
     await time.increase(1);
@@ -211,7 +211,7 @@ describe("Contract close early", function () {
 
     // Check history after closeout
     const [historyEntryAfter] = await impl.read.getHistory([0n, 1n]);
-    expect(historyEntryAfter._goodCloseout).to.be.false;
+    expect(historyEntryAfter._endTime < historyEntryBefore._endTime).is.true;
   });
 
   it("should apply future terms", async function () {

@@ -44,12 +44,6 @@ update-validator-registry:
 populate-contracts:
 	yarn hardhat run --network default ./scripts/populate-contracts.ts
 
-whitelist-clonefactory:
-	yarn hardhat run --network default ./scripts/whitelist-clonefactory.ts
-
-set-fee-recipient:
-	yarn hardhat run --network default ./scripts/set-feeRecipient.ts
-
 build-go:
 	./build-go.sh
 
@@ -65,12 +59,6 @@ release-js:
 	make release-git path="build-js" remote="git@github.com:Lumerin-protocol/contracts-js.git"
 	echo "contracts-js released"
 
-update-public-contracts:
-	make release-git path="contracts" remote="git@github.com:Lumerin-protocol/smart-contracts.git"
-	echo "smart-contracts released"
-
-# release-js-npm:
-# 	./templates/js/release.sh $(version) $(token)
 
 release-git:
 	cd $(path) \
@@ -92,9 +80,6 @@ node-local:
 
 deploy-local:
 	yarn hardhat run ./scripts/deploy-local.ts
-
-node-local-deploy:
-	./node-local-deploy.sh
 
 node-local-update:
 	./node-local-update.sh

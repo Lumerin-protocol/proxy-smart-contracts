@@ -35,24 +35,16 @@ async function main() {
         { account: seller }
       );
 
-      const receipt = await pc.waitForTransactionReceipt({ hash });
-      const [event] = parseEventLogs({
-        logs: receipt.logs,
-        abi: cf.abi,
-        eventName: "contractCreated",
-      });
-      const address = event.args._address;
+      /*const receipt =*/ await pc.waitForTransactionReceipt({ hash });
+      // const [event] = parseEventLogs({
+      //   logs: receipt.logs,
+      //   abi: cf.abi,
+      //   eventName: "contractCreated",
+      // });
+      // const address = event.args._address;
 
-      const hrContract = await viem.getContractAt("Implementation", address);
-
-      console.log("Address:", address);
-      console.log(`Hashrate ${contract.config.speedTHPS} TH/s`);
-      console.log(`Length ${contract.config.lengthHours} hours`);
-      console.log(`Profit target ${contract.config.profitTargetPercent}%`);
-      const [price, fee] = await hrContract.read.priceAndFee();
-      console.log(`Price: ${price}`);
-      console.log(`Fee: ${fee}`);
-      console.log();
+      // const hrContract = await viem.getContractAt("Implementation", address);
+      // const [price, fee] = await hrContract.read.priceAndFee();
     }
   }
 }

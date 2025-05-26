@@ -51,11 +51,14 @@ async function main() {
   });
   console.log("Proxy update txhash:", tx);
 
+  const pc = await viem.getPublicClient();
+  await pc.waitForTransactionReceipt({ hash: tx });
+
   // Verify the update was successful
   const newImplementation = await upgrades.erc1967.getImplementationAddress(
     cloneFactoryProxy.address
   );
-  console.log("\nVerification:");
+  console.log("\nVerification:", newImplementation);
   console.log(
     "Update successful:",
     newImpl.address.toLowerCase() === newImplementation.toLowerCase()
@@ -72,7 +75,7 @@ async function main() {
   const hashrateContractBeaconAddr: `0x${string}` =
     await cloneFactoryProxy.read.baseImplementation();
   const beacon = await viem.getContractAt(
-    "@openzeppelin/contracts-v5/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon",
+    "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon",
     hashrateContractBeaconAddr
   );
   console.log("Beacon address:", beacon.address);

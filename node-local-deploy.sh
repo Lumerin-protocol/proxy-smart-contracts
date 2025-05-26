@@ -25,25 +25,25 @@ export VALIDATOR_PUNISH_AMOUNT=100000000000
 export VALIDATOR_PUNISH_THRESHOLD=3
 
 # deploy fee token
-yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/deploy-lumerin.ts
+yarn hardhat run --network localhost --config hardhat.config.ts ./scripts/deploy-lumerin.ts
 export LUMERIN_TOKEN_ADDRESS="$(cat lumerin-addr.tmp)"
 
 # deploy payment token
-yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/deploy-lumerin.ts
+yarn hardhat run --network localhost --config hardhat.config.ts ./scripts/deploy-lumerin.ts
 export LUMERIN_TOKEN_ADDRESS="$(cat lumerin-addr.tmp)"
 
 # deploy faucet
-yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/deploy-faucet.ts 
+yarn hardhat run --network localhost --config hardhat.config.ts ./scripts/deploy-faucet.ts 
 
 # deploy clonefactory
-yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/deploy-clonefactory.ts
+yarn hardhat run --network localhost --config hardhat.config.ts ./scripts/deploy-clonefactory.ts
 export CLONE_FACTORY_ADDRESS="$(cat clonefactory-addr.tmp)"
 
 # whitelist clonefactory addresses
-yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/whitelist-clonefactory.ts
+yarn hardhat run --network localhost --config hardhat.config.ts ./scripts/whitelist-clonefactory.ts
 
 # populate contracts
-yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/populate-contracts.ts
+yarn hardhat run --network localhost --config hardhat.config.ts ./scripts/populate-contracts.ts
 
 # validator registry
-yarn hardhat run --network localhost --config hardhat-base.config.ts ./scripts/deploy-validator-registry.ts
+yarn hardhat run --network localhost --config hardhat.config.ts ./scripts/deploy-validator-registry.ts

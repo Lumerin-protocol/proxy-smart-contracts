@@ -48,10 +48,11 @@ describe("Validator fee", function () {
     const { contracts, accounts, config } = await loadFixture(deployLocalFixture);
     const buyer = accounts.buyer.account.address;
     const validatorAddr = accounts.validator.account.address;
+    const sellerAddr = accounts.seller.account.address;
 
     const cf = contracts.cloneFactory;
-    const paymentToken = contracts.lumerinToken;
-    const feeToken = contracts.usdcMock;
+    const feeToken = contracts.lumerinToken;
+    const paymentToken = contracts.usdcMock;
     const hrContractAddr = config.cloneFactory.contractAddresses[0];
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
@@ -78,20 +79,16 @@ describe("Validator fee", function () {
 
     // claim funds by validator
     const validatorBalanceBefore = await feeToken.read.balanceOf([validatorAddr]);
-    await impl.write.claimFundsValidator({ account: validatorAddr });
-    const validatorBalanceAfter = await feeToken.read.balanceOf([validatorAddr]);
-    const deltaValidatorBalance = validatorBalanceAfter - validatorBalanceBefore;
-    expect(deltaValidatorBalance).to.equal(validatorFee);
+    const sellerBalanceBefore = await paymentToken.read.balanceOf([sellerAddr]);
 
-    // claim funds by seller
-    const sellerBalanceBefore = await paymentToken.read.balanceOf([
-      accounts.seller.account.address,
-    ]);
-    await impl.write.claimFunds({
-      account: accounts.seller.account.address,
-    });
-    const sellerBalanceAfter = await paymentToken.read.balanceOf([accounts.seller.account.address]);
+    await impl.write.claimFunds({ account: sellerAddr });
+
+    const validatorBalanceAfter = await feeToken.read.balanceOf([validatorAddr]);
+    const sellerBalanceAfter = await paymentToken.read.balanceOf([sellerAddr]);
+    const deltaValidatorBalance = validatorBalanceAfter - validatorBalanceBefore;
     const deltaSellerBalance = sellerBalanceAfter - sellerBalanceBefore;
+
+    expect(deltaValidatorBalance).to.equal(validatorFee);
     expect(deltaSellerBalance).to.equal(price);
 
     // check lmr balance of the contract
@@ -109,8 +106,8 @@ describe("Validator fee", function () {
     const validatorAddr = accounts.validator.account.address;
 
     const cf = contracts.cloneFactory;
-    const paymentToken = contracts.lumerinToken;
-    const feeToken = contracts.usdcMock;
+    const paymentToken = contracts.usdcMock;
+    const feeToken = contracts.lumerinToken;
     const hrContractAddr = config.cloneFactory.contractAddresses[0];
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
@@ -181,8 +178,8 @@ describe("Validator fee", function () {
     const validator2Addr = accounts.validator2.account.address;
 
     const cf = contracts.cloneFactory;
-    const paymentToken = contracts.lumerinToken;
-    const feeToken = contracts.usdcMock;
+    const paymentToken = contracts.usdcMock;
+    const feeToken = contracts.lumerinToken;
     const hrContractAddr = config.cloneFactory.contractAddresses[0];
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 

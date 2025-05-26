@@ -3,6 +3,7 @@ import { parseUnits, getAddress, parseEventLogs } from "viem";
 import { hoursToSeconds } from "../../lib/utils";
 import { THPStoHPS } from "../../lib/utils";
 import { compressPublicKey, getPublicKey } from "../../lib/pubkey";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 type ContractConfigWithCount = {
   config: {
@@ -38,15 +39,21 @@ export async function deployLocalFixture() {
     []
   );
 
+  // Top up buyer with tokens
+  await usdcMock.write.transfer([buyer.account.address, parseUnits("1000", 8)]);
+  await lumerinToken.write.transfer([buyer.account.address, parseUnits("1000", 8)]);
+
   const BITCOIN_DECIMALS = 8;
+  const USDC_DECIMALS = 6;
 
   const oracle = {
-    btcPrice: parseUnits("84524.2", BITCOIN_DECIMALS),
+    btcPrice: parseUnits("84524.2", USDC_DECIMALS),
     blockReward: parseUnits("3.125", BITCOIN_DECIMALS),
     difficulty: 121n * 10n ** 12n,
+    decimals: USDC_DECIMALS,
   };
 
-  await btcPriceOracleMock.write.setPrice([oracle.btcPrice, BITCOIN_DECIMALS]);
+  await btcPriceOracleMock.write.setPrice([oracle.btcPrice, oracle.decimals]);
 
   // Deploy HashrateOracle
   const hashrateOracle = await viem.deployContract(
@@ -75,6 +82,9 @@ export async function deployLocalFixture() {
     parseUnits("0.01", 18), // FAUCET_ETH_PAYOUT
   ]);
 
+  // Deploy Multicall3
+  const multicall3 = await viem.deployContract("Multicall3", []);
+
   // Deploy Implementation and Beacon
   const implementation = await viem.deployContract(
     "contracts/marketplace/Implementation.sol:Implementation",
@@ -82,7 +92,7 @@ export async function deployLocalFixture() {
   );
 
   const beacon = await viem.deployContract(
-    "@openzeppelin/contracts-v5/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon",
+    "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon",
     [implementation.address, owner.account.address]
   );
 
@@ -97,6 +107,7 @@ export async function deployLocalFixture() {
       parseUnits("0.01", 18) *
       10n ** BigInt((await lumerinToken.read.decimals()) - (await usdcMock.read.decimals())),
     contractAddresses: [] as `0x${string}`[],
+    minSellerStake: parseUnits("10000", 8),
   };
   // Initialize CloneFactory with beacon address instead of implementation
   await cloneFactory.write.initialize([
@@ -105,6 +116,7 @@ export async function deployLocalFixture() {
     usdcMock.address, // paymentToken (USDC)
     lumerinToken.address, // feeToken (LMR)
     cloneFactoryConfig.validatorFeeRateScaled,
+    cloneFactoryConfig.minSellerStake,
   ]);
 
   // Deploy ValidatorRegistry
@@ -158,8 +170,17 @@ export async function deployLocalFixture() {
     { account: validator2.account }
   );
   await pc.waitForTransactionReceipt({ hash: hash2 });
-  // Create contracts
 
+  // Register seller
+  await lumerinToken.write.transfer([seller.account.address, cloneFactoryConfig.minSellerStake]);
+  await lumerinToken.write.approve([cloneFactory.address, cloneFactoryConfig.minSellerStake], {
+    account: seller.account,
+  });
+  await cloneFactory.write.sellerRegister([cloneFactoryConfig.minSellerStake], {
+    account: seller.account,
+  });
+
+  // Create contracts
   for (const contract of sampleContracts) {
     for (let i = 0; i < contract.count; i++) {
       const hash = await cloneFactory.write.setCreateNewRentalContractV2(
@@ -187,19 +208,62 @@ export async function deployLocalFixture() {
 
       const hrContract = await viem.getContractAt("Implementation", address);
 
-      console.log("hashrate TH/s:", contract.config.speedTHPS);
-      console.log("length hours:", contract.config.lengthHours);
-      console.log("profit target percent:", contract.config.profitTargetPercent);
       const [price, fee] = await hrContract.read.priceAndFee();
-      console.log("Price:", price);
-      console.log("Fee:", fee);
 
       cloneFactoryConfig.contractAddresses.push(address);
     }
   }
 
-  // Deploy Multicall3
-  const multicall3 = await viem.deployContract("Multicall3", []);
+  await buyContract(
+    cloneFactoryConfig.contractAddresses[0],
+    lumerinToken,
+    cloneFactory,
+    buyer,
+    usdcMock,
+    validator
+  );
+  await buyContract(
+    cloneFactoryConfig.contractAddresses[1],
+    lumerinToken,
+    cloneFactory,
+    buyer,
+    usdcMock,
+    validator
+  );
+
+  // viem increase blockchain time
+  const maxLength = Math.max(
+    sampleContracts[0].config.lengthHours,
+    sampleContracts[1].config.lengthHours
+  );
+  await time.increaseTo(
+    Math.round(new Date().getTime() / 1000) - (sampleContracts[0].config.lengthHours * 3600) / 2
+  );
+
+  await buyContract(
+    cloneFactoryConfig.contractAddresses[0],
+    lumerinToken,
+    cloneFactory,
+    buyer,
+    usdcMock,
+    validator
+  );
+  await buyContract(
+    cloneFactoryConfig.contractAddresses[1],
+    lumerinToken,
+    cloneFactory,
+    buyer,
+    usdcMock,
+    validator
+  );
+
+  await time.increaseTo(Math.round(new Date().getTime() / 1000));
+
+  const c1 = await viem.getContractAt("Implementation", cloneFactoryConfig.contractAddresses[0]);
+  await c1.write.closeEarly([0], {
+    account: buyer.account,
+  });
+  await pc.waitForTransactionReceipt({ hash });
 
   // Return all deployed contracts and accounts
   return {
@@ -228,4 +292,27 @@ export async function deployLocalFixture() {
       pc,
     },
   };
+}
+async function buyContract(
+  contractAddress: string,
+  lumerinToken,
+  cloneFactory,
+  buyer,
+  usdcMock,
+  validator
+) {
+  const c1 = await viem.getContractAt("Implementation", contractAddress);
+  const [price, fee] = await c1.read.priceAndFee();
+  await lumerinToken.write.approve([cloneFactory.address, fee], {
+    account: buyer.account,
+  });
+  await usdcMock.write.approve([cloneFactory.address, price], {
+    account: buyer.account,
+  });
+  await cloneFactory.write.setPurchaseRentalContractV2(
+    [c1.address, validator.account.address, "", "", 0],
+    {
+      account: buyer.account,
+    }
+  );
 }

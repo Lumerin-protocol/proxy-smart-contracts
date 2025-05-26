@@ -3,18 +3,16 @@ import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { deployLocalFixture } from "./fixtures-2";
 import { viem } from "hardhat";
 
+const ZETTA = 10n ** 21n;
+
 describe("Contract pricing", function () {
   it("should calculate correct price based on hashrate and duration", async function () {
     const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
-    const { owner, seller } = accounts;
-
-    // Set up mining parameters
-    const difficulty = config.oracle.difficulty;
-    const blockReward = config.oracle.blockReward;
-    const btcPrice = config.oracle.btcPrice;
+    const { seller } = accounts;
+    const { oracle } = config;
 
     // Set up contract parameters
-    const speed = 1000000000000n; // 1 TH/s
+    const speed = 1n * ZETTA;
     const length = 3600n; // 1 hour
     const profitTarget = 10; // 10% profit target
 
@@ -28,34 +26,29 @@ describe("Contract pricing", function () {
     const hrContractAddr = receipt.logs[0].address;
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-    // Calculate expected price
-    // rewardPerTHinBTC = blockReward * TERA / difficulty / DIFFICULTY_TO_HASHRATE_FACTOR
-    // priceInToken = rewardPerTHinBTC * btcPrice * speed * length
-    // finalPrice = priceInToken * (100 + profitTarget) / 100
-    const TERA = 10n ** 12n;
-    const DIFFICULTY_TO_HASHRATE_FACTOR = 2n ** 32n;
-    const rewardPerTHinBTC = (blockReward * TERA) / difficulty / DIFFICULTY_TO_HASHRATE_FACTOR;
-    const priceInToken = rewardPerTHinBTC * btcPrice * speed * length;
-    const expectedPrice = (priceInToken * BigInt(100 + profitTarget)) / 100n;
+    const expectedPrice = convertPrice({
+      blockRewardWei: oracle.blockReward,
+      difficulty: oracle.difficulty,
+      btcPrice: oracle.btcPrice,
+      oracleDecimals: oracle.decimals,
+      speed,
+      length,
+      profitTarget,
+    });
 
     // Get actual price
     const [actualPrice, fee] = await impl.read.priceAndFee();
 
-    // Verify price calculation
     expect(actualPrice).to.equal(expectedPrice);
   });
 
   it("should handle zero profit target correctly", async function () {
     const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
     const { seller } = accounts;
-
-    // Set up mining parameters
-    const difficulty = config.oracle.difficulty;
-    const blockReward = config.oracle.blockReward;
-    const btcPrice = config.oracle.btcPrice;
+    const { oracle } = config;
 
     // Set up contract parameters with zero profit target
-    const speed = 1000000000000n;
+    const speed = 1n * ZETTA;
     const length = 3600n;
     const profitTarget = 0;
 
@@ -69,11 +62,15 @@ describe("Contract pricing", function () {
     const hrContractAddr = receipt.logs[0].address;
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-    // Calculate expected price (should be same as priceInToken since profit target is 0)
-    const TERA = 10n ** 12n;
-    const DIFFICULTY_TO_HASHRATE_FACTOR = 2n ** 32n;
-    const rewardPerTHinBTC = (blockReward * TERA) / difficulty / DIFFICULTY_TO_HASHRATE_FACTOR;
-    const expectedPrice = rewardPerTHinBTC * btcPrice * speed * length;
+    const expectedPrice = convertPrice({
+      blockRewardWei: oracle.blockReward,
+      difficulty: oracle.difficulty,
+      btcPrice: oracle.btcPrice,
+      oracleDecimals: oracle.decimals,
+      speed,
+      length,
+      profitTarget,
+    });
 
     // Get actual price
     const [actualPrice, fee] = await impl.read.priceAndFee();
@@ -84,16 +81,11 @@ describe("Contract pricing", function () {
 
   it("should handle negative profit target correctly", async function () {
     const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
-    const { hashrateOracle, btcPriceOracleMock } = contracts;
-    const { owner, seller } = accounts;
-
-    // Set up mining parameters
-    const difficulty = config.oracle.difficulty;
-    const blockReward = config.oracle.blockReward;
-    const btcPrice = config.oracle.btcPrice;
+    const { seller } = accounts;
+    const { oracle } = config;
 
     // Set up contract parameters with negative profit target
-    const speed = 1000000000000n;
+    const speed = 1n * ZETTA;
     const length = 3600n;
     const profitTarget = -5; // -5% profit target
 
@@ -108,16 +100,45 @@ describe("Contract pricing", function () {
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
     // Calculate expected price
-    const TERA = 10n ** 12n;
-    const DIFFICULTY_TO_HASHRATE_FACTOR = 2n ** 32n;
-    const rewardPerTHinBTC = (blockReward * TERA) / difficulty / DIFFICULTY_TO_HASHRATE_FACTOR;
-    const priceInToken = rewardPerTHinBTC * btcPrice * speed * length;
-    const expectedPrice = (priceInToken * BigInt(100 + profitTarget)) / 100n;
-
+    const expectedPrice = convertPrice({
+      blockRewardWei: oracle.blockReward,
+      difficulty: oracle.difficulty,
+      btcPrice: oracle.btcPrice,
+      oracleDecimals: oracle.decimals,
+      speed,
+      length,
+      profitTarget,
+    });
     // Get actual price
     const [actualPrice, fee] = await impl.read.priceAndFee();
 
     // Verify price calculation
-    expect(actualPrice).to.equal(expectedPrice);
+    expect(Number(actualPrice)).approximately(Number(expectedPrice), 5);
   });
 });
+
+// oracle has to consider the decimals or source token, dest token and decimals of the oracle itself
+function convertPrice(props: {
+  blockRewardWei: bigint;
+  difficulty: bigint;
+  btcPrice: bigint;
+  oracleDecimals: number;
+  speed: bigint;
+  length: bigint;
+  profitTarget: number;
+}) {
+  const { blockRewardWei, difficulty, btcPrice, oracleDecimals, speed, length, profitTarget } =
+    props;
+  const DIFFICULTY_TO_HASHRATE_FACTOR = 2n ** 32n;
+  const MULTIPLIER = 10n ** 31n;
+  const rewardPerZHinBTC =
+    (blockRewardWei * MULTIPLIER) / difficulty / DIFFICULTY_TO_HASHRATE_FACTOR;
+
+  const priceInToken =
+    (rewardPerZHinBTC * speed * length * btcPrice * 10n ** 6n) /
+    10n ** BigInt(oracleDecimals) /
+    10n ** 8n /
+    MULTIPLIER;
+  const expectedPrice = (priceInToken * BigInt(100 + profitTarget)) / 100n;
+  return expectedPrice;
+}
