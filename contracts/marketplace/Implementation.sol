@@ -216,7 +216,7 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
     ) external onlyCloneFactory {
         require(contractState() == ContractState.Available, "contract is not in an available state");
 
-        maybePayParties();
+        maybePayParties(false);
         maybeApplyFutureTerms();
 
         buyer = _buyer;
@@ -292,7 +292,7 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
     /// @notice Can be called during contract execution, then returns funds for elapsed time for current contract
     /// @dev Can be called from any address, but the seller reward will be sent to the seller
     function claimFunds() external payable {
-        bool paid = maybePayParties();
+        bool paid = maybePayParties(false);
         require(paid, "no funds to withdraw");
         emit fundsClaimed();
     }
@@ -300,7 +300,7 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
     /// @notice Resolves the payments for contract/validator that are due.
     /// @dev same as claimFunds, kept for backwards compatibility
     function claimFundsValidator() external {
-        bool paid = maybePayParties();
+        bool paid = maybePayParties(false);
         require(paid, "no funds to withdraw");
         emit fundsClaimed();
     }
@@ -347,7 +347,7 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
         successCount--;
         failCount++;
 
-        maybePayParties();
+        maybePayParties(true);
         setPaymentResolved();
         maybeApplyFutureTerms();
 
@@ -356,7 +356,7 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
 
     /// @dev Pays the parties according to the payment struct
     /// @dev Removed the events, cause Transfer events emitted anyway
-    function maybePayParties() private returns (bool isPaid) {
+    function maybePayParties(bool isCloseout) private returns (bool isPaid) {
         if (isPaymentResolved()) {
             isPaid = false;
             return isPaid;
@@ -384,13 +384,15 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
             isPaid = true;
             feeToken.safeTransfer(validator, unpaidDeliveredFee);
         }
-        if (undeliveredPayment > 0) {
-            isPaid = true;
-            paymentToken.safeTransfer(buyer, undeliveredPayment);
-        }
-        if (undeliveredFee > 0) {
-            isPaid = true;
-            feeToken.safeTransfer(buyer, undeliveredFee);
+        if (isCloseout) {
+            if (undeliveredPayment > 0) {
+                isPaid = true;
+                paymentToken.safeTransfer(buyer, undeliveredPayment);
+            }
+            if (undeliveredFee > 0) {
+                isPaid = true;
+                feeToken.safeTransfer(buyer, undeliveredFee);
+            }
         }
 
         return isPaid;
