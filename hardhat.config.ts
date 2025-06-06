@@ -1,5 +1,6 @@
 import type { HardhatUserConfig } from "hardhat/config";
 
+import "solidity-coverage";
 import "@nomiclabs/hardhat-ethers";
 import "@nomicfoundation/hardhat-verify";
 import "@openzeppelin/hardhat-upgrades";
@@ -7,6 +8,11 @@ import "hardhat-abi-exporter";
 import "dotenv/config";
 import "@nomicfoundation/hardhat-viem";
 import "hardhat-storage-layout";
+
+import chai from "chai";
+import chaiAsPromised from "chai-as-promised";
+
+chai.use(chaiAsPromised);
 
 // Base config is used for local deployment and/or contract build
 const config: HardhatUserConfig = {
@@ -71,9 +77,7 @@ const config: HardhatUserConfig = {
       "HashrateOracle",
     ],
   },
-  mocha: {
-    timeout: 5 * 60 * 1000, // 5 minutes
-  },
+  mocha: {},
 };
 
 export default config;

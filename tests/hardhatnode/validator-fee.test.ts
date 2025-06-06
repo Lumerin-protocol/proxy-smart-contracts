@@ -156,7 +156,7 @@ describe("Validator fee", function () {
   });
 
   it("claimFundsValidator - should error if no funds or address is wrong", async function () {
-    const { contracts, config, accounts } = await loadFixture(deployLocalFixture);
+    const { config, accounts } = await loadFixture(deployLocalFixture);
     const validatorAddr = accounts.validator.account.address;
     const hrContractAddr = config.cloneFactory.contractAddresses[0];
     const impl = await viem.getContractAt("Implementation", hrContractAddr);

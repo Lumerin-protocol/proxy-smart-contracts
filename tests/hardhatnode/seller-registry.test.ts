@@ -2,14 +2,13 @@ import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { deployLocalFixture } from "./fixtures-2";
 import { viem } from "hardhat";
-import { parseUnits } from "viem";
 import { getPublicKey } from "../../lib/pubkey";
 import { expectIsError } from "../utils";
 
 describe("CloneFactory Seller Registry", function () {
   describe("Seller Registration", function () {
     it("should allow seller registration with sufficient stake", async function () {
-      const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
+      const { contracts, config } = await loadFixture(deployLocalFixture);
       const [, , newSeller] = await viem.getWalletClients();
 
       const stakeAmount = config.cloneFactory.minSellerStake;

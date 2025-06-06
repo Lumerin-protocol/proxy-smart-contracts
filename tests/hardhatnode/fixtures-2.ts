@@ -1,9 +1,10 @@
 import { viem } from "hardhat";
-import { parseUnits, getAddress, parseEventLogs } from "viem";
+import { parseUnits, getAddress, parseEventLogs, Account, TransactionReceipt } from "viem";
 import { hoursToSeconds } from "../../lib/utils";
 import { THPStoHPS } from "../../lib/utils";
 import { compressPublicKey, getPublicKey } from "../../lib/pubkey";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
+import { WalletClient } from "@nomicfoundation/hardhat-viem/types";
 
 type ContractConfigWithCount = {
   config: {
@@ -242,18 +243,18 @@ export async function deployLocalFixture() {
 
   await buyContract(
     cloneFactoryConfig.contractAddresses[0],
-    lumerinToken,
+    lumerinToken as any,
     cloneFactory,
     buyer,
-    usdcMock,
+    usdcMock as any,
     validator
   );
   await buyContract(
     cloneFactoryConfig.contractAddresses[1],
-    lumerinToken,
+    lumerinToken as any,
     cloneFactory,
     buyer,
-    usdcMock,
+    usdcMock as any,
     validator
   );
 
@@ -293,15 +294,16 @@ export async function deployLocalFixture() {
     },
   };
 }
+
 async function buyContract(
   contractAddress: string,
-  lumerinToken,
-  cloneFactory,
-  buyer,
-  usdcMock,
-  validator
+  lumerinToken: IERC20,
+  cloneFactory: ICloneFactory,
+  buyer: WalletClient,
+  usdcMock: IERC20,
+  validator: WalletClient
 ) {
-  const c1 = await viem.getContractAt("Implementation", contractAddress);
+  const c1 = await viem.getContractAt("Implementation", contractAddress as `0x${string}`);
   const [price, fee] = await c1.read.priceAndFee();
   await lumerinToken.write.approve([cloneFactory.address, fee], {
     account: buyer.account,
@@ -316,3 +318,14 @@ async function buyContract(
     }
   );
 }
+
+function getCloneFactory(addr: `0x${string}`) {
+  return viem.getContractAt("CloneFactory", addr);
+}
+
+function getIERC20(addr: `0x${string}`) {
+  return viem.getContractAt("@openzeppelin/contracts-v4/token/ERC20/IERC20.sol:IERC20", addr);
+}
+
+type ICloneFactory = Awaited<ReturnType<typeof getCloneFactory>>;
+type IERC20 = Awaited<ReturnType<typeof getIERC20>>;

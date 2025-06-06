@@ -94,40 +94,46 @@ describe("Hashrate oracle", function () {
     });
   });
 
-  it.skip("should calculate correct reward per TH in BTC", async function () {
-    const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
+  it("should calculate correct reward per TH in BTC", async function () {
+    const { contracts, config } = await loadFixture(deployLocalFixture);
     const hashrateOracle = contracts.hashrateOracle;
-    const owner = accounts.owner;
 
-    // Set test values
-    const difficulty = 1000000000000n; // 1T difficulty
-    const blockReward = parseUnits("6.25", 8); // 6.25 BTC in satoshis
-    await hashrateOracle.write.setDifficulty([difficulty], { account: owner.account });
-    await hashrateOracle.write.setBlockReward([blockReward], { account: owner.account });
+    const { difficulty, blockReward } = config.oracle;
 
-    // Calculate expected reward per TH
-    const expectedReward = (blockReward * BigInt(10 ** 12)) / (difficulty * BigInt(2 ** 32));
-    expect(await hashrateOracle.read.getRewardPerTHinBTC()).to.equal(expectedReward);
+    // Calculate expected hashes needed to earn 1 BTC using floating point arithmetic
+    // Formula: (difficulty * DIFFICULTY_TO_HASHRATE_FACTOR) / blockReward
+    const DIFFICULTY_TO_HASHRATE_FACTOR = 2 ** 32;
+
+    // Convert BigInt values to numbers for floating point calculation
+    const difficultyFloat = Number(difficulty);
+    const blockRewardFloat = Number(blockReward);
+
+    // Calculate using floats
+    const expectedHashesFloat =
+      (difficultyFloat * DIFFICULTY_TO_HASHRATE_FACTOR) / blockRewardFloat;
+    const expectedHashesForBTC = BigInt(Math.floor(expectedHashesFloat));
+
+    const actualHashesForBTC = await hashrateOracle.read.getHashesForBTC();
+    expect(actualHashesForBTC).to.equal(expectedHashesForBTC);
   });
 
-  it.skip("should calculate correct reward per TH in token", async function () {
+  it("should calculate correct reward per TH in token", async function () {
     const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
     const hashrateOracle = contracts.hashrateOracle;
-    const owner = accounts.owner;
 
-    // Set test values
-    const difficulty = 1000000000000n; // 1T difficulty
-    const blockReward = parseUnits("6.25", 8); // 6.25 BTC in satoshis
-    await hashrateOracle.write.setDifficulty([difficulty], { account: owner.account });
-    await hashrateOracle.write.setBlockReward([blockReward], { account: owner.account });
+    const { btcPrice, decimals } = config.oracle;
 
     // Get reward in token
-    const rewardInToken = await hashrateOracle.read.getRewardPerEHinToken();
-    const rewardInBTC = await hashrateOracle.read.getRewardPerEHinBTC();
+    const hashesForToken = await hashrateOracle.read.getHashesforToken();
+    const hashesForBTC = await hashrateOracle.read.getHashesForBTC();
 
-    // The reward in token should be reward in BTC multiplied by BTC price
-    // Since we're using a mock oracle with price 100, the reward should be 100x
-    expect(rewardInToken).to.equal(rewardInBTC * BigInt(100));
+    // oracle has its own decimals
+    const btcDecimals = 8;
+    const usdcDecimals = 6;
+    const resultDecimals = btcDecimals - usdcDecimals + decimals;
+    const result = (Number(hashesForBTC) / Number(btcPrice)) * 10 ** resultDecimals;
+
+    expect(Number(hashesForToken)).to.approximately(result, 1);
   });
 
   it("should emit DifficultyUpdated when values are updated", async function () {

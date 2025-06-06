@@ -13,6 +13,13 @@ test:
 test-hardhat:
 	yarn hardhat --network hardhat test $$(find ./tests/hardhatnode/ -type f -iname "*.test.ts")
 
+test-hardhat-coverage:
+	SOLIDITY_COVERAGE=true yarn hardhat coverage --testfiles "./tests/hardhatnode/**/*.test.ts"
+
+.PHONY: coverage
+coverage:
+	open ./coverage/index.html
+
 test-upgrade:
 	yarn hardhat --network localhost test --bail tests/upgrades/*.ts 
 
