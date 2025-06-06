@@ -47,16 +47,16 @@ async function main() {
   console.log();
 
   console.log("Deploying HashrateOracle implementation...");
-  // const hashrateOracleImpl = await viem.deployContract("HashrateOracle", [
-  //   env.BTCUSDC_ORACLE_ADDRESS,
-  //   tokenDecimals,
-  // ]);
-  // console.log("Deployed at:", hashrateOracleImpl.address);
-  const hashrateOracleImpl = await viem.getContractAt(
-    "HashrateOracle",
-    "0xfd9e680c92514a7d433d10d0ca3f1ffa6f212559"
-  );
-  // await verifyContract(hashrateOracleImpl.address, [env.BTCUSDC_ORACLE_ADDRESS, tokenDecimals]);
+  const hashrateOracleImpl = await viem.deployContract("HashrateOracle", [
+    env.BTCUSDC_ORACLE_ADDRESS,
+    tokenDecimals,
+  ]);
+  console.log("Deployed at:", hashrateOracleImpl.address);
+  // const hashrateOracleImpl = await viem.getContractAt(
+  //   "HashrateOracle",
+  //   "0xfd9e680c92514a7d433d10d0ca3f1ffa6f212559"
+  // );
+  await verifyContract(hashrateOracleImpl.address, [env.BTCUSDC_ORACLE_ADDRESS, tokenDecimals]);
 
   console.log();
 
