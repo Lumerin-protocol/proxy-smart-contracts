@@ -51,6 +51,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     event contractDeleteUpdated(address _address, bool _isDeleted); // emitted whenever a contract is deleted/restored
     event purchaseInfoUpdated(address indexed _address); // emitted whenever contract data updated
     event validatorFeeRateUpdated(uint256 _validatorFeeRateScaled);
+    event contractHardDeleted(address indexed _address);
 
     modifier _onlyOwner() {
         require(_msgSender() == owner(), "you are not authorized");
@@ -214,8 +215,26 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
             }
             _contract.setContractDeleted(_isDeleted);
         }
-            emit contractDeleteUpdated(_contractAddress, _isDeleted);
-        }
+    }
+
+    /// @notice Hard delete a contract
+    /// @param _index The index of the contract to delete
+    function contractHardDelete(uint256 _index) external {
+        require(_index < rentalContracts.length, "index out of bounds");
+
+        address _contractAddress = rentalContracts[_index];
+        Implementation _contract = Implementation(_contractAddress);
+        address _seller = _contract.seller();
+        require(_msgSender() == _seller || _msgSender() == owner(), "you are not authorized");
+
+        removeSellerContract(_seller, _contractAddress);
+        delete rentalContractsMap[_contractAddress];
+
+        rentalContracts[_index] = rentalContracts[rentalContracts.length - 1];
+        rentalContracts.pop();
+
+        emit contractHardDeleted(_contractAddress);
+        _contract.setContractDeleted(true);
     }
 
     /// @notice Updates the contract information for a rental contract
