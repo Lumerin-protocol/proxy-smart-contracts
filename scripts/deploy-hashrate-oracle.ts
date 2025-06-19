@@ -3,6 +3,7 @@ import { viem } from "hardhat";
 import { encodeFunctionData } from "viem";
 import { writeAndWait } from "./lib/writeContract";
 import { verifyContract } from "./lib/verify";
+
 async function main() {
   console.log("Hashrate Oracle deployment script");
   console.log();
@@ -57,8 +58,6 @@ async function main() {
   //   "0xfd9e680c92514a7d433d10d0ca3f1ffa6f212559"
   // );
   await verifyContract(hashrateOracleImpl.address, [env.BTCUSDC_ORACLE_ADDRESS, tokenDecimals]);
-
-  console.log();
 
   // Deploy ERC1967Proxy
   console.log("Deploying Proxy...");

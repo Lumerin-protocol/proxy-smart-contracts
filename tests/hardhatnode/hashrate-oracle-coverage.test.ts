@@ -1,8 +1,10 @@
 import { viem } from "hardhat";
 import { expect } from "chai";
-import { parseUnits } from "viem";
-import { deployLocalFixture } from "./fixtures-2";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
+import { deployLocalFixture } from "./fixtures-2";
+import { getAddress, parseEventLogs, parseUnits } from "viem";
+import { catchError } from "../lib";
+import { ZERO_ADDRESS } from "../utils";
 
 describe("HashrateOracle Coverage Tests", function () {
   describe("Authorization and Upgrades", function () {
@@ -18,11 +20,11 @@ describe("HashrateOracle Coverage Tests", function () {
       );
 
       // Non-owner should not be able to upgrade
-      await expect(
-        hashrateOracle.write.upgradeToAndCall([newImplementation.address, "0x"], {
+      await catchError(hashrateOracle.abi, "OwnableUnauthorizedAccount", async () => {
+        await hashrateOracle.write.upgradeToAndCall([hashrateOracle.address, "0x"], {
           account: seller.account,
-        })
-      ).to.be.rejectedWith("UUPSUnauthorizedCallContext()");
+        });
+      });
     });
   });
 
@@ -33,32 +35,20 @@ describe("HashrateOracle Coverage Tests", function () {
       const { owner } = accounts;
 
       await expect(
-        hashrateOracle.write.setDifficulty([0n], {
+        hashrateOracle.write.setHashesForBTC([0n], {
           account: owner.account,
         })
       ).to.be.rejectedWith("ValueCannotBeZero");
     });
 
-    it("should revert when setting zero block reward", async function () {
+    it("should not emit event when setting same value", async function () {
       const { contracts, accounts } = await loadFixture(deployLocalFixture);
       const { hashrateOracle } = contracts;
       const { owner } = accounts;
 
-      await expect(
-        hashrateOracle.write.setBlockReward([0n], {
-          account: owner.account,
-        })
-      ).to.be.rejectedWith("ValueCannotBeZero");
-    });
+      const current = await hashrateOracle.read.getHashesForBTC();
 
-    it("should not emit event when setting same difficulty", async function () {
-      const { contracts, accounts } = await loadFixture(deployLocalFixture);
-      const { hashrateOracle } = contracts;
-      const { owner } = accounts;
-
-      const currentDifficulty = await hashrateOracle.read.getDifficulty();
-
-      const hash = await hashrateOracle.write.setDifficulty([currentDifficulty], {
+      const hash = await hashrateOracle.write.setHashesForBTC([current.value], {
         account: owner.account,
       });
 
@@ -66,73 +56,38 @@ describe("HashrateOracle Coverage Tests", function () {
       const receipt = await accounts.pc.waitForTransactionReceipt({ hash });
 
       // Check that no events were emitted (or at least no DifficultyUpdated event)
-      const logs = receipt.logs.filter(
-        (log) =>
-          log.topics[0] === "0x7da2e87d0b02df1162d5736cc40dfcfffd17198aaf093ddff4a8f4eb26002fde" // DifficultyUpdated event topic
-      );
-      expect(logs.length).to.equal(0);
-    });
-
-    it("should not emit event when setting same block reward", async function () {
-      const { contracts, accounts } = await loadFixture(deployLocalFixture);
-      const { hashrateOracle } = contracts;
-      const { owner } = accounts;
-
-      const currentBlockReward = await hashrateOracle.read.getBlockReward();
-
-      const hash = await hashrateOracle.write.setBlockReward([currentBlockReward], {
-        account: owner.account,
+      const logs = parseEventLogs({
+        abi: hashrateOracle.abi,
+        logs: receipt.logs,
+        eventName: "HashesForBTCUpdated",
       });
-
-      // Should not emit BlockRewardUpdated event since value is the same
-      const receipt = await accounts.pc.waitForTransactionReceipt({ hash });
-
-      // Check that no events were emitted (or at least no BlockRewardUpdated event)
-      const logs = receipt.logs.filter(
-        (log) =>
-          log.topics[0] === "0x4cede65c3c0b9de8001d1b14a2d0c4eb8fda5b0ac2d73a1f9a2b7e8b6e6b6c8d" // BlockRewardUpdated event topic (placeholder)
-      );
       expect(logs.length).to.equal(0);
     });
 
-    it("should update difficulty and emit event", async function () {
+    it("should update value and emit event", async function () {
       const { contracts, accounts } = await loadFixture(deployLocalFixture);
       const { hashrateOracle } = contracts;
       const { owner } = accounts;
 
-      const newDifficulty = parseUnits("150", 12); // 150T difficulty
+      const newValue = parseUnits("150", 12); // 150T difficulty
 
-      const hash = await hashrateOracle.write.setDifficulty([newDifficulty], {
+      const hash = await hashrateOracle.write.setHashesForBTC([newValue], {
         account: owner.account,
       });
 
       // Check that difficulty was updated
-      const updatedDifficulty = await hashrateOracle.read.getDifficulty();
-      expect(updatedDifficulty).to.equal(newDifficulty);
+      const updatedDifficulty = await hashrateOracle.read.getHashesForBTC();
+      expect(updatedDifficulty.value).to.equal(newValue);
 
       // Verify event was emitted
       const receipt = await accounts.pc.waitForTransactionReceipt({ hash });
       expect(receipt.logs.length).to.be.greaterThan(0);
-    });
-
-    it("should update block reward and emit event", async function () {
-      const { contracts, accounts } = await loadFixture(deployLocalFixture);
-      const { hashrateOracle } = contracts;
-      const { owner } = accounts;
-
-      const newBlockReward = parseUnits("6.25", 8); // 6.25 BTC
-
-      const hash = await hashrateOracle.write.setBlockReward([newBlockReward], {
-        account: owner.account,
+      const [event] = parseEventLogs({
+        abi: hashrateOracle.abi,
+        logs: receipt.logs,
+        eventName: "HashesForBTCUpdated",
       });
-
-      // Check that block reward was updated
-      const updatedBlockReward = await hashrateOracle.read.getBlockReward();
-      expect(updatedBlockReward).to.equal(newBlockReward);
-
-      // Verify event was emitted
-      const receipt = await accounts.pc.waitForTransactionReceipt({ hash });
-      expect(receipt.logs.length).to.be.greaterThan(0);
+      expect(event?.args.newHashesForBTC).to.equal(newValue);
     });
   });
 
@@ -145,21 +100,19 @@ describe("HashrateOracle Coverage Tests", function () {
       const newDifficulty = parseUnits("150", 12);
 
       await expect(
-        hashrateOracle.write.setDifficulty([newDifficulty], {
+        hashrateOracle.write.setHashesForBTC([newDifficulty], {
           account: seller.account,
         })
       ).to.be.rejectedWith("OwnableUnauthorizedAccount");
     });
 
-    it("should revert when non-owner tries to set block reward", async function () {
+    it("should revert when non-owner tries to set ttl", async function () {
       const { contracts, accounts } = await loadFixture(deployLocalFixture);
       const { hashrateOracle } = contracts;
       const { seller } = accounts;
 
-      const newBlockReward = parseUnits("6.25", 8);
-
       await expect(
-        hashrateOracle.write.setBlockReward([newBlockReward], {
+        hashrateOracle.write.setTTL([1n, 1n], {
           account: seller.account,
         })
       ).to.be.rejectedWith("OwnableUnauthorizedAccount");
@@ -173,8 +126,8 @@ describe("HashrateOracle Coverage Tests", function () {
 
       const hashesForBTC = await hashrateOracle.read.getHashesForBTC();
 
-      expect(typeof hashesForBTC).to.equal("bigint");
-      expect(hashesForBTC > 0n).to.be.true;
+      expect(typeof hashesForBTC.value).to.equal("bigint");
+      expect(hashesForBTC.value > 0n).to.be.true;
     });
 
     it("should calculate hashes for token correctly", async function () {
@@ -186,66 +139,218 @@ describe("HashrateOracle Coverage Tests", function () {
       expect(typeof hashesForToken).to.equal("bigint");
       expect(hashesForToken > 0n).to.be.true;
     });
+  });
 
-    it("should return current difficulty", async function () {
-      const { contracts } = await loadFixture(deployLocalFixture);
-      const { hashrateOracle } = contracts;
+  it("should initialize with correct values", async function () {
+    const decimals = 8;
+    const usdcTokenMock = await viem.deployContract(
+      "contracts/mocks/LumerinTokenMock.sol:LumerinToken",
+      []
+    );
+    const hashrateOracle = await viem.deployContract(
+      "contracts/marketplace/HashrateOracle.sol:HashrateOracle",
+      [usdcTokenMock.address, decimals]
+    );
 
-      const difficulty = await hashrateOracle.read.getDifficulty();
+    // Check initial values
+    expect((await hashrateOracle.read.getHashesForBTC()).value).to.equal(0n);
+  });
 
-      expect(typeof difficulty).to.equal("bigint");
-      expect(difficulty > 0n).to.be.true;
-    });
+  it("should allow owner to set difficulty", async function () {
+    const { accounts, contracts } = await loadFixture(deployLocalFixture);
+    const hashrateOracle = contracts.hashrateOracle;
+    const owner = accounts.owner;
 
-    it("should return current block reward", async function () {
-      const { contracts } = await loadFixture(deployLocalFixture);
-      const { hashrateOracle } = contracts;
+    // Set difficulty
+    const difficulty = 1000n;
+    await hashrateOracle.write.setHashesForBTC([difficulty], { account: owner.account });
+    expect((await hashrateOracle.read.getHashesForBTC()).value).to.equal(difficulty);
+  });
 
-      const blockReward = await hashrateOracle.read.getBlockReward();
+  it("should allow owner to set block reward and difficulty", async function () {
+    const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
+    const hashrateOracle = contracts.hashrateOracle;
+    const owner = accounts.owner;
 
-      expect(blockReward).to.be.a("bigint");
-      expect(blockReward > 0n).to.be.true;
+    // Set difficulty
+    const difficulty = 1000n;
+    await hashrateOracle.write.setHashesForBTC([difficulty], { account: owner.account });
+    expect((await hashrateOracle.read.getHashesForBTC()).value).to.equal(difficulty);
+  });
+
+  it("should not allow non-owner to set difficulty", async function () {
+    const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
+    const hashrateOracle = contracts.hashrateOracle;
+    const nonOwner = accounts.buyer;
+
+    // Try to set difficulty as non-owner
+    await catchError(contracts.hashrateOracle.abi, "OwnableUnauthorizedAccount", async () => {
+      await hashrateOracle.write.setHashesForBTC([1000n], { account: nonOwner.account });
     });
   });
 
-  describe("Edge Cases", function () {
-    it("should handle very large difficulty values", async function () {
-      const { contracts, accounts } = await loadFixture(deployLocalFixture);
-      const { hashrateOracle } = contracts;
-      const { owner } = accounts;
+  it("should not allow setting zero difficulty", async function () {
+    const { accounts, contracts } = await loadFixture(deployLocalFixture);
+    const hashrateOracle = contracts.hashrateOracle;
+    const owner = accounts.owner;
 
-      const largeDifficulty = BigInt("999999999999999999999999");
+    // Try to set zero difficulty
+    await catchError(contracts.hashrateOracle.abi, "ValueCannotBeZero", async () => {
+      await hashrateOracle.write.setHashesForBTC([0n], { account: owner.account });
+    });
+  });
 
-      await hashrateOracle.write.setDifficulty([largeDifficulty], {
-        account: owner.account,
-      });
+  it("should calculate correct reward per TH in BTC", async function () {
+    const { contracts, config } = await loadFixture(deployLocalFixture);
+    const hashrateOracle = contracts.hashrateOracle;
 
-      const updatedDifficulty = await hashrateOracle.read.getDifficulty();
-      expect(updatedDifficulty).to.equal(largeDifficulty);
+    const { difficulty, blockReward } = config.oracle;
 
-      // Should still be able to calculate hashes
-      const hashesForBTC = await hashrateOracle.read.getHashesForBTC();
-      expect(hashesForBTC).to.be.a("bigint");
+    // Calculate expected hashes needed to earn 1 BTC using floating point arithmetic
+    // Formula: (difficulty * DIFFICULTY_TO_HASHRATE_FACTOR) / blockReward
+    const DIFFICULTY_TO_HASHRATE_FACTOR = 2 ** 32;
+
+    // Convert BigInt values to numbers for floating point calculation
+    const difficultyFloat = Number(difficulty);
+    const blockRewardFloat = Number(blockReward);
+
+    // Calculate using floats
+    const expectedHashesFloat =
+      (difficultyFloat * DIFFICULTY_TO_HASHRATE_FACTOR) / blockRewardFloat;
+    const expectedHashesForBTC = BigInt(Math.floor(expectedHashesFloat));
+
+    const actualHashesForBTC = await hashrateOracle.read.getHashesForBTC();
+    expect(actualHashesForBTC.value).to.equal(expectedHashesForBTC);
+  });
+
+  it("should calculate correct reward per TH in token", async function () {
+    const { contracts, config } = await loadFixture(deployLocalFixture);
+    const hashrateOracle = contracts.hashrateOracle;
+
+    const { btcPrice, decimals } = config.oracle;
+
+    // Get reward in token
+    const hashesForToken = await hashrateOracle.read.getHashesforToken();
+    const hashesForBTC = await hashrateOracle.read.getHashesForBTC();
+
+    // oracle has its own decimals
+    const btcDecimals = 8;
+    const usdcDecimals = 6;
+    const resultDecimals = btcDecimals - usdcDecimals + decimals;
+    const result = (Number(hashesForBTC.value) / Number(btcPrice)) * 10 ** resultDecimals;
+
+    expect(Number(hashesForToken)).to.approximately(result, 1);
+  });
+
+  it("should emit DifficultyUpdated when values are updated", async function () {
+    const { accounts, contracts } = await loadFixture(deployLocalFixture);
+    const hashrateOracle = contracts.hashrateOracle;
+    const owner = accounts.owner;
+    const pc = accounts.pc;
+
+    // Set difficulty and check event
+    const difficulty = 1000n;
+    const difficultyTx = await hashrateOracle.write.setHashesForBTC([difficulty], {
+      account: owner.account,
+    });
+    const difficultyReceipt = await pc.waitForTransactionReceipt({ hash: difficultyTx });
+    const [difficultyEvent] = parseEventLogs({
+      abi: hashrateOracle.abi,
+      logs: difficultyReceipt.logs,
+      eventName: "HashesForBTCUpdated",
+    });
+    expect(difficultyEvent.args.newHashesForBTC).to.equal(difficulty);
+  });
+
+  it("should not emit events when values are not changed", async function () {
+    const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
+    const hashrateOracle = contracts.hashrateOracle;
+    const owner = accounts.owner;
+    const pc = accounts.pc;
+
+    // Set initial values
+    await hashrateOracle.write.setHashesForBTC([1000n], { account: owner.account });
+
+    // Set same values again and check no events are emitted
+    const difficultyTx = await hashrateOracle.write.setHashesForBTC([1000n], {
+      account: owner.account,
+    });
+    const difficultyReceipt = await pc.waitForTransactionReceipt({ hash: difficultyTx });
+    const difficultyEvents = parseEventLogs({
+      abi: hashrateOracle.abi,
+      logs: difficultyReceipt.logs,
+      eventName: "HashesForBTCUpdated",
+    });
+    expect(difficultyEvents.length).to.equal(0);
+  });
+
+  it("should allow owner to transfer ownership", async function () {
+    const { accounts, contracts } = await loadFixture(deployLocalFixture);
+    const hashrateOracle = contracts.hashrateOracle;
+    const owner = accounts.owner;
+    const newOwner = accounts.buyer;
+    const pc = accounts.pc;
+
+    // Transfer ownership
+    const transferTx = await hashrateOracle.write.transferOwnership([newOwner.account.address], {
+      account: owner.account,
+    });
+    const transferReceipt = await pc.waitForTransactionReceipt({ hash: transferTx });
+    const [ownershipEvent] = parseEventLogs({
+      abi: hashrateOracle.abi,
+      logs: transferReceipt.logs,
+      eventName: "OwnershipTransferred",
     });
 
-    it("should handle very small block reward values", async function () {
-      const { contracts, accounts } = await loadFixture(deployLocalFixture);
-      const { hashrateOracle } = contracts;
-      const { owner } = accounts;
+    expect(ownershipEvent.args.previousOwner).to.equal(getAddress(owner.account.address));
+    expect(ownershipEvent.args.newOwner).to.equal(getAddress(newOwner.account.address));
+    expect(await hashrateOracle.read.owner()).to.equal(getAddress(newOwner.account.address));
+  });
 
-      const smallBlockReward = 1n; // 1 satoshi
+  it("should not allow non-owner to transfer ownership", async function () {
+    const { accounts, contracts } = await loadFixture(deployLocalFixture);
+    const hashrateOracle = contracts.hashrateOracle;
+    const nonOwner = accounts.buyer;
+    const newOwner = accounts.seller;
 
-      await hashrateOracle.write.setBlockReward([smallBlockReward], {
-        account: owner.account,
+    await catchError(contracts.hashrateOracle.abi, "OwnableUnauthorizedAccount", async () => {
+      await hashrateOracle.write.transferOwnership([newOwner.account.address], {
+        account: nonOwner.account,
       });
+    });
+  });
 
-      const updatedBlockReward = await hashrateOracle.read.getBlockReward();
-      expect(updatedBlockReward).to.equal(smallBlockReward);
+  it("should allow owner to renounce ownership", async function () {
+    const { accounts, contracts } = await loadFixture(deployLocalFixture);
+    const hashrateOracle = contracts.hashrateOracle;
+    const owner = accounts.owner;
+    const pc = accounts.pc;
 
-      // Should still be able to calculate hashes (will be very large)
-      const hashesForBTC = await hashrateOracle.read.getHashesForBTC();
-      expect(hashesForBTC).to.be.a("bigint");
-      expect(hashesForBTC > 0n).to.be.true;
+    // Renounce ownership
+    const renounceTx = await hashrateOracle.write.renounceOwnership({
+      account: owner.account,
+    });
+    const renounceReceipt = await pc.waitForTransactionReceipt({ hash: renounceTx });
+    const [ownershipEvent] = parseEventLogs({
+      abi: hashrateOracle.abi,
+      logs: renounceReceipt.logs,
+      eventName: "OwnershipTransferred",
+    });
+
+    expect(ownershipEvent.args.previousOwner).to.equal(getAddress(owner.account.address));
+    expect(ownershipEvent.args.newOwner).to.equal(ZERO_ADDRESS);
+    expect(await hashrateOracle.read.owner()).to.equal(ZERO_ADDRESS);
+  });
+
+  it("should not allow non-owner to renounce ownership", async function () {
+    const { accounts, contracts } = await loadFixture(deployLocalFixture);
+    const hashrateOracle = contracts.hashrateOracle;
+    const nonOwner = accounts.buyer;
+
+    await catchError(contracts.hashrateOracle.abi, "OwnableUnauthorizedAccount", async () => {
+      await hashrateOracle.write.renounceOwnership({
+        account: nonOwner.account,
+      });
     });
   });
 });

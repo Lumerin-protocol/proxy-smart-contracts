@@ -3,6 +3,7 @@ import { expect } from "chai";
 import { parseUnits } from "viem";
 import { deployLocalFixture } from "./fixtures-2";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
+import { catchError } from "../lib";
 
 describe("CloneFactory Coverage Tests (Fixed)", function () {
   describe("Authorization and Ownership", function () {
@@ -40,8 +41,6 @@ describe("CloneFactory Coverage Tests (Fixed)", function () {
       const { cloneFactory } = contracts;
       const { owner, seller } = accounts;
 
-      console.log("owner==========", await cloneFactory.read.owner());
-
       // Deploy a new implementation
       const newImplementation = await viem.deployContract(
         "contracts/marketplace/CloneFactory.sol:CloneFactory",
@@ -49,11 +48,11 @@ describe("CloneFactory Coverage Tests (Fixed)", function () {
       );
 
       // Non-owner should not be able to upgrade
-      await expect(
-        cloneFactory.write.upgradeToAndCall([newImplementation.address, "0x"], {
+      await catchError(newImplementation.abi, "OwnableUnauthorizedAccount", async () => {
+        await cloneFactory.write.upgradeToAndCall([cloneFactory.address, "0x"], {
           account: seller.account,
-        })
-      ).to.be.rejectedWith("UUPSUnauthorizedCallContext()");
+        });
+      });
     });
   });
 
@@ -223,7 +222,7 @@ describe("CloneFactory Coverage Tests (Fixed)", function () {
         cloneFactory.write.sellerDeregister({
           account: validator.account,
         })
-      ).to.be.rejectedWith("seller not found");
+      ).to.be.rejectedWith("seller is not registered");
     });
   });
 

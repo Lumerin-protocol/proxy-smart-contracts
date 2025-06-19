@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { addValidatorFixture, deployFixture } from "./utils/fixtures";
-import { catchError, getTxDeltaBalance } from "./utils/utils";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
+import { catchError, getTxDeltaBalance } from "../../lib";
 
 describe("Validator registry - deregister", () => {
   it("should deregister a validator", async () => {

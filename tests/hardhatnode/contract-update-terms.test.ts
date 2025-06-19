@@ -7,7 +7,7 @@ import { getPublicKey } from "../../lib/pubkey";
 
 describe("Contract terms update", function () {
   async function setupContractFixture() {
-    const { accounts, contracts } = await loadFixture(deployLocalFixture);
+    const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
     const { seller, buyer, owner } = accounts;
     const { cloneFactory, usdcMock, lumerinToken } = contracts;
     const pc = await viem.getPublicClient();
@@ -50,6 +50,7 @@ describe("Contract terms update", function () {
       initialSpeed,
       initialLength,
       initialProfitTarget,
+      config,
     };
   }
 
@@ -79,16 +80,30 @@ describe("Contract terms update", function () {
   });
 
   it("should prohibit updating if caller is not a seller", async function () {
-    const { hrContractAddr, buyer, cloneFactory } = await loadFixture(setupContractFixture);
+    const { hrContractAddr, cloneFactory, lumerinToken, config, owner } = await loadFixture(
+      setupContractFixture
+    );
+    const [, , , , , seller2] = await viem.getWalletClients();
 
     const speed = 2n;
     const length = 3n;
     const profitTarget = 1;
 
+    await lumerinToken.write.transfer(
+      [seller2.account.address, config.cloneFactory.minSellerStake],
+      { account: owner.account }
+    );
+    await lumerinToken.write.approve([cloneFactory.address, config.cloneFactory.minSellerStake], {
+      account: seller2.account,
+    });
+    await cloneFactory.write.sellerRegister([config.cloneFactory.minSellerStake], {
+      account: seller2.account,
+    });
+
     try {
       await cloneFactory.write.setUpdateContractInformationV2(
         [hrContractAddr, 0n, 0n, speed, length, profitTarget],
-        { account: buyer.account }
+        { account: seller2.account }
       );
       expect.fail("should throw error");
     } catch (err: any) {
