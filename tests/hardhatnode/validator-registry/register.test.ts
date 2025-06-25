@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { getAddress, parseUnits, zeroAddress } from "viem";
 import { addValidatorFixture, deployFixture } from "./utils/fixtures";
-import { catchError, getTxDeltaBalance } from "./utils/utils";
+import { catchError, getTxDeltaBalance } from "../../lib";
 import { compressPublicKey } from "../../../lib/pubkey";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 

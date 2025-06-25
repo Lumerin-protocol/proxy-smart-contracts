@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import { Paginator } from "@solarity/solidity-lib/libs/arrays/Paginator.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-// following are openzeppelin v5 dependencies
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -38,7 +37,7 @@ contract ValidatorRegistry is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     error AlreadyComplained(); // the last complain was made by the same address
 
     uint8 constant hostLengthLimit = 255; // max length of url
-    string public constant VERSION = "2.0.6"; // This will be replaced during build time
+    string public constant VERSION = "2.0.7"; // This will be replaced during build time
 
     IERC20 public token; // token used for staking
     uint256 public totalStake; // total amount of all collected stakes, used to avoid withdrawing all funds by owners
@@ -50,6 +49,10 @@ contract ValidatorRegistry is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     mapping(address => Validator) public validators;
     EnumerableSet.AddressSet private validatorAddresses;
     EnumerableSet.AddressSet private activeValidators;
+
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         IERC20 _token,
@@ -119,9 +122,9 @@ contract ValidatorRegistry is UUPSUpgradeable, OwnableUpgradeable, Versionable {
 
         v.stake = 0;
         v.addr = address(0);
-        v.complains = 0;
         v.host = "";
-        v.lastComplainer = address(0);
+        // v.complains and v.lastComplainer are not reset to avoid
+        // validator reregistering that resets the complains counter
 
         emit ValidatorDeregistered(addr);
 

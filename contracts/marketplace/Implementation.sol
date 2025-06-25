@@ -19,7 +19,7 @@ import { Versionable } from "../util/versionable.sol";
 ///      - Dynamic pricing based on hashrate oracle
 ///      - Contract terms management and updates
 ///      - Historical record keeping
-contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableUpgradeable, Versionable {
+contract Implementation is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     IERC20 public feeToken;
     IERC20 public paymentToken;
     HashrateOracle public hashrateOracle;
@@ -45,7 +45,7 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
     uint32 private failCount;
 
     uint8 public constant VALIDATOR_FEE_DECIMALS = 18;
-    string public constant VERSION = "2.0.6"; // This will be replaced during build time
+    string public constant VERSION = "2.0.7"; // This will be replaced during build time
 
     using SafeERC20 for IERC20;
 
@@ -87,6 +87,10 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
     event destinationUpdated(string newValidatorURL, string newDestURL);
     event fundsClaimed();
 
+    constructor() {
+        _disableInitializers();
+    }
+
     /// @notice Initializes the contract with basic parameters
     /// @param _cloneFactory Address of the clone factory for access control
     /// @param _hashrateOracle Address of the hashrate oracle for profit calculation
@@ -115,9 +119,8 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
         feeToken = IERC20(_feeToken);
         paymentToken = IERC20(_paymentToken);
         hashrateOracle = HashrateOracle(_hashrateOracle);
-        __ReentrancyGuard_init();
         __UUPSUpgradeable_init();
-        __Ownable_init(msg.sender);
+        __Ownable_init(_msgSender());
     }
 
     /// @dev Only the owner can upgrade the contract
@@ -180,12 +183,12 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
     /// @param _offset Starting index for history entries
     /// @param _limit Maximum number of entries to return
     /// @return Array of history entries
-    function getHistory(uint256 _offset, uint256 _limit) external view returns (HistoryEntry[] memory) {
+    function getHistory(uint256 _offset, uint8 _limit) external view returns (HistoryEntry[] memory) {
         if (_offset > history.length) {
             _offset = history.length;
         }
         if (_offset + _limit > history.length) {
-            _limit = history.length - _offset;
+            _limit = uint8(history.length - _offset);
         }
 
         HistoryEntry[] memory values = new HistoryEntry[](_limit);
@@ -216,7 +219,7 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
     ) external onlyCloneFactory {
         require(contractState() == ContractState.Available, "contract is not in an available state");
 
-        maybePayParties(false);
+        (uint256 a, uint256 b, uint256 c, uint256 d) = getPayments(false);
         maybeApplyFutureTerms();
 
         buyer = _buyer;
@@ -241,14 +244,16 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
             )
         );
 
-        emit contractPurchased(msg.sender);
+        sendPayments(a, b, c, d);
+
+        emit contractPurchased(_msgSender());
     }
 
     /// @notice Updates the mining destination during contract execution
     /// @param _encrValidatorURL New encrypted validator URL
     /// @param _encrDestURL New encrypted destination URL
     function setDestination(string calldata _encrValidatorURL, string calldata _encrDestURL) external {
-        require(msg.sender == buyer, "this account is not authorized to update the ciphertext information");
+        require(_msgSender() == buyer, "this account is not authorized to update the ciphertext information");
         require(contractState() == ContractState.Running, "the contract is not in the running state");
         encrDestURL = _encrDestURL;
         encrValidatorURL = _encrValidatorURL;
@@ -292,7 +297,8 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
     /// @notice Can be called during contract execution, then returns funds for elapsed time for current contract
     /// @dev Can be called from any address, but the seller reward will be sent to the seller
     function claimFunds() external payable {
-        bool paid = maybePayParties(false);
+        (uint256 a, uint256 b, uint256 c, uint256 d) = getPayments(false);
+        bool paid = sendPayments(a, b, c, d);
         require(paid, "no funds to withdraw");
         emit fundsClaimed();
     }
@@ -300,7 +306,8 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
     /// @notice Resolves the payments for contract/validator that are due.
     /// @dev same as claimFunds, kept for backwards compatibility
     function claimFundsValidator() external {
-        bool paid = maybePayParties(false);
+        (uint256 a, uint256 b, uint256 c, uint256 d) = getPayments(false);
+        bool paid = sendPayments(a, b, c, d);
         require(paid, "no funds to withdraw");
         emit fundsClaimed();
     }
@@ -337,7 +344,7 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
     /// @param reason The reason for the early closeout
     function closeEarly(CloseReason reason) external {
         require(
-            msg.sender == buyer || msg.sender == validator,
+            _msgSender() == buyer || _msgSender() == validator,
             "this account is not authorized to trigger an early closeout"
         );
         require(contractState() == ContractState.Running, "the contract is not in the running state");
@@ -347,19 +354,21 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
         successCount--;
         failCount++;
 
-        maybePayParties(true);
+        (uint256 a, uint256 b, uint256 c, uint256 d) = getPayments(true);
+
         setPaymentResolved();
         maybeApplyFutureTerms();
 
         emit closedEarly(reason);
+        sendPayments(a, b, c, d);
     }
 
     /// @dev Pays the parties according to the payment struct
     /// @dev Removed the events, cause Transfer events emitted anyway
-    function maybePayParties(bool isCloseout) private returns (bool isPaid) {
+    /// @dev split into two functions (getPayments and sendPayments) to better fit check-effect-interaction pattern
+    function getPayments(bool isCloseout) private view returns (uint256, uint256, uint256, uint256) {
         if (isPaymentResolved()) {
-            isPaid = false;
-            return isPaid;
+            return (0, 0, 0, 0);
         }
 
         bool hasValidator = validator != address(0);
@@ -376,23 +385,37 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
         uint256 unpaidDeliveredPayment = paymentToken.balanceOf(address(this)) - undeliveredPayment;
         uint256 unpaidDeliveredFee = feeToken.balanceOf(address(this)) - undeliveredFee;
 
-        if (unpaidDeliveredPayment > 0) {
-            isPaid = true;
-            paymentToken.safeTransfer(seller, unpaidDeliveredPayment);
-        }
-        if (unpaidDeliveredFee > 0) {
-            isPaid = true;
-            feeToken.safeTransfer(validator, unpaidDeliveredFee);
-        }
         if (isCloseout) {
-            if (undeliveredPayment > 0) {
-                isPaid = true;
-                paymentToken.safeTransfer(buyer, undeliveredPayment);
-            }
-            if (undeliveredFee > 0) {
-                isPaid = true;
-                feeToken.safeTransfer(buyer, undeliveredFee);
-            }
+            // refund the buyer for the undelivered payment and fee
+            return (unpaidDeliveredPayment, unpaidDeliveredFee, undeliveredPayment, undeliveredFee);
+        } else {
+            return (unpaidDeliveredPayment, unpaidDeliveredFee, 0, 0);
+        }
+    }
+
+    function sendPayments(
+        uint256 sellerPayment,
+        uint256 validatorFee,
+        uint256 buyerRefundPayment,
+        uint256 buyerRefundFee
+    ) private returns (bool) {
+        bool isPaid = false;
+
+        if (sellerPayment > 0) {
+            isPaid = true;
+            paymentToken.safeTransfer(seller, sellerPayment);
+        }
+        if (validatorFee > 0) {
+            isPaid = true;
+            feeToken.safeTransfer(validator, validatorFee);
+        }
+        if (buyerRefundPayment > 0) {
+            isPaid = true;
+            paymentToken.safeTransfer(buyer, buyerRefundPayment);
+        }
+        if (buyerRefundFee > 0) {
+            isPaid = true;
+            feeToken.safeTransfer(buyer, buyerRefundFee);
         }
 
         return isPaid;
@@ -420,7 +443,7 @@ contract Implementation is UUPSUpgradeable, ReentrancyGuardUpgradeable, OwnableU
     }
 
     modifier onlyCloneFactory() {
-        require(msg.sender == address(cloneFactory), "only clonefactory can call this function");
+        require(_msgSender() == address(cloneFactory), "only clonefactory can call this function");
         _;
     }
 }

@@ -1,10 +1,10 @@
 import { viem } from "hardhat";
-import { parseUnits, getAddress, parseEventLogs, Account, TransactionReceipt } from "viem";
+import { parseUnits, parseEventLogs, maxUint256, maxUint32, encodeFunctionData } from "viem";
 import { hoursToSeconds } from "../../lib/utils";
 import { THPStoHPS } from "../../lib/utils";
 import { compressPublicKey, getPublicKey } from "../../lib/pubkey";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
-import { WalletClient } from "@nomicfoundation/hardhat-viem/types";
+import type { WalletClient } from "@nomicfoundation/hardhat-viem/types";
 
 type ContractConfigWithCount = {
   config: {
@@ -27,12 +27,15 @@ export async function deployLocalFixture() {
   // Get wallet clients
   const [owner, seller, buyer, validator, validator2] = await viem.getWalletClients();
   const pc = await viem.getPublicClient();
+  const tc = await viem.getTestClient();
 
   // Deploy Lumerin Token (for fees)
-  const lumerinToken = await viem.deployContract("contracts/token/LumerinToken.sol:Lumerin", []);
+  const _lumerinToken = await viem.deployContract("contracts/token/LumerinToken.sol:Lumerin", []);
+  const lumerinToken = await getIERC20(_lumerinToken.address);
 
   // Deploy USDC Mock (for payments)
-  const usdcMock = await viem.deployContract("contracts/mocks/USDCMock.sol:USDCMock", []);
+  const _usdcMock = await viem.deployContract("contracts/mocks/USDCMock.sol:USDCMock", []);
+  const usdcMock = await getIERC20(_usdcMock.address);
 
   // Deploy BTC Price Oracle Mock
   const btcPriceOracleMock = await viem.deployContract(
@@ -44,27 +47,43 @@ export async function deployLocalFixture() {
   await usdcMock.write.transfer([buyer.account.address, parseUnits("1000", 8)]);
   await lumerinToken.write.transfer([buyer.account.address, parseUnits("1000", 8)]);
 
-  const BITCOIN_DECIMALS = 8;
-  const USDC_DECIMALS = 6;
+  const oracle = (() => {
+    const BITCOIN_DECIMALS = 8;
+    const USDC_DECIMALS = 6;
+    const DIFFICULTY_TO_HASHRATE_FACTOR = 2n ** 32n;
 
-  const oracle = {
-    btcPrice: parseUnits("84524.2", USDC_DECIMALS),
-    blockReward: parseUnits("3.125", BITCOIN_DECIMALS),
-    difficulty: 121n * 10n ** 12n,
-    decimals: USDC_DECIMALS,
-  };
+    const btcPrice = parseUnits("84524.2", USDC_DECIMALS);
+    const blockReward = parseUnits("3.125", BITCOIN_DECIMALS);
+    const difficulty = 121n * 10n ** 12n;
+    const hashesForBTC = (difficulty * DIFFICULTY_TO_HASHRATE_FACTOR) / blockReward;
+    return {
+      btcPrice,
+      blockReward,
+      difficulty,
+      decimals: USDC_DECIMALS,
+      hashesForBTC,
+    };
+  })();
 
   await btcPriceOracleMock.write.setPrice([oracle.btcPrice, oracle.decimals]);
 
   // Deploy HashrateOracle
-  const hashrateOracle = await viem.deployContract(
+  const hashrateOracleImpl = await viem.deployContract(
     "contracts/marketplace/HashrateOracle.sol:HashrateOracle",
-    [btcPriceOracleMock.address, await usdcMock.read.decimals()]
+    [btcPriceOracleMock.address, await _usdcMock.read.decimals()]
   );
-  await hashrateOracle.write.initialize();
+  const hashrateOracleProxy = await viem.deployContract("ERC1967Proxy", [
+    hashrateOracleImpl.address,
+    encodeFunctionData({
+      abi: hashrateOracleImpl.abi,
+      functionName: "initialize",
+      args: [],
+    }),
+  ]);
+  const hashrateOracle = await viem.getContractAt("HashrateOracle", hashrateOracleProxy.address);
 
-  await hashrateOracle.write.setBlockReward([oracle.blockReward]);
-  await hashrateOracle.write.setDifficulty([oracle.difficulty]);
+  await hashrateOracle.write.setTTL([maxUint256, maxUint256]);
+  await hashrateOracle.write.setHashesForBTC([oracle.hashesForBTC]);
 
   const btcPrice = await btcPriceOracleMock.read.latestRoundData();
   console.log("BTC price:", btcPrice);
@@ -98,49 +117,70 @@ export async function deployLocalFixture() {
   );
 
   // Deploy CloneFactory
-  const cloneFactory = await viem.deployContract(
-    "contracts/marketplace/CloneFactory.sol:CloneFactory",
-    []
-  );
-
   const cloneFactoryConfig = {
     validatorFeeRateScaled:
       parseUnits("0.01", 18) *
-      10n ** BigInt((await lumerinToken.read.decimals()) - (await usdcMock.read.decimals())),
+      10n ** BigInt((await _lumerinToken.read.decimals()) - (await _usdcMock.read.decimals())),
     contractAddresses: [] as `0x${string}`[],
     minSellerStake: parseUnits("10000", 8),
+    minContractDuration: 0,
+    maxContractDuration: Number(maxUint32),
   };
-  // Initialize CloneFactory with beacon address instead of implementation
-  await cloneFactory.write.initialize([
-    beacon.address, // baseImplementation (beacon)
-    hashrateOracle.address, // hashrateOracle
-    usdcMock.address, // paymentToken (USDC)
-    lumerinToken.address, // feeToken (LMR)
-    cloneFactoryConfig.validatorFeeRateScaled,
-    cloneFactoryConfig.minSellerStake,
-  ]);
-
-  // Deploy ValidatorRegistry
-  const validatorRegistry = await viem.deployContract(
-    "contracts/validator-registry/ValidatorRegistry.sol:ValidatorRegistry",
+  const cloneFactoryImpl = await viem.deployContract(
+    "contracts/marketplace/CloneFactory.sol:CloneFactory",
     []
   );
+  const cloneFactoryProxy = await viem.deployContract("ERC1967Proxy", [
+    cloneFactoryImpl.address,
+    encodeFunctionData({
+      abi: cloneFactoryImpl.abi,
+      functionName: "initialize",
+      args: [
+        beacon.address, // baseImplementation (beacon)
+        hashrateOracle.address, // hashrateOracle
+        usdcMock.address, // paymentToken (USDC)
+        lumerinToken.address, // feeToken (LMR)
+        cloneFactoryConfig.validatorFeeRateScaled,
+        cloneFactoryConfig.minSellerStake,
+        cloneFactoryConfig.minContractDuration,
+        cloneFactoryConfig.maxContractDuration,
+      ],
+    }),
+  ]);
 
+  const cloneFactory = await viem.getContractAt("CloneFactory", cloneFactoryProxy.address);
+
+  // Deploy ValidatorRegistry
   const validatorRegistryConfig = {
     validatorStakeMinimum: parseUnits("0.1", 8),
     validatorStakeRegister: parseUnits("1", 8),
     validatorPunishAmount: parseUnits("0.1", 8),
     validatorPunishThreshold: 3,
   };
+  const validatorRegistryImpl = await viem.deployContract(
+    "contracts/validator-registry/ValidatorRegistry.sol:ValidatorRegistry",
+    []
+  );
 
-  // Initialize ValidatorRegistry
-  await validatorRegistry.write.initialize([
-    lumerinToken.address,
-    validatorRegistryConfig.validatorStakeMinimum,
-    validatorRegistryConfig.validatorStakeRegister,
-    validatorRegistryConfig.validatorPunishAmount,
-    validatorRegistryConfig.validatorPunishThreshold,
+  const validatorRegistryProxy = await viem.deployContract("ERC1967Proxy", [
+    validatorRegistryImpl.address,
+    encodeFunctionData({
+      abi: validatorRegistryImpl.abi,
+      functionName: "initialize",
+      args: [
+        lumerinToken.address,
+        validatorRegistryConfig.validatorStakeMinimum,
+        validatorRegistryConfig.validatorStakeRegister,
+        validatorRegistryConfig.validatorPunishAmount,
+        validatorRegistryConfig.validatorPunishThreshold,
+      ],
+    }),
   ]);
+
+  const validatorRegistry = await viem.getContractAt(
+    "ValidatorRegistry",
+    validatorRegistryProxy.address
+  );
 
   // add validators to ValidatorRegistry
   const exp = {
@@ -279,7 +319,7 @@ export async function deployLocalFixture() {
       btcPriceOracleMock,
       hashrateOracle,
       faucet,
-      cloneFactory,
+      cloneFactory: cloneFactory,
       implementation,
       validatorRegistry,
       multicall3,

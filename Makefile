@@ -90,3 +90,9 @@ deploy-local:
 
 node-local-update:
 	./node-local-update.sh
+
+static-analysis:
+	slither . --checklist --include-paths "contracts/validator-registry|contracts/marketplace"
+
+static-analysis-aderyn:
+	yarn run aderyn

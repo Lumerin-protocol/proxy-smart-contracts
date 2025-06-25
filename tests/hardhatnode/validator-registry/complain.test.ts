@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { getAddress } from "viem";
 import { add3ValidatorsFixture } from "./utils/fixtures";
-import { catchError } from "./utils/utils";
+import { catchError } from "../../lib";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { complain } from "./utils/actions";
 import { RandomEthAddress } from "../../utils";

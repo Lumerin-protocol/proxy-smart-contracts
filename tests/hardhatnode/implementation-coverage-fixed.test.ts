@@ -1,9 +1,10 @@
 import { viem } from "hardhat";
 import { expect } from "chai";
-import { parseUnits, parseEventLogs } from "viem";
+import { parseEventLogs, zeroAddress } from "viem";
 import { deployLocalFixture } from "./fixtures-2";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
+import { catchError } from "../lib";
 
 // Constants to replace magic numbers
 const CONTRACT_STATE = {
@@ -26,7 +27,7 @@ const TEST_VALUES = {
   FIRST_CONTRACT_INDEX: 0,
   THIRD_CONTRACT_INDEX: 2,
   HISTORY_OFFSET: 0n,
-  HISTORY_LIMIT: 10n,
+  HISTORY_LIMIT: 10,
   TERMS_VERSION_INITIAL: 0,
 } as const;
 
@@ -36,13 +37,8 @@ describe("Implementation Coverage Tests (Fixed)", function () {
       const { contracts, accounts, config } = await loadFixture(deployLocalFixture);
       const { owner, seller } = accounts;
 
-      // Get the first contract address from the fixture
-      const contractAddress =
-        config.cloneFactory.contractAddresses[TEST_VALUES.FIRST_CONTRACT_INDEX];
-      const implementation = await viem.getContractAt(
-        "contracts/marketplace/Implementation.sol:Implementation",
-        contractAddress
-      );
+      const beaconAddr = await contracts.cloneFactory.read.baseImplementation();
+      const beacon = await viem.getContractAt("UpgradeableBeacon", beaconAddr);
 
       // Deploy a new implementation
       const newImplementation = await viem.deployContract(
@@ -50,12 +46,27 @@ describe("Implementation Coverage Tests (Fixed)", function () {
         []
       );
 
+      // Should revert with InvalidInitialization when calling on proxy implementation
+      await catchError(newImplementation.abi, "InvalidInitialization", async () => {
+        await newImplementation.write.initialize([
+          zeroAddress,
+          zeroAddress,
+          zeroAddress,
+          zeroAddress,
+          zeroAddress,
+          "0x",
+          1n,
+          1n,
+          0,
+        ]);
+      });
+
       // Non-owner should not be able to upgrade
-      await expect(
-        implementation.write.upgradeToAndCall([newImplementation.address, "0x"], {
+      await catchError(newImplementation.abi, "OwnableUnauthorizedAccount", async () => {
+        await beacon.write.upgradeTo([beaconAddr], {
           account: seller.account,
-        })
-      ).to.be.rejectedWith("UUPSUnauthorizedCallContext()");
+        });
+      });
     });
   });
 

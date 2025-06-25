@@ -11,22 +11,26 @@ import { Versionable } from "../util/versionable.sol";
 /// @notice Contract for managing hashrate and mining difficulty calculations
 /// @dev This contract provides functions to calculate hashrate requirements based on BTC price and mining difficulty
 contract HashrateOracle is UUPSUpgradeable, OwnableUpgradeable, Versionable {
-    AggregatorV3Interface public immutable btcTokenOracle;
-    // TODO: replace decimals with uint8
-    uint256 public immutable oracleDecimals;
-    uint256 public immutable tokenDecimals;
+    AggregatorV3Interface private immutable btcTokenOracle;
+    uint8 private immutable oracleDecimals;
+    uint8 private immutable tokenDecimals;
 
-    uint256 private difficulty = 0;
-    uint256 private blockReward = 0;
+    Feed private hashesForBTC;
+    uint256 public btcPriceTTL;
 
-    uint256 private constant DIFFICULTY_TO_HASHRATE_FACTOR = 2 ** 32;
     uint256 private constant BTC_DECIMALS = 8;
-    string public constant VERSION = "2.0.6";
+    string public constant VERSION = "2.0.7";
 
-    event DifficultyUpdated(uint256 newDifficulty);
-    event BlockRewardUpdated(uint256 newBlockReward);
+    struct Feed {
+        uint256 value;
+        uint256 updatedAt;
+        uint256 ttl;
+    }
+
+    event HashesForBTCUpdated(uint256 newHashesForBTC);
 
     error ValueCannotBeZero();
+    error StaleData();
 
     /// @notice Constructor for the HashrateOracle contract
     /// @param _btcTokenOracleAddress Address of the BTC price oracle
@@ -35,11 +39,12 @@ contract HashrateOracle is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         btcTokenOracle = AggregatorV3Interface(_btcTokenOracleAddress);
         oracleDecimals = btcTokenOracle.decimals();
         tokenDecimals = _tokenDecimals;
+        _disableInitializers();
     }
 
     /// @notice Initializes the contract
     function initialize() external initializer {
-        __Ownable_init(msg.sender);
+        __Ownable_init(_msgSender());
         __UUPSUpgradeable_init();
     }
 
@@ -47,44 +52,32 @@ contract HashrateOracle is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         // Only the owner can upgrade the contract
     }
 
-    /// @notice Returns the current mining difficulty
-    function getDifficulty() external view returns (uint256) {
-        return difficulty;
-    }
-
-    /// @notice Returns the current block reward
-    function getBlockReward() external view returns (uint256) {
-        return blockReward;
+    function setHashesForBTC(uint256 newHashesForBTC) external onlyOwner {
+        if (newHashesForBTC == 0) revert ValueCannotBeZero();
+        if (newHashesForBTC != hashesForBTC.value) {
+            hashesForBTC.value = newHashesForBTC;
+            hashesForBTC.updatedAt = block.timestamp;
+            emit HashesForBTCUpdated(newHashesForBTC);
+        }
     }
 
     /// @notice Returns the number of hashes to mine per 1 satoshi
-    function getHashesForBTC() public view returns (uint256) {
-        return difficulty * DIFFICULTY_TO_HASHRATE_FACTOR / blockReward;
+    function getHashesForBTC() external view returns (Feed memory) {
+        return hashesForBTC;
     }
 
     /// @notice Returns the number of hashes required to mine BTC equivalent of 1 token minimum denomination
     function getHashesforToken() external view returns (uint256) {
-        (, int256 btcPrice,,,) = btcTokenOracle.latestRoundData();
-        return getHashesForBTC() * (10 ** (BTC_DECIMALS + oracleDecimals - tokenDecimals)) / uint256(btcPrice);
+        (, int256 btcPrice,, uint256 updatedAt,) = btcTokenOracle.latestRoundData();
+
+        if (block.timestamp - updatedAt > btcPriceTTL) revert StaleData();
+        if (block.timestamp - hashesForBTC.updatedAt > hashesForBTC.ttl) revert StaleData();
+
+        return hashesForBTC.value * (10 ** (BTC_DECIMALS + oracleDecimals - tokenDecimals)) / uint256(btcPrice);
     }
 
-    /// @notice Updates the mining difficulty
-    /// @param newDifficulty The new difficulty value
-    function setDifficulty(uint256 newDifficulty) external onlyOwner {
-        if (newDifficulty == 0) revert ValueCannotBeZero();
-        if (newDifficulty != difficulty) {
-            difficulty = newDifficulty;
-            emit DifficultyUpdated(newDifficulty);
-        }
-    }
-
-    /// @notice Updates the block reward
-    /// @param newBlockReward The new block reward value
-    function setBlockReward(uint256 newBlockReward) external onlyOwner {
-        if (newBlockReward == 0) revert ValueCannotBeZero();
-        if (newBlockReward != blockReward) {
-            blockReward = newBlockReward;
-            emit BlockRewardUpdated(newBlockReward);
-        }
+    function setTTL(uint256 newBtcPriceTTL, uint256 newHashesForBTCTTL) external onlyOwner {
+        btcPriceTTL = newBtcPriceTTL;
+        hashesForBTC.ttl = newHashesForBTCTTL;
     }
 }

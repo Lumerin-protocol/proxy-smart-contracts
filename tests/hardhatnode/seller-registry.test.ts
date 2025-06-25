@@ -198,7 +198,7 @@ describe("CloneFactory Seller Registry", function () {
         expect.fail("Should not allow contract creation after deregistration");
       } catch (err) {
         expectIsError(err);
-        expect(err.message).to.include("seller not found");
+        expect(err.message).to.include("seller is not registered");
       }
     });
 
@@ -229,7 +229,7 @@ describe("CloneFactory Seller Registry", function () {
         expect.fail("Should not allow deregistration of unregistered seller");
       } catch (err) {
         expectIsError(err);
-        expect(err.message).to.include("seller not found");
+        expect(err.message).to.include("seller is not registered");
       }
     });
   });
@@ -252,65 +252,83 @@ describe("CloneFactory Seller Registry", function () {
         expect.fail("Should not allow contract creation by unregistered seller");
       } catch (err) {
         expectIsError(err);
-        expect(err.message).to.include("seller not found");
+        expect(err.message).to.include("seller is not registered");
       }
     });
 
     it("should prevent sellers with insufficient stake from creating contracts", async function () {
-      const { contracts, config } = await loadFixture(deployLocalFixture);
-      const [, , , , , newSeller] = await viem.getWalletClients();
+      const { accounts, contracts } = await loadFixture(deployLocalFixture);
+      const { seller, owner } = accounts;
 
-      // Register seller with minimum stake
-      const stakeAmount = config.cloneFactory.minSellerStake;
-      await contracts.lumerinToken.write.transfer([newSeller.account.address, stakeAmount]);
-      await contracts.lumerinToken.write.approve([contracts.cloneFactory.address, stakeAmount], {
-        account: newSeller.account,
-      });
-      await contracts.cloneFactory.write.sellerRegister([stakeAmount], {
-        account: newSeller.account,
+      // Get the seller's current stake (they were registered in the fixture)
+      const [sellerInfo, isActive, isRegistered] =
+        await contracts.cloneFactory.read.sellerByAddress([seller.account.address]);
+      expect(isRegistered).to.be.true;
+      expect(isActive).to.be.true;
+
+      // Increase minimum stake to be higher than the seller's current stake
+      const newMinStake = sellerInfo.stake + 1000000000n; // Add 10 LMR (8 decimals)
+
+      await contracts.cloneFactory.write.setMinSellerStake([newMinStake], {
+        account: owner.account,
       });
 
-      // Verify seller can create contracts initially
-      const speed = 1000000000000000000000n;
-      const length = 3600n;
+      // Verify the seller is now inactive due to insufficient stake
+      const [, isActiveAfterUpdate] = await contracts.cloneFactory.read.sellerByAddress([
+        seller.account.address,
+      ]);
+      expect(isActiveAfterUpdate).to.be.false;
+
+      // Try to create a contract - should fail
+      const speed = 1000000000000000000000n; // 1 ZH/s
+      const length = 3600n; // 1 hour
       const profitTarget = 10;
-      const pubKey = await getPublicKey(newSeller);
+      const pubKey = await getPublicKey(seller);
 
-      await contracts.cloneFactory.write.setCreateNewRentalContractV2(
-        [0n, 0n, speed, length, profitTarget, newSeller.account.address, pubKey],
-        { account: newSeller.account }
-      );
-
-      // This test demonstrates that access control works - if we got here, the seller is properly registered
-      expect(true).to.be.true;
+      try {
+        await contracts.cloneFactory.write.setCreateNewRentalContractV2(
+          [0n, 0n, speed, length, profitTarget, seller.account.address, pubKey],
+          { account: seller.account }
+        );
+        expect.fail("Should not allow contract creation by seller with insufficient stake");
+      } catch (err) {
+        expectIsError(err);
+        expect(err.message).to.include("seller is not active");
+      }
     });
 
     it("should prevent contract purchases from inactive sellers", async function () {
-      const { contracts, config } = await loadFixture(deployLocalFixture);
-      const [, , , , , inactiveSeller] = await viem.getWalletClients();
+      const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
+      const { seller, owner, validator, buyer } = accounts;
 
-      // Register seller with insufficient stake to make them inactive
-      const insufficientStake = config.cloneFactory.minSellerStake / 2n;
-      await contracts.lumerinToken.write.transfer([
-        inactiveSeller.account.address,
-        insufficientStake,
+      // Get the seller's current stake (they were registered in the fixture)
+      const [sellerInfo, isActive, isRegistered] =
+        await contracts.cloneFactory.read.sellerByAddress([seller.account.address]);
+      expect(isRegistered).to.be.true;
+      expect(isActive).to.be.true;
+
+      // Increase minimum stake to be higher than the seller's current stake
+      const newMinStake = sellerInfo.stake + 1000000000n; // Add 10 LMR (8 decimals)
+
+      await contracts.cloneFactory.write.setMinSellerStake([newMinStake], {
+        account: owner.account,
+      });
+
+      // Verify the seller is now inactive due to insufficient stake
+      const [, isActiveAfterUpdate] = await contracts.cloneFactory.read.sellerByAddress([
+        seller.account.address,
       ]);
-      await contracts.lumerinToken.write.approve(
-        [contracts.cloneFactory.address, insufficientStake],
-        {
-          account: inactiveSeller.account,
-        }
-      );
+      expect(isActiveAfterUpdate).to.be.false;
 
-      // This should fail during registration
       try {
-        await contracts.cloneFactory.write.sellerRegister([insufficientStake], {
-          account: inactiveSeller.account,
-        });
-        expect.fail("Should not allow registration with insufficient stake");
+        await contracts.cloneFactory.write.setPurchaseRentalContractV2(
+          [config.cloneFactory.contractAddresses[0], validator.account.address, "", "", 0],
+          { account: buyer.account }
+        );
+        expect.fail("Should not allow contract purchase by seller with insufficient stake");
       } catch (err) {
         expectIsError(err);
-        expect(err.message).to.include("stake is less than required minimum");
+        expect(err.message).to.include("seller is not active");
       }
     });
   });
@@ -458,7 +476,7 @@ describe("CloneFactory Seller Registry", function () {
         expect.fail("Should not allow double deregistration");
       } catch (err) {
         expectIsError(err);
-        expect(err.message).to.include("seller not found");
+        expect(err.message).to.include("seller is not registered");
       }
     });
   });
