@@ -219,10 +219,12 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
 
     /// @notice Hard delete a contract
     /// @param _index The index of the contract to delete
-    function contractHardDelete(uint256 _index) external {
+    function contractHardDelete(uint256 _index, address _address) external {
         require(_index < rentalContracts.length, "index out of bounds");
 
         address _contractAddress = rentalContracts[_index];
+        require(_contractAddress == _address, "contract address mismatch");
+
         Implementation _contract = Implementation(_contractAddress);
         address _seller = _contract.seller();
         require(_msgSender() == _seller || _msgSender() == owner(), "you are not authorized");

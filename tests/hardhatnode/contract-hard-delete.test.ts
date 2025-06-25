@@ -55,8 +55,10 @@ describe("Contract hard delete", function () {
     const contractIndex = initialContractList.findIndex((addr) => addr === hrContractAddr);
     expect(contractIndex).to.not.equal(-1);
 
+    const contractAddress = initialContractList[contractIndex];
+
     // Hard delete the contract
-    await cloneFactory.write.contractHardDelete([BigInt(contractIndex)], {
+    await cloneFactory.write.contractHardDelete([BigInt(contractIndex), contractAddress], {
       account: seller.account,
     });
 
@@ -84,8 +86,9 @@ describe("Contract hard delete", function () {
     const contractIndex = initialContractList.findIndex((addr) => addr === hrContractAddr);
     expect(contractIndex).to.not.equal(-1);
 
+    const contractAddress = initialContractList[contractIndex];
     // Hard delete the contract as owner
-    await cloneFactory.write.contractHardDelete([BigInt(contractIndex)], {
+    await cloneFactory.write.contractHardDelete([BigInt(contractIndex), contractAddress], {
       account: owner.account,
     });
 
@@ -111,8 +114,9 @@ describe("Contract hard delete", function () {
     expect(contractIndex).to.not.equal(-1);
 
     // Attempt to hard delete as buyer should fail
+    const contractAddress = initialContractList[contractIndex];
     try {
-      await cloneFactory.write.contractHardDelete([BigInt(contractIndex)], {
+      await cloneFactory.write.contractHardDelete([BigInt(contractIndex), contractAddress], {
         account: buyer.account,
       });
       expect.fail("should throw error");
@@ -132,12 +136,31 @@ describe("Contract hard delete", function () {
 
     // Attempt to hard delete with invalid index
     try {
-      await cloneFactory.write.contractHardDelete([BigInt(invalidIndex)], {
+      await cloneFactory.write.contractHardDelete([BigInt(invalidIndex), zeroAddress], {
         account: seller.account,
       });
       expect.fail("should throw error");
     } catch (err: any) {
       expect(err.message).to.include("index out of bounds");
+    }
+  });
+
+  it("should reject hard deletion if address doesn't match index", async function () {
+    const { accounts, contracts } = await loadFixture(setupContractFixture);
+    const { seller } = accounts;
+    const { cloneFactory } = contracts;
+
+    // Get current contract list length
+    const index = 0;
+
+    // Attempt to hard delete with invalid index
+    try {
+      await cloneFactory.write.contractHardDelete([BigInt(index), zeroAddress], {
+        account: seller.account,
+      });
+      expect.fail("should throw error");
+    } catch (err: any) {
+      expect(err.message).to.include("contract address mismatch");
     }
   });
 
@@ -152,7 +175,7 @@ describe("Contract hard delete", function () {
     const lastContractAddr = initialContractList[lastIndex];
 
     // Hard delete the last contract
-    await cloneFactory.write.contractHardDelete([BigInt(lastIndex)], {
+    await cloneFactory.write.contractHardDelete([BigInt(lastIndex), lastContractAddr], {
       account: seller.account,
     });
 
@@ -193,7 +216,7 @@ describe("Contract hard delete", function () {
     const lastContractAddr = contractList[contractList.length - 1];
 
     // Hard delete the middle contract
-    await cloneFactory.write.contractHardDelete([BigInt(middleIndex)], {
+    await cloneFactory.write.contractHardDelete([BigInt(middleIndex), middleContractAddr], {
       account: seller.account,
     });
 
@@ -212,8 +235,9 @@ describe("Contract hard delete", function () {
     // Get initial contract list and hard delete
     const initialContractList = await cloneFactory.read.getContractList();
     const contractIndex = initialContractList.findIndex((addr) => addr === hrContractAddr);
+    const contractAddress = initialContractList[contractIndex];
 
-    await cloneFactory.write.contractHardDelete([BigInt(contractIndex)], {
+    await cloneFactory.write.contractHardDelete([BigInt(contractIndex), contractAddress], {
       account: seller.account,
     });
 
@@ -272,7 +296,7 @@ describe("Contract hard delete", function () {
     for (let i = 0; i < 2; i++) {
       const currentList = await cloneFactory.read.getContractList();
       // Always delete the first contract to test array shifting
-      await cloneFactory.write.contractHardDelete([0n], {
+      await cloneFactory.write.contractHardDelete([0n, currentList[0]], {
         account: seller.account,
       });
     }
@@ -316,8 +340,9 @@ describe("Contract hard delete", function () {
     // Hard delete the purchased contract
     const contractList = await cloneFactory.read.getContractList();
     const contractIndex = contractList.findIndex((addr) => addr === hrContractAddr);
+    const contractAddress = contractList[contractIndex];
 
-    await cloneFactory.write.contractHardDelete([BigInt(contractIndex)], {
+    await cloneFactory.write.contractHardDelete([BigInt(contractIndex), contractAddress], {
       account: seller.account,
     });
 
@@ -325,7 +350,7 @@ describe("Contract hard delete", function () {
     const finalContractList = await cloneFactory.read.getContractList();
     expect(finalContractList).to.not.include(hrContractAddr);
 
-    const [finalState, , , , , , finalIsDeleted] = await impl.read.getPublicVariablesV2();
+    const [, , , , , , finalIsDeleted] = await impl.read.getPublicVariablesV2();
     expect(finalIsDeleted).to.equal(true);
   });
 });
