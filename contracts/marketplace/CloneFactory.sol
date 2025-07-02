@@ -117,16 +117,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         enforceContractDuration(_length);
 
         bytes memory data = abi.encodeWithSelector(
-            Implementation(address(0)).initialize.selector,
-            address(this),
-            hashrateOracle,
-            address(paymentToken),
-            address(feeToken),
-            _msgSender(),
-            _pubKey,
-            _speed,
-            _length,
-            _profitTarget
+            Implementation(address(0)).initialize.selector, _msgSender(), _pubKey, _speed, _length, _profitTarget
         );
 
         BeaconProxy beaconProxy = new BeaconProxy(baseImplementation, data);
@@ -340,6 +331,10 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     function setContractDurationInterval(uint32 _min, uint32 _max) external _onlyOwner {
         minContractDuration = _min;
         maxContractDuration = _max;
+    }
+
+    function setHashrateOracle(address _hashrateOracle) external _onlyOwner {
+        hashrateOracle = _hashrateOracle;
     }
 
     /// @notice Get the allowed contract duration interval in seconds inclusive

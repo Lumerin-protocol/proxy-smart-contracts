@@ -2,7 +2,7 @@ import { requireEnvsSet } from "../lib/utils";
 import { viem } from "hardhat";
 import { verifyContract } from "./lib/verify";
 import { upgrades } from "hardhat";
-import { ethers } from "hardhat";
+import { encodeFunctionData } from "viem/utils";
 
 async function main() {
   console.log("CloneFactory update script");
@@ -11,8 +11,11 @@ async function main() {
   const env = <
     {
       CLONE_FACTORY_ADDRESS: `0x${string}`;
+      HASHRATE_ORACLE_ADDRESS: `0x${string}`;
+      USDC_TOKEN_ADDRESS: `0x${string}`;
+      LUMERIN_TOKEN_ADDRESS: `0x${string}`;
     }
-  >requireEnvsSet("CLONE_FACTORY_ADDRESS");
+  >requireEnvsSet("CLONE_FACTORY_ADDRESS", "HASHRATE_ORACLE_ADDRESS", "USDC_TOKEN_ADDRESS", "LUMERIN_TOKEN_ADDRESS");
 
   const [deployer] = await viem.getWalletClients();
   console.log("Deployer:", deployer.account.address);
@@ -46,9 +49,16 @@ async function main() {
 
   // Update the proxy to point to new implementation
   console.log("\nUpdating proxy to new implementation...");
-  const tx = await cloneFactoryProxy.write.upgradeToAndCall([newImpl.address, "0x"], {
-    account: deployer.account.address,
+  // encode call to setHashrateOracle
+  const setHashrateOracleCall = encodeFunctionData({
+    abi: cloneFactoryProxy.abi,
+    functionName: "setHashrateOracle",
+    args: [env.HASHRATE_ORACLE_ADDRESS],
   });
+  const tx = await cloneFactoryProxy.write.upgradeToAndCall(
+    [newImpl.address, setHashrateOracleCall],
+    { account: deployer.account.address }
+  );
   console.log("Proxy update txhash:", tx);
 
   const pc = await viem.getPublicClient();
@@ -86,10 +96,17 @@ async function main() {
 
   // Deploy new Implementation
   console.log("\nDeploying new Implementation...");
-  const newHashrateContractImpl = await viem.deployContract("Implementation");
+  const params = [
+    cloneFactoryProxy.address,
+    env.HASHRATE_ORACLE_ADDRESS,
+    env.USDC_TOKEN_ADDRESS,
+    env.LUMERIN_TOKEN_ADDRESS,
+  ] as const;
+
+  const newHashrateContractImpl = await viem.deployContract("Implementation", [...params]);
   console.log("New Implementation deployed at:", newHashrateContractImpl.address);
   console.log("New Implementation version:", await newHashrateContractImpl.read.VERSION());
-  await verifyContract(newHashrateContractImpl.address, []);
+  await verifyContract(newHashrateContractImpl.address, [...params]);
 
   // Update beacon to point to new Implementation
   console.log("\nUpdating beacon to new Implementation...");

@@ -43,22 +43,12 @@ describe("Implementation Coverage Tests (Fixed)", function () {
       // Deploy a new implementation
       const newImplementation = await viem.deployContract(
         "contracts/marketplace/Implementation.sol:Implementation",
-        []
+        [zeroAddress, zeroAddress, zeroAddress, zeroAddress]
       );
 
       // Should revert with InvalidInitialization when calling on proxy implementation
       await catchError(newImplementation.abi, "InvalidInitialization", async () => {
-        await newImplementation.write.initialize([
-          zeroAddress,
-          zeroAddress,
-          zeroAddress,
-          zeroAddress,
-          zeroAddress,
-          "0x",
-          1n,
-          1n,
-          0,
-        ]);
+        await newImplementation.write.initialize([zeroAddress, "0x", 1n, 1n, 0]);
       });
 
       // Non-owner should not be able to upgrade

@@ -2,7 +2,6 @@ import { requireEnvsSet } from "../lib/utils";
 import { viem } from "hardhat";
 import { verifyContract } from "./lib/verify";
 import { upgrades } from "hardhat";
-import { ethers } from "hardhat";
 
 // https://forum.openzeppelin.com/t/openzeppelin-upgrades-step-by-step-tutorial-for-hardhat/3580
 async function main() {
@@ -15,10 +14,14 @@ async function main() {
     }
   >requireEnvsSet("VALIDATOR_REGISTRY_ADDRESS");
 
+  const pc = await viem.getPublicClient();
   const [deployer] = await viem.getWalletClients();
   console.log("Deployer:", deployer.account.address);
 
-  // Get current implementation address
+  const ValidatorRegistryProxy = await viem.getContractAt(
+    "ValidatorRegistry",
+    env.VALIDATOR_REGISTRY_ADDRESS
+  );
   const currentImplementation = await upgrades.erc1967.getImplementationAddress(
     env.VALIDATOR_REGISTRY_ADDRESS
   );
@@ -33,22 +36,13 @@ async function main() {
 
   // Get the proxy admin address and perform manual upgrade
   console.log("\nPerforming manual upgrade...");
-  const proxyAdminAddress = await upgrades.erc1967.getAdminAddress(env.VALIDATOR_REGISTRY_ADDRESS);
-  console.log("Proxy admin address:", proxyAdminAddress);
-
-  // Use ethers to interact with ProxyAdmin
-  const [ethersDeployer] = await ethers.getSigners();
-  const proxyAdmin = await ethers.getContractAt(
-    "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol:ProxyAdmin",
-    proxyAdminAddress,
-    ethersDeployer
-  );
 
   // Upgrade the proxy to point to new implementation
   console.log("Upgrading proxy to new implementation...");
-  const tx = await proxyAdmin.upgradeAndCall(env.VALIDATOR_REGISTRY_ADDRESS, newImpl.address, "0x");
-  await tx.wait();
-  console.log("Proxy upgrade txhash:", tx.hash);
+  const txhash = await ValidatorRegistryProxy.write.upgradeToAndCall([newImpl.address, "0x"], {
+    account: deployer.account.address,
+  });
+  await pc.waitForTransactionReceipt({ hash: txhash });
 
   // Verify the update was successful
   const newImplementation = await upgrades.erc1967.getImplementationAddress(

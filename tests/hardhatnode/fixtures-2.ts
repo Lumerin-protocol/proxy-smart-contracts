@@ -1,5 +1,12 @@
 import { viem } from "hardhat";
-import { parseUnits, parseEventLogs, maxUint256, maxUint32, encodeFunctionData } from "viem";
+import {
+  parseUnits,
+  parseEventLogs,
+  maxUint256,
+  maxUint32,
+  encodeFunctionData,
+  zeroAddress,
+} from "viem";
 import { hoursToSeconds } from "../../lib/utils";
 import { THPStoHPS } from "../../lib/utils";
 import { compressPublicKey, getPublicKey } from "../../lib/pubkey";
@@ -106,14 +113,14 @@ export async function deployLocalFixture() {
   const multicall3 = await viem.deployContract("Multicall3", []);
 
   // Deploy Implementation and Beacon
-  const implementation = await viem.deployContract(
+  const mockImplementation = await viem.deployContract(
     "contracts/marketplace/Implementation.sol:Implementation",
-    []
+    [zeroAddress, zeroAddress, zeroAddress, zeroAddress]
   );
 
   const beacon = await viem.deployContract(
     "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon",
-    [implementation.address, owner.account.address]
+    [mockImplementation.address, owner.account.address]
   );
 
   // Deploy CloneFactory
@@ -149,6 +156,15 @@ export async function deployLocalFixture() {
   ]);
 
   const cloneFactory = await viem.getContractAt("CloneFactory", cloneFactoryProxy.address);
+
+  const implementation = await viem.deployContract(
+    "contracts/marketplace/Implementation.sol:Implementation",
+    [cloneFactory.address, hashrateOracle.address, usdcMock.address, lumerinToken.address]
+  );
+
+  await beacon.write.upgradeTo([implementation.address], {
+    account: owner.account,
+  });
 
   // Deploy ValidatorRegistry
   const validatorRegistryConfig = {
@@ -343,6 +359,7 @@ async function buyContract(
   usdcMock: IERC20,
   validator: WalletClient
 ) {
+  console.log("buying contract", contractAddress);
   const c1 = await viem.getContractAt("Implementation", contractAddress as `0x${string}`);
   const [price, fee] = await c1.read.priceAndFee();
   await lumerinToken.write.approve([cloneFactory.address, fee], {

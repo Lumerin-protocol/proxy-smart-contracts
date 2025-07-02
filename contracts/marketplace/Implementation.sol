@@ -20,10 +20,10 @@ import { Versionable } from "../util/versionable.sol";
 ///      - Contract terms management and updates
 ///      - Historical record keeping
 contract Implementation is UUPSUpgradeable, OwnableUpgradeable, Versionable {
-    IERC20 public feeToken;
-    IERC20 public paymentToken;
-    HashrateOracle public hashrateOracle;
-    CloneFactory public cloneFactory; // address of the clone factory for access control
+    address private __gap1;
+    address private __gap2;
+    address private __gap3;
+    address private __gap4;
 
     Terms public terms; // the terms of the contract
     Terms public futureTerms; // the terms of the contract to be applied after the current contract is closed
@@ -32,20 +32,26 @@ contract Implementation is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     address public buyer; // buyer of the contract
     address public seller; // seller of the contract
     address public validator; // validator, can close out contract early, if empty - no validator (buyer node)
-    bool private _gap; // not used
+    bool private __gap5; // not used
     bool public isDeleted; // used to track if the contract is deleted
 
     string public pubKey; // encrypted data for pool target info
     string public encrValidatorURL; // if using own validator (buyer-node) this will be the encrypted buyer address. Encrypted with the seller's public key
     string public encrDestURL; // where to redirect the hashrate after validation (for both third-party validator and buyer-node) If empty, then the hashrate will be redirected to the default pool of the buyer node
 
-    uint256 public gap; // TODO: remove this variable after fresh deployment
+    uint256 private __gap6; // not used
     HistoryEntry[] public history; // TODO: replace this struct with querying logs from a blockchain node
     uint32 private successCount;
     uint32 private failCount;
 
     uint8 public constant VALIDATOR_FEE_DECIMALS = 18;
     string public constant VERSION = "2.0.7"; // This will be replaced during build time
+
+    // shared between all contract instances, and updated altogether with the implementation
+    HashrateOracle public immutable hashrateOracle;
+    CloneFactory public immutable cloneFactory;
+    IERC20 public immutable feeToken;
+    IERC20 public immutable paymentToken;
 
     using SafeERC20 for IERC20;
 
@@ -87,38 +93,31 @@ contract Implementation is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     event destinationUpdated(string newValidatorURL, string newDestURL);
     event fundsClaimed();
 
-    constructor() {
-        _disableInitializers();
-    }
-
-    /// @notice Initializes the contract with basic parameters
     /// @param _cloneFactory Address of the clone factory for access control
     /// @param _hashrateOracle Address of the hashrate oracle for profit calculation
     /// @param _paymentToken Address of the payment token to pay the provider
     /// @param _feeToken Address of the payment token to pay the validator
+    constructor(address _cloneFactory, address _hashrateOracle, address _paymentToken, address _feeToken) {
+        _disableInitializers();
+        cloneFactory = CloneFactory(_cloneFactory);
+        hashrateOracle = HashrateOracle(_hashrateOracle);
+        paymentToken = IERC20(_paymentToken);
+        feeToken = IERC20(_feeToken);
+    }
+
+    /// @notice Initializes the contract with basic parameters
     /// @param _seller Address of the seller of the contract
     /// @param _pubKey Encrypted data for pool target info
     /// @param _speed Hashrate of the contract
     /// @param _length Length of the contract in seconds
     /// @param _profitTarget Profit target in percentage (e.g., 10 means 10% higher than mining price)
-    function initialize(
-        address _cloneFactory,
-        address _hashrateOracle,
-        address _paymentToken,
-        address _feeToken,
-        address _seller,
-        string calldata _pubKey,
-        uint256 _speed,
-        uint256 _length,
-        int8 _profitTarget
-    ) external initializer {
+    function initialize(address _seller, string calldata _pubKey, uint256 _speed, uint256 _length, int8 _profitTarget)
+        external
+        initializer
+    {
         terms = Terms(0, 0, _speed, _length, 0, _profitTarget);
         seller = _seller;
-        cloneFactory = CloneFactory(_cloneFactory);
         pubKey = _pubKey;
-        feeToken = IERC20(_feeToken);
-        paymentToken = IERC20(_paymentToken);
-        hashrateOracle = HashrateOracle(_hashrateOracle);
         __UUPSUpgradeable_init();
         __Ownable_init(_msgSender());
     }
