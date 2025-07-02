@@ -9,12 +9,14 @@ import {
   bytecode as ValidatorRegistryBC,
   abi as ValidatorRegistryAbi,
 } from "./abi/ValidatorRegistry.json";
+import IERC20Abi from "./abi/IERC20.json";
 
 import { ContractContext as CloneFactoryContext } from "./generated-types/CloneFactory";
 import { ContractContext as ImplementationContext } from "./generated-types/Implementation";
 import { ContractContext as LumerinContext } from "./generated-types/Lumerin";
 import { ContractContext as FaucetContext } from "./generated-types/Faucet";
 import { ContractContext as ValidatorRegistryContext } from "./generated-types/ValidatorRegistry";
+import { ContractContext as IERC20Context } from "./generated-types/IERC20";
 
 const factory = <T>(web3: Web3, address: string, abi: any): T => {
   if (!web3 || !web3.eth) {
@@ -45,6 +47,9 @@ export const Faucet = (web3: Web3, address: string): FaucetContext =>
 export const ValidatorRegistry = (web3: Web3, address: string): ValidatorRegistryContext =>
   factory(web3, address, ValidatorRegistryAbi);
 
+export const IERC20 = (web3: Web3, address: string): IERC20Context =>
+  factory(web3, address, IERC20Abi);
+
 const ethersFactory = <T>(ethers: any, address: string, abi: any, bytecode: string): T => {
   if (!ethers || !ethers.ContractFactory) {
     console.log("Ethers: ", ethers);
@@ -69,6 +74,9 @@ export const EthersLumerin = (ethers: any, address: string): LumerinContext =>
 export const EthersFaucet = (ethers: any, address: string): FaucetContext =>
   ethersFactory(ethers, address, FaucetAbi, FaucetBC);
 
+export const EthersIERC20 = (ethers: any, address: string): IERC20Context =>
+  ethersFactory(ethers, address, IERC20Abi, "");
+
 export const LumerinContract = { abi: LumerinAbi, bytecode: LumerinBC };
 export const FaucetContract = { abi: FaucetAbi, bytecode: FaucetBC };
 export const ImplementationContract = { abi: ImplementationAbi, bytecode: ImplementationBC };
@@ -77,6 +85,7 @@ export const ValidatorRegistryContract = {
   abi: ValidatorRegistryAbi,
   bytecode: ValidatorRegistryBC,
 };
+export const IERC20Contract = { abi: IERC20Abi };
 
 export {
   CloneFactoryContext,
@@ -84,5 +93,6 @@ export {
   LumerinContext,
   FaucetContext,
   ValidatorRegistryContext,
+  IERC20Context,
   abi,
 };

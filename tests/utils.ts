@@ -152,8 +152,8 @@ export function expectIsError(err: unknown): asserts err is Error {
 }
 
 export enum CloseReason {
-  Unspecified = "0",
-  Underdelivery = "1",
-  DestinationUnavailable = "2",
-  ShareTimeout = "3",
+  Unspecified = 0,
+  Underdelivery = 1,
+  DestinationUnavailable = 2,
+  ShareTimeout = 3,
 }

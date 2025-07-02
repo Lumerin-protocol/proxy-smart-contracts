@@ -17,10 +17,44 @@ export async function DeployLumerin(deployerPkey: string, log = noop) {
   return { address: lumerin.address };
 }
 
+export async function DeployUSDCMock(deployerPkey: string, log = noop) {
+  const deployer = new Wallet(deployerPkey).connect(ethers.provider);
+
+  const USDCMock = await ethers.getContractFactory("USDCMock", deployer);
+  const usdcMock = await USDCMock.deploy();
+  await usdcMock.deployed();
+
+  log("Success. USDC Mock address:", usdcMock.address);
+  return { address: usdcMock.address };
+}
+
+export async function DeployBTCPriceOracleMock(deployerPkey: string, log = noop) {
+  const deployer = new Wallet(deployerPkey).connect(ethers.provider);
+
+  const BTCPriceOracleMock = await ethers.getContractFactory("BTCPriceOracleMock", deployer);
+  const btcPriceOracleMock = await BTCPriceOracleMock.deploy([]);
+  await btcPriceOracleMock.deployed();
+
+  log("Success. BTC Price Oracle address:", btcPriceOracleMock.address);
+  return { address: btcPriceOracleMock.address };
+}
+
+export async function DeployHashrateOracle(deployerPkey: string, log = noop) {
+  const deployer = new Wallet(deployerPkey).connect(ethers.provider);
+
+  const HashrateOracle = await ethers.getContractFactory("HashrateOracle", deployer);
+  const hashrateOracle = await HashrateOracle.deploy([]);
+  await hashrateOracle.deployed();
+
+  log("Success. Hashrate Oracle address:", hashrateOracle.address);
+  return { address: hashrateOracle.address };
+}
+
 export async function DeployCloneFactory(
-  lumerinAddr: string,
   deployerPkey: string,
-  feeRecipientAddress: string,
+  oracleAddr: string,
+  paymentTokenAddr: string,
+  feeTokenAddr: string,
   validatorFee: number,
   log = noop
 ) {
@@ -28,7 +62,7 @@ export async function DeployCloneFactory(
 
   log("Deployer address:", deployer.address);
   log("Deployer balance:", (await ethers.provider.getBalance(deployer.address)).toString());
-  log("LUMERIN address:", lumerinAddr);
+  log("Payment token address:", paymentTokenAddr);
   log();
 
   log("1. Deploying upgradeable base IMPLEMENTATION");
@@ -37,19 +71,11 @@ export async function DeployCloneFactory(
   await impl.deployed();
   log("Beacon deployed at address:", impl.address);
 
-  const beaconProxy = await upgrades.deployBeaconProxy(impl.address, Implementation, [], {
-    unsafeAllow: ["constructor"],
-    initializer: false,
-  } as any);
-  await beaconProxy.deployed();
-  log("Beacon proxy deployed at address", beaconProxy.address);
-  log();
-
   log("2. Deploying upgradeable CLONEFACTORY");
   const CloneFactory = await ethers.getContractFactory("CloneFactory", deployer);
   const cloneFactory = await upgrades.deployProxy(
     CloneFactory,
-    [impl.address, lumerinAddr, feeRecipientAddress, Math.round(validatorFee * 10000)],
+    [impl.address, oracleAddr, paymentTokenAddr, feeTokenAddr, Math.round(validatorFee * 10 ** 18)],
     { unsafeAllow: ["constructor"] }
   );
   await cloneFactory.deployed();

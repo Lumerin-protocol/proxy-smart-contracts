@@ -4,7 +4,7 @@ import { add3ValidatorsFixture, addValidatorFixture, deployFixture } from "./uti
 import { compressPublicKey } from "../../../lib/pubkey";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { complain } from "./utils/actions";
-import { catchError } from "./utils/utils";
+import { catchError } from "../../lib";
 
 describe("Validator registry - configure", () => {
   it("should deploy the ValidatorRegistry contract", async () => {

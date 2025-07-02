@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { zeroAddress } from "viem";
 import { add3ValidatorsFixture, deployFixture } from "./utils/fixtures";
-import { catchError } from "./utils/utils";
+import { catchError } from "../../lib";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { complain } from "./utils/actions";
 
