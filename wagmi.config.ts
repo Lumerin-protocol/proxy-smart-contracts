@@ -8,8 +8,8 @@ export default defineConfig({
       project: ".",
       exclude: ["*Test.sol/**", "vesting/**"],
       commands: {
-        build: "yarn hardhat --config hardhat-base.config.ts compile",
-        rebuild: "yarn hardhat --config hardhat-base.config.ts compile",
+        build: "yarn hardhat compile",
+        rebuild: "yarn hardhat compile",
       },
     }),
   ],

@@ -1,12 +1,30 @@
-import { fromHex, fromBytes } from "viem";
+import { fromHex, fromBytes, type SignMessageReturnType } from "viem";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { hexToBytes, bytesToHex } from "@noble/curves/abstract/utils";
 import { type Account, keccak256, toBytes, recoverPublicKey, type WalletActions } from "viem";
 
+type Signer = {
+  signMessage?: (arg: { message: string }) => Promise<SignMessageReturnType>;
+};
+
+type WalletClient = {
+  account: Signer & { publicKey?: `0x${string}` };
+} & Signer;
+
 // Workaround to obtain public keys for the accounts in hardhat
-export async function getPublicKey(account: WalletActions<undefined, Account>) {
+export async function getPublicKey(client: WalletClient) {
+  const publicKey = client.account.publicKey;
+  if (publicKey) {
+    return publicKey;
+  }
+
+  const signMessage = client.signMessage || client.account.signMessage;
+  if (!signMessage) {
+    throw new Error("Account does not have a signMessage method");
+  }
+
   const message = "abc";
-  const sig = await account.signMessage({ message });
+  const sig = await signMessage({ message });
   const rec = keccak256(toBytes(`\x19Ethereum Signed Message:\n${message.length}${message}`));
   const pubkey = await recoverPublicKey({ hash: rec, signature: sig });
   return pubkey;
