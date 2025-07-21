@@ -19,7 +19,7 @@ contract HashrateOracle is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     uint256 public btcPriceTTL;
 
     uint256 private constant BTC_DECIMALS = 8;
-    string public constant VERSION = "2.0.7";
+    string public constant VERSION = "2.0.8";
 
     struct Feed {
         uint256 value;
@@ -73,6 +73,13 @@ contract HashrateOracle is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         if (block.timestamp - updatedAt > btcPriceTTL) revert StaleData();
         if (block.timestamp - hashesForBTC.updatedAt > hashesForBTC.ttl) revert StaleData();
 
+        return hashesForBTC.value * (10 ** (BTC_DECIMALS + oracleDecimals - tokenDecimals)) / uint256(btcPrice);
+    }
+
+    /// @notice Returns the number of hashes required to mine BTC equivalent of 1 token minimum denomination
+    /// @dev This function does not check for stale data
+    function getHashesForTokenUnchecked() external view returns (uint256) {
+        (, int256 btcPrice,,,) = btcTokenOracle.latestRoundData();
         return hashesForBTC.value * (10 ** (BTC_DECIMALS + oracleDecimals - tokenDecimals)) / uint256(btcPrice);
     }
 

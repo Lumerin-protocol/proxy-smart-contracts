@@ -52,7 +52,7 @@ describe("Implementation Coverage Tests (Fixed)", function () {
       });
 
       // Non-owner should not be able to upgrade
-      await catchError(newImplementation.abi, "OwnableUnauthorizedAccount", async () => {
+      await catchError(beacon.abi, "OwnableUnauthorizedAccount", async () => {
         await beacon.write.upgradeTo([beaconAddr], {
           account: seller.account,
         });
@@ -308,7 +308,7 @@ describe("Implementation Coverage Tests (Fixed)", function () {
 
   describe("Price and Fee Calculations", function () {
     it("should calculate price and fee correctly", async function () {
-      const { contracts, accounts, config } = await loadFixture(deployLocalFixture);
+      const { config } = await loadFixture(deployLocalFixture);
       const contractAddress =
         config.cloneFactory.contractAddresses[TEST_VALUES.FIRST_CONTRACT_INDEX];
       const implementation = await viem.getContractAt(
@@ -324,16 +324,16 @@ describe("Implementation Coverage Tests (Fixed)", function () {
     });
 
     it("should handle claim funds", async function () {
-      const { contracts, accounts, config } = await loadFixture(deployLocalFixture);
+      const { config } = await loadFixture(deployLocalFixture);
       const contractAddress = config.cloneFactory.contractAddresses[0];
       const implementation = await viem.getContractAt(
         "contracts/marketplace/Implementation.sol:Implementation",
         contractAddress
       );
 
-      // This might revert if no funds to claim, which is expected
       try {
         await implementation.write.claimFunds();
+        expect.fail("should have reverted");
       } catch (error: any) {
         expect(error.message).to.include("no funds to withdraw");
       }

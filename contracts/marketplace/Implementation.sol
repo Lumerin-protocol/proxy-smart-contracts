@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >0.8.0;
 
-import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import { ContextUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { CloneFactory } from "./CloneFactory.sol";
@@ -19,7 +18,7 @@ import { Versionable } from "../util/versionable.sol";
 ///      - Dynamic pricing based on hashrate oracle
 ///      - Contract terms management and updates
 ///      - Historical record keeping
-contract Implementation is UUPSUpgradeable, OwnableUpgradeable, Versionable {
+contract Implementation is Versionable, ContextUpgradeable {
     address private __gap1;
     address private __gap2;
     address private __gap3;
@@ -45,7 +44,7 @@ contract Implementation is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     uint32 private failCount;
 
     uint8 public constant VALIDATOR_FEE_DECIMALS = 18;
-    string public constant VERSION = "2.0.7"; // This will be replaced during build time
+    string public constant VERSION = "2.0.8"; // This will be replaced during build time
 
     // shared between all contract instances, and updated altogether with the implementation
     HashrateOracle public immutable hashrateOracle;
@@ -118,12 +117,7 @@ contract Implementation is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         terms = Terms(0, 0, _speed, _length, 0, _profitTarget);
         seller = _seller;
         pubKey = _pubKey;
-        __UUPSUpgradeable_init();
-        __Ownable_init(_msgSender());
     }
-
-    /// @dev Only the owner can upgrade the contract
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner { }
 
     /// @notice Returns the current state of the contract
     /// @return The current contract state (Available or Running)
@@ -163,7 +157,7 @@ contract Implementation is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     {
         bool hasFutureTerms = futureTerms._length != 0;
         Terms memory __terms = terms;
-        __terms._price = price();
+        __terms._price = priceUnchecked();
         __terms._fee = getValidatorFee(__terms._price, getValidatorFeeRateScaled());
         return (
             contractState(),
@@ -323,6 +317,15 @@ contract Implementation is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     /// @notice Returns the estimated price of the contract in the payment token
     function price() private view returns (uint256) {
         uint256 hashesForToken = hashrateOracle.getHashesforToken();
+        uint256 priceInToken = (terms._length * terms._speed) / hashesForToken;
+        int256 priceInTokenWithProfit =
+            int256(priceInToken) + (int256(priceInToken) * int256(terms._profitTarget)) / 100;
+
+        return priceInTokenWithProfit < 0 ? 0 : uint256(priceInTokenWithProfit);
+    }
+
+    function priceUnchecked() private view returns (uint256) {
+        uint256 hashesForToken = hashrateOracle.getHashesForTokenUnchecked();
         uint256 priceInToken = (terms._length * terms._speed) / hashesForToken;
         int256 priceInTokenWithProfit =
             int256(priceInToken) + (int256(priceInToken) * int256(terms._profitTarget)) / 100;
