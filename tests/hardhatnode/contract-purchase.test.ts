@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { viem } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { encrypt } from "ecies-geth";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { deployLocalFixture } from "./fixtures-2";
 import { remove0xPrefix } from "../../lib/utils";
 import { getPublicKey } from "../../lib/pubkey";
@@ -34,7 +35,7 @@ describe("Contract purchase", function () {
     const [, terms] = await impl.read.getPublicVariablesV2();
 
     // Check history before purchase
-    const history_before = await impl.read.getHistory([0n, 100n]);
+    const history_before = await impl.read.getHistory([0n, 100]);
     expect(history_before.length).equal(0);
 
     // Approve tokens for purchase
@@ -61,7 +62,7 @@ describe("Contract purchase", function () {
     const actValidatorURL = await impl.read.encrValidatorURL();
     const actDestURL = await impl.read.encrDestURL();
     const actValidatorAddr = await impl.read.validator();
-    const history_after = await impl.read.getHistory([0n, 100n]);
+    const history_after = await impl.read.getHistory([0n, 100]);
 
     expect(actValidatorURL).equal(encValidatorURL.toString("hex"));
     expect(actDestURL).equal(encDestURL.toString("hex"));
@@ -71,5 +72,50 @@ describe("Contract purchase", function () {
 
     // Close the contract
     await impl.write.closeEarly([0], { account: buyer.account });
+  });
+
+  it("should fail purchase if oracle data is stale", async function () {
+    const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
+    const { buyer, validator, owner } = accounts;
+    const { cloneFactory, usdcMock, lumerinToken, hashrateOracle } = contracts;
+    const [, , contractAddr] = config.cloneFactory.contractAddresses;
+
+    // Set short TTL values to make oracle data stale quickly
+    const shortTTL = 60n; // 60 seconds
+    await hashrateOracle.write.setTTL([shortTTL, shortTTL], {
+      account: owner.account,
+    });
+
+    // Advance time to make the oracle data stale
+    await time.increase(Number(shortTTL) + 1);
+
+    // Get contract instance and terms
+    const impl = await viem.getContractAt("Implementation", contractAddr);
+    const [, terms] = await impl.read.getPublicVariablesV2();
+
+    // Approve tokens for purchase
+    await usdcMock.write.approve([cloneFactory.address, terms._price], {
+      account: buyer.account,
+    });
+    await lumerinToken.write.approve([cloneFactory.address, terms._fee], {
+      account: buyer.account,
+    });
+
+    // Try to purchase the contract - should fail due to stale oracle data
+    try {
+      await cloneFactory.write.setPurchaseRentalContractV2(
+        [
+          contractAddr,
+          validator.account.address,
+          "encryptedValidatorURL",
+          "encryptedDestURL",
+          terms._version,
+        ],
+        { account: buyer.account }
+      );
+      expect.fail("Purchase should have failed due to stale oracle data");
+    } catch (err: any) {
+      expect(err.message).to.include("StaleData");
+    }
   });
 });

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { requireEnvsSet } from "../lib/utils";
 import { viem } from "hardhat";
-import { encodeFunctionData } from "viem";
+import { encodeFunctionData, zeroAddress } from "viem";
 import { writeAndWait } from "./lib/writeContract";
 import { verifyContract } from "./lib/verify";
 
@@ -15,8 +15,11 @@ async function main() {
       VALIDATOR_FEE_RATE: string;
       USDC_TOKEN_ADDRESS: `0x${string}`;
       HASHRATE_ORACLE_ADDRESS: `0x${string}`;
+      CF_MIN_SELLER_STAKE: string;
+      CF_MIN_CONTRACT_DURATION: string;
+      CF_MAX_CONTRACT_DURATION: string;
     }
-  >requireEnvsSet("LUMERIN_TOKEN_ADDRESS", "VALIDATOR_FEE_RATE", "USDC_TOKEN_ADDRESS", "HASHRATE_ORACLE_ADDRESS");
+  >requireEnvsSet("LUMERIN_TOKEN_ADDRESS", "VALIDATOR_FEE_RATE", "USDC_TOKEN_ADDRESS", "HASHRATE_ORACLE_ADDRESS", "CF_MIN_SELLER_STAKE", "CF_MIN_CONTRACT_DURATION", "CF_MAX_CONTRACT_DURATION");
   const SAFE_OWNER_ADDRESS = process.env.SAFE_OWNER_ADDRESS as `0x${string}` | undefined;
 
   const [deployer] = await viem.getWalletClients();
@@ -50,42 +53,41 @@ async function main() {
   );
   console.log("Hashrate oracle:", hashrateOracle.address);
   console.log("Num hashes to find to earn 1 satoshi:", await hashrateOracle.read.getHashesForBTC());
-  console.log("Block reward:", await hashrateOracle.read.getBlockReward());
-  console.log("Difficulty:", await hashrateOracle.read.getDifficulty());
 
   console.log();
 
-  console.log("Deploying Implementation implementation...");
-  const impl = await viem.deployContract("Implementation");
-  console.log("Deployed at:", impl.address);
-  await verifyContract(impl.address, []);
-  console.log("Version:", await impl.read.VERSION());
+  // Deploy Implementation and Beacon
+  console.log("Deploying Implementation mock implementation...");
+  const mockImplementation = await viem.deployContract(
+    "contracts/marketplace/Implementation.sol:Implementation",
+    [zeroAddress, zeroAddress, zeroAddress, zeroAddress]
+  );
 
-  console.log();
-
-  console.log("Deploying Implementation Beacon...");
+  console.log("Deploying Implementation beacon...");
   const beacon = await viem.deployContract(
     "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon",
-    [impl.address, deployer.account.address]
+    [mockImplementation.address, deployer.account.address]
   );
   console.log("Deployed at:", beacon.address);
-  await verifyContract(beacon.address, [impl.address, deployer.account.address]);
-  console.log();
+  await verifyContract(beacon.address, [mockImplementation.address, deployer.account.address]);
 
-  console.log("Deploying CloneFactory implementation...");
-  const cloneFactory = await viem.deployContract("CloneFactory");
-  console.log("Deployed at:", cloneFactory.address);
-  await verifyContract(cloneFactory.address, []);
-  console.log("Version:", await cloneFactory.read.VERSION());
+  console.log("Deploying clonefactory");
+  const cloneFactoryImpl = await viem.deployContract(
+    "contracts/marketplace/CloneFactory.sol:CloneFactory",
+    []
+  );
+  console.log("Deployed at:", cloneFactoryImpl.address);
+  await verifyContract(cloneFactoryImpl.address, []);
+  console.log("Version:", await cloneFactoryImpl.read.VERSION());
 
-  const feeDecimals = await cloneFactory.read.VALIDATOR_FEE_DECIMALS();
+  const feeDecimals = await cloneFactoryImpl.read.VALIDATOR_FEE_DECIMALS();
   console.log("Validator fee decimals:", feeDecimals);
 
   console.log();
 
   console.log("Deploying CloneFactory proxy...");
   const encodedInitFn = encodeFunctionData({
-    abi: cloneFactory.abi,
+    abi: cloneFactoryImpl.abi,
     functionName: "initialize",
     args: [
       beacon.address, // implementation address
@@ -93,16 +95,44 @@ async function main() {
       env.USDC_TOKEN_ADDRESS as `0x${string}`, // payment token
       env.LUMERIN_TOKEN_ADDRESS as `0x${string}`, // fee token
       BigInt(Number(env.VALIDATOR_FEE_RATE) * 10 ** feeDecimals), // validator fee rate
+      BigInt(env.CF_MIN_SELLER_STAKE),
+      Number(env.CF_MIN_CONTRACT_DURATION),
+      Number(env.CF_MAX_CONTRACT_DURATION),
     ],
   });
   const cloneFactoryProxy = await viem.deployContract(
     "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy",
-    [cloneFactory.address, encodedInitFn]
+    [cloneFactoryImpl.address, encodedInitFn]
   );
   console.log("Deployed at:", cloneFactoryProxy.address);
-  await verifyContract(cloneFactoryProxy.address, [cloneFactory.address, encodedInitFn]);
+  await verifyContract(cloneFactoryProxy.address, [cloneFactoryImpl.address, encodedInitFn]);
   const cf = await viem.getContractAt("CloneFactory", cloneFactoryProxy.address);
   console.log("Version:", await cf.read.VERSION());
+
+  ///////////////////////
+
+  console.log("Deploying real Implementation...");
+  const impl = await viem.deployContract("Implementation", [
+    cloneFactoryProxy.address,
+    env.HASHRATE_ORACLE_ADDRESS as `0x${string}`,
+    env.USDC_TOKEN_ADDRESS as `0x${string}`,
+    env.LUMERIN_TOKEN_ADDRESS as `0x${string}`,
+  ]);
+  console.log("Deployed at:", impl.address);
+  await verifyContract(impl.address, [
+    cloneFactoryProxy.address,
+    env.HASHRATE_ORACLE_ADDRESS as `0x${string}`,
+    env.USDC_TOKEN_ADDRESS as `0x${string}`,
+    env.LUMERIN_TOKEN_ADDRESS as `0x${string}`,
+  ]);
+  console.log("Version:", await impl.read.VERSION());
+
+  console.log();
+
+  console.log("Upgrading beacon to real Implementation...");
+  const tx = await beacon.simulate.upgradeTo([impl.address]);
+  const receipt = await writeAndWait(deployer, tx);
+  console.log("Txhash:", receipt.transactionHash);
 
   console.log();
   if (SAFE_OWNER_ADDRESS) {
@@ -115,7 +145,7 @@ async function main() {
     console.log();
     console.log("Transferring ownership of Implementation to owner:", SAFE_OWNER_ADDRESS);
 
-    const res2 = await impl.simulate.transferOwnership([SAFE_OWNER_ADDRESS]);
+    const res2 = await beacon.simulate.transferOwnership([SAFE_OWNER_ADDRESS]);
     const receipt2 = await writeAndWait(deployer, res2);
     console.log("Txhash:", receipt2.transactionHash);
   }
@@ -124,7 +154,7 @@ async function main() {
   console.log("SUCCESS");
 
   console.log("CLONE_FACTORY address:", cloneFactoryProxy.address);
-  fs.writeFileSync("clone-factory-addr.tmp", cloneFactory.address);
+  fs.writeFileSync("clone-factory-addr.tmp", cloneFactoryProxy.address);
 }
 
 main()

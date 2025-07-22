@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
+import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 import { deployLocalFixture } from "./fixtures-2";
 import { viem } from "hardhat";
 
@@ -114,6 +114,25 @@ describe("Contract pricing", function () {
 
     // Verify price calculation
     expect(Number(actualPrice)).approximately(Number(expectedPrice), 5);
+  });
+
+  it("should not revert if oracle data is stale", async function () {
+    const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
+
+    const shortTTL = 60n; // 60 seconds
+    await contracts.hashrateOracle.write.setTTL([shortTTL, shortTTL], {
+      account: accounts.owner.account,
+    });
+
+    // Advance time to make the oracle data stale
+    await time.increase(Number(shortTTL) + 1);
+
+    // Get contract instance and terms
+    const impl = await viem.getContractAt(
+      "Implementation",
+      config.cloneFactory.contractAddresses[0]
+    );
+    const [, terms] = await impl.read.getPublicVariablesV2();
   });
 });
 

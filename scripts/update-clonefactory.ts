@@ -113,6 +113,8 @@ async function main() {
   const beaconTx = await beacon.write.upgradeTo([newHashrateContractImpl.address], {
     account: deployer.account.address,
   });
+
+  await pc.waitForTransactionReceipt({ hash: beaconTx });
   console.log("Beacon update txhash:", beaconTx);
 
   // Verify beacon update
