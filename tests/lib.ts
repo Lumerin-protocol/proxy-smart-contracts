@@ -21,6 +21,16 @@ export async function getTxTimestamp(client: PublicClient, txHash: `0x${string}`
   return block.timestamp;
 }
 
+export async function getTxDeltaTime(
+  client: PublicClient,
+  txHash: `0x${string}`,
+  txHash2: `0x${string}`
+): Promise<bigint> {
+  const timestamp1 = await getTxTimestamp(client, txHash);
+  const timestamp2 = await getTxTimestamp(client, txHash2);
+  return timestamp2 - timestamp1;
+}
+
 /** helper function to catch errors and check if the error is the expected one
  * @example
  * await catchError(abi, "ErrorName", async () => {

@@ -32,7 +32,7 @@ export const sampleContracts: ContractConfigWithCount[] = [
 
 export async function deployLocalFixture() {
   // Get wallet clients
-  const [owner, seller, buyer, validator, validator2] = await viem.getWalletClients();
+  const [owner, seller, buyer, validator, validator2, buyer2] = await viem.getWalletClients();
   const pc = await viem.getPublicClient();
   const tc = await viem.getTestClient();
 
@@ -93,13 +93,13 @@ export async function deployLocalFixture() {
   await hashrateOracle.write.setHashesForBTC([oracle.hashesForBTC]);
 
   const btcPrice = await btcPriceOracleMock.read.latestRoundData();
-  console.log("BTC price:", btcPrice);
+  // console.log("BTC price:", btcPrice);
 
   const hfb = await hashrateOracle.read.getHashesForBTC();
-  console.log("Hashes for 1 unit of btc:", hfb);
+  // console.log("Hashes for 1 unit of btc:", hfb);
 
   const rewardPerTHinToken = await hashrateOracle.read.getHashesforToken();
-  console.log("Hashes for 1 unit of token:", rewardPerTHinToken);
+  // console.log("Hashes for 1 unit of token:", rewardPerTHinToken);
 
   // Deploy Faucet
   const faucet = await viem.deployContract("contracts/faucet/Faucet.sol:Faucet", [
@@ -271,56 +271,56 @@ export async function deployLocalFixture() {
     }
   }
 
-  await buyContract(
-    cloneFactoryConfig.contractAddresses[0],
-    lumerinToken,
-    cloneFactory,
-    buyer,
-    usdcMock,
-    validator
-  );
-  await buyContract(
-    cloneFactoryConfig.contractAddresses[1],
-    lumerinToken,
-    cloneFactory,
-    buyer,
-    usdcMock,
-    validator
-  );
+  // await buyContract(
+  //   cloneFactoryConfig.contractAddresses[0],
+  //   lumerinToken,
+  //   cloneFactory,
+  //   buyer,
+  //   usdcMock,
+  //   validator
+  // );
+  // await buyContract(
+  //   cloneFactoryConfig.contractAddresses[1],
+  //   lumerinToken,
+  //   cloneFactory,
+  //   buyer,
+  //   usdcMock,
+  //   validator
+  // );
 
-  // viem increase blockchain time
-  const maxLength = Math.max(
-    sampleContracts[0].config.lengthHours,
-    sampleContracts[1].config.lengthHours
-  );
-  await time.increaseTo(
-    Math.round(new Date().getTime() / 1000) - (sampleContracts[0].config.lengthHours * 3600) / 2
-  );
+  // // viem increase blockchain time
+  // const maxLength = Math.max(
+  //   sampleContracts[0].config.lengthHours,
+  //   sampleContracts[1].config.lengthHours
+  // );
+  // await time.increaseTo(
+  //   Math.round(new Date().getTime() / 1000) - (sampleContracts[0].config.lengthHours * 3600) / 2
+  // );
 
-  await buyContract(
-    cloneFactoryConfig.contractAddresses[0],
-    lumerinToken as any,
-    cloneFactory,
-    buyer,
-    usdcMock as any,
-    validator
-  );
-  await buyContract(
-    cloneFactoryConfig.contractAddresses[1],
-    lumerinToken as any,
-    cloneFactory,
-    buyer,
-    usdcMock as any,
-    validator
-  );
+  // await buyContract(
+  //   cloneFactoryConfig.contractAddresses[0],
+  //   lumerinToken as any,
+  //   cloneFactory,
+  //   buyer,
+  //   usdcMock as any,
+  //   validator
+  // );
+  // await buyContract(
+  //   cloneFactoryConfig.contractAddresses[1],
+  //   lumerinToken as any,
+  //   cloneFactory,
+  //   buyer,
+  //   usdcMock as any,
+  //   validator
+  // );
 
-  await time.increaseTo(Math.round(new Date().getTime() / 1000));
+  // await time.increaseTo(Math.round(new Date().getTime() / 1000));
 
-  const c1 = await viem.getContractAt("Implementation", cloneFactoryConfig.contractAddresses[0]);
-  await c1.write.closeEarly([0], {
-    account: buyer.account,
-  });
-  await pc.waitForTransactionReceipt({ hash });
+  // const c1 = await viem.getContractAt("Implementation", cloneFactoryConfig.contractAddresses[0]);
+  // await c1.write.closeEarly([0], {
+  //   account: buyer.account,
+  // });
+  // await pc.waitForTransactionReceipt({ hash });
 
   // Return all deployed contracts and accounts
   return {
@@ -344,6 +344,7 @@ export async function deployLocalFixture() {
       owner,
       seller,
       buyer,
+      buyer2,
       validator,
       validator2,
       pc,

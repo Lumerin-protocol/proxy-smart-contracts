@@ -10,6 +10,13 @@ import { Implementation } from "./Implementation.sol";
 import { Versionable } from "../util/versionable.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { Paginator } from "@solarity/solidity-lib/libs/arrays/Paginator.sol";
+import "hardhat/console.sol";
+
+struct BuyerInfo {
+    address addr;
+    string encrValidatorURL;
+    string encrDestURL;
+}
 
 /// @title CloneFactory
 /// @author Josh Kean (Lumerin), Oleksandr (Shev) Shevchuk
@@ -37,10 +44,13 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     /// @dev  validatorFeeRateScaled = priceWithDecimals / feeWithDecimals * 10**VALIDATOR_FEE_DECIMALS
     /// @dev  validatorFeeRateScaled = 10 * 10**8 / 100 * 10**6 * 10**18 = 10 * 10**18
     uint256 public validatorFeeRateScaled;
-    uint8 public constant VALIDATOR_FEE_DECIMALS = 18;
-    string public constant VERSION = "2.0.8"; // This will be replaced during build time
     uint32 private minContractDuration;
     uint32 private maxContractDuration;
+    BuyerInfo private defaultBuyer;
+    int8 private defaultBuyerProfitTarget;
+
+    uint8 public constant VALIDATOR_FEE_DECIMALS = 18;
+    string public constant VERSION = "2.0.8"; // This will be replaced during build time
 
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -139,34 +149,72 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         address _validatorAddress,
         string calldata _encrValidatorURL,
         string calldata _encrDestURL,
-        uint32 termsVersion
+        uint32 termsVersion,
+        bool _isResellable,
+        bool _resellToDefaultBuyer,
+        int8 _resellProfitTarget
     ) external payable {
         // Validation block - variables scoped to reduce stack depth
-        {
-            Implementation targetContract = Implementation(_contractAddress);
-            require(rentalContractsMap[_contractAddress], "unknown contract address");
-            require(!targetContract.isDeleted(), "cannot purchase deleted contract");
-            require(targetContract.seller() != _msgSender(), "cannot purchase your own contract");
-            ensureActiveSeller(targetContract.seller());
-
-            uint32 _version;
-            (,,,, _version,) = targetContract.futureTerms();
-            if (_version == 0) {
-                (,,,, _version,) = targetContract.terms();
-            }
-            require(_version == termsVersion, "cannot purchase, contract terms were updated");
-        }
-
+        validatePurchase(_contractAddress, termsVersion, _isResellable);
         emit clonefactoryContractPurchased(_contractAddress, _validatorAddress);
+        _handlePurchase(
+            _contractAddress,
+            _encrValidatorURL,
+            _encrDestURL,
+            _validatorAddress,
+            _isResellable,
+            _resellToDefaultBuyer,
+            _resellProfitTarget
+        );
+    }
 
-        // Payment handling block - get price and fee directly in transfers
-        (uint256 _price, uint256 _fee) = Implementation(_contractAddress).priceAndFee();
+    function validatePurchase(address _contractAddress, uint32 termsVersion, bool _isResellable) internal view {
+        Implementation targetContract = Implementation(_contractAddress);
+        require(rentalContractsMap[_contractAddress], "unknown contract address");
+        require(!targetContract.isDeleted(), "cannot purchase deleted contract");
+        require(targetContract.seller() != _msgSender(), "cannot purchase your own contract");
+        ensureActiveSeller(targetContract.seller());
 
-        Implementation(_contractAddress).setPurchaseContract(
-            _encrValidatorURL, _encrDestURL, _price, _msgSender(), _validatorAddress, validatorFeeRateScaled
+        uint32 _version;
+        (,, _version) = targetContract.futureTerms();
+        if (_version == 0) {
+            (,, _version) = targetContract.terms();
+        }
+        require(_version == termsVersion, "cannot purchase, contract terms were updated");
+
+        if (_isResellable) {
+            ensureActiveSeller(_msgSender());
+        }
+    }
+
+    function _handlePurchase(
+        address _contractAddress,
+        string calldata _encrValidatorURL,
+        string calldata _encrDestURL,
+        address _validatorAddress,
+        bool _isResellable,
+        bool _resellToDefaultBuyer,
+        int8 _resellProfitTarget
+    ) internal {
+        Implementation targetContract = Implementation(_contractAddress);
+
+        // Fetch price and fee once
+        (uint256 _price, uint256 _fee) = targetContract.priceAndFee();
+
+        targetContract.setPurchaseContract(
+            _encrValidatorURL,
+            _encrDestURL,
+            _price,
+            _msgSender(),
+            _validatorAddress,
+            validatorFeeRateScaled,
+            _isResellable,
+            _resellToDefaultBuyer,
+            _resellProfitTarget
         );
 
         paymentToken.safeTransferFrom(_msgSender(), _contractAddress, _price);
+
         if (_validatorAddress != address(0) && _fee > 0) {
             feeToken.safeTransferFrom(_msgSender(), _contractAddress, _fee);
         }
@@ -340,6 +388,20 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     /// @notice Get the allowed contract duration interval in seconds inclusive
     function getContractDurationInterval() external view returns (uint32, uint32) {
         return (minContractDuration, maxContractDuration);
+    }
+
+    function setDefaultBuyer(
+        address _buyerAddress,
+        int8 _profitTarget,
+        string calldata _encrValidatorURL,
+        string calldata _encrDestURL
+    ) external _onlyOwner {
+        defaultBuyer = BuyerInfo(_buyerAddress, _encrValidatorURL, _encrDestURL);
+        defaultBuyerProfitTarget = _profitTarget;
+    }
+
+    function getDefaultBuyer() external view returns (BuyerInfo memory, int8) {
+        return (defaultBuyer, defaultBuyerProfitTarget);
     }
 
     /// @dev Throws if the contract duration is not within the allowed interval
