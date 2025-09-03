@@ -9,8 +9,6 @@ import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "hardhat/console.sol";
 
-
-
 //vesting wallet logic to support calling multiple contracts
 contract VestingWalletMulti is Context {
     event EtherReleased(uint256 amount);
@@ -21,7 +19,7 @@ contract VestingWalletMulti is Context {
     //total number of tokens to be vested
     mapping(address => uint256) _erc20VestingAmount;
     //keeps track of how many tokens have been vested
-    mapping(address => uint256) _erc20Released; 
+    mapping(address => uint256) _erc20Released;
     //determines which vesting schedule to follow
     mapping(address => uint8) _whichVestingSchedule;
     //used to prevent reentrance
@@ -33,9 +31,9 @@ contract VestingWalletMulti is Context {
     /**
      * @dev Set the beneficiary, start timestamp and vesting duration of the vesting wallet.
      */
-     constructor(address _lumerin) {
-         _lumerin = Lumerin;
-     }
+    constructor(address _lumerin) {
+        _lumerin = Lumerin;
+    }
 
     /**
      * @dev Getter for the start timestamp.
@@ -44,11 +42,9 @@ contract VestingWalletMulti is Context {
         return _start;
     }
 
-    function setAddToVestingAmount(address _claiment, uint _value) public {
+    function setAddToVestingAmount(address _claiment, uint256 _value) public {
         _erc20VestingAmount[_claiment] = _value;
     }
-
-
 
     /**
      * @dev Getter for the vesting duration.
@@ -69,7 +65,7 @@ contract VestingWalletMulti is Context {
      *
      * Emits a {TokensReleased} event.
      */
-     //double check for leaks as this may leave the msg.sender vulnerabl
+    //double check for leaks as this may leave the msg.sender vulnerabl
     function release() public virtual {
         uint256 releasable = vestedAmount(msg.sender, uint64(block.timestamp)) - released();
         _erc20Released[msg.sender] += releasable;
@@ -77,8 +73,8 @@ contract VestingWalletMulti is Context {
         SafeERC20.safeTransfer(IERC20(Lumerin), msg.sender, releasable);
     }
 
-     //returns the total amount of lumerin tokens that could be vested assuming none have been
-     //vested. 
+    //returns the total amount of lumerin tokens that could be vested assuming none have been
+    //vested.
     function vestedAmount(address claiment, uint64 timestamp) public view virtual returns (uint256) {
         return _vestingSchedule(_erc20VestingAmount[claiment], timestamp);
     }
@@ -87,7 +83,7 @@ contract VestingWalletMulti is Context {
      * @dev Virtual implementation of the vesting formula. This returns the amout vested, as a function of time, for
      * an asset given its total historical allocation.
      */
-     //overridden in the main contract
+    //overridden in the main contract
     function _vestingSchedule(uint256 totalAllocation, uint64 timestamp) internal view virtual returns (uint256) {
         if (timestamp < start()) {
             return 0;

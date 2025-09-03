@@ -1,47 +1,41 @@
 import { expect } from "chai";
-import { LocalTestnetAddresses, expectIsError } from "../utils";
+import { expectIsError } from "../utils";
 import { testEarlyCloseout } from "../actions";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import { deployAllFixture } from "./fixtures";
-import { CloneFactory, Implementation, Lumerin } from "../../build-js/src";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
+import { deployLocalFixture } from "./fixtures-2";
+import { viem } from "hardhat";
 
-// These tests expect written for hardhat network
-// e.g. `yarn hardhat --network hardhat test tests/validator-fee.test.ts`
 describe("Validator fee", function () {
-  const { buyer, validatorAddr } = LocalTestnetAddresses;
-
   for (const progress of [0, 0.01, 0.1, 0.5, 0.75]) {
     it(`should verify balances after ${progress * 100}% early closeout`, async function () {
-      const data = await loadFixture(deployAllFixture);
+      const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
 
       await testEarlyCloseout(
         progress,
-        data.fee,
-        data.cfg.sellerAddr,
-        buyer,
-        validatorAddr,
-        data.cloneFactoryAddr,
-        data.lumerinTokenAddr,
-        data.web3
+        config.cloneFactory.contractAddresses[0],
+        accounts.buyer.account.address,
+        accounts.validator.account.address,
+        contracts.cloneFactory.address,
+        contracts.usdcMock.address,
+        contracts.lumerinToken.address
       );
     });
   }
 
   it("should fail early closeout when progress of the contract is 100%", async function () {
-    const data = await loadFixture(deployAllFixture);
+    const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
     const progress = 1;
 
     try {
       await testEarlyCloseout(
         progress,
-        data.fee,
-        data.cfg.sellerAddr,
-        buyer,
-        validatorAddr,
-        data.cloneFactoryAddr,
-        data.lumerinTokenAddr,
-        data.web3
+        config.cloneFactory.contractAddresses[0],
+        accounts.buyer.account.address,
+        accounts.validator.account.address,
+        contracts.cloneFactory.address,
+        contracts.usdcMock.address,
+        contracts.lumerinToken.address
       );
       expect.fail("should not allow early closeout when progress is 100%");
     } catch (err) {
@@ -51,115 +45,110 @@ describe("Validator fee", function () {
   });
 
   it("claimFundsValidator - should collect validator fee after contract is auto-closed", async function () {
-    const { web3, cloneFactoryAddr, lumerinTokenAddr, hrContracts, cfg } = await loadFixture(
-      deployAllFixture
+    const { contracts, accounts, config } = await loadFixture(deployLocalFixture);
+    const buyer = accounts.buyer.account.address;
+    const validatorAddr = accounts.validator.account.address;
+    const sellerAddr = accounts.seller.account.address;
+
+    const cf = contracts.cloneFactory;
+    const feeToken = contracts.lumerinToken;
+    const paymentToken = contracts.usdcMock;
+    const hrContractAddr = config.cloneFactory.contractAddresses[0];
+    const impl = await viem.getContractAt("Implementation", hrContractAddr);
+
+    const hrContractData = await impl.read.getPublicVariablesV2();
+    const [price, validatorFee] = await impl.read.priceAndFee();
+
+    await paymentToken.write.approve([cf.address, BigInt(price)], {
+      account: buyer,
+    });
+    await feeToken.write.approve([cf.address, BigInt(validatorFee)], {
+      account: buyer,
+    });
+
+    await cf.write.setPurchaseRentalContractV2(
+      [hrContractAddr, validatorAddr, "encryptedValidatorURL", "encryptedDestURL", 0],
+      { account: buyer }
     );
-    const { buyer, validatorAddr } = LocalTestnetAddresses;
 
-    const cf = CloneFactory(web3, cloneFactoryAddr);
-    const lmr = Lumerin(web3, lumerinTokenAddr);
-    const hrContractAddr = hrContracts[0];
-    const hrContractData = await Implementation(web3, hrContractAddr)
-      .methods.getPublicVariablesV2()
-      .call();
-
-    const validatorFee = Math.round(Number(hrContractData._terms._price) * cfg.validatorFeeRate);
-    const priceWithValidatorFee = Number(hrContractData._terms._price) + validatorFee;
-    await lmr.methods
-      .approve(cloneFactoryAddr, String(priceWithValidatorFee))
-      .send({ from: buyer });
-    await cf.methods
-      .setPurchaseRentalContractV2(
-        hrContractAddr,
-        validatorAddr,
-        "encryptedValidatorURL",
-        "encryptedDestURL",
-        0
-      )
-      .send({ from: buyer, value: cfg.marketplaceFee.toString() });
-
-    await time.increase(Number(hrContractData._terms._length));
+    await time.increase(Number(hrContractData[1]._length));
 
     // make sure the contract is auto-closed
-    const impl = Implementation(web3, hrContractAddr);
-    const hrContractData2 = await impl.methods.getPublicVariablesV2().call();
-    expect(hrContractData2._state).to.equal("0");
+    const hrContractData2 = await impl.read.getPublicVariablesV2();
+    expect(hrContractData2[0]).to.equal(0); // ContractState.Available = 0
 
     // claim funds by validator
-    const validatorBalanceBefore = Number(await lmr.methods.balanceOf(validatorAddr).call());
-    await impl.methods.claimFundsValidator().send({ from: validatorAddr });
-    const validatorBalanceAfter = Number(await lmr.methods.balanceOf(validatorAddr).call());
-    const deltaValidatorBalance = validatorBalanceAfter - validatorBalanceBefore;
-    expect(deltaValidatorBalance).to.equal(validatorFee);
+    const validatorBalanceBefore = await feeToken.read.balanceOf([validatorAddr]);
+    const sellerBalanceBefore = await paymentToken.read.balanceOf([sellerAddr]);
 
-    // claim funds by seller
-    const sellerBalanceBefore = Number(await lmr.methods.balanceOf(cfg.sellerAddr).call());
-    await impl.methods
-      .claimFunds()
-      .send({ from: cfg.sellerAddr, value: cfg.marketplaceFee.toString() });
-    const sellerBalanceAfter = Number(await lmr.methods.balanceOf(cfg.sellerAddr).call());
+    await impl.write.claimFunds({ account: sellerAddr });
+
+    const validatorBalanceAfter = await feeToken.read.balanceOf([validatorAddr]);
+    const sellerBalanceAfter = await paymentToken.read.balanceOf([sellerAddr]);
+    const deltaValidatorBalance = validatorBalanceAfter - validatorBalanceBefore;
     const deltaSellerBalance = sellerBalanceAfter - sellerBalanceBefore;
-    expect(deltaSellerBalance).to.equal(Number(hrContractData._terms._price));
+
+    expect(deltaValidatorBalance).to.equal(validatorFee);
+    expect(deltaSellerBalance).to.equal(price);
 
     // check lmr balance of the contract
-    const contractBalance = Number(await lmr.methods.balanceOf(hrContractAddr).call());
-    expect(contractBalance).to.equal(0);
+    const contractBalance = await paymentToken.read.balanceOf([hrContractAddr]);
+    expect(contractBalance).to.equal(0n);
+
+    // check fee token balance of the contract
+    const contractFeeBalance = await feeToken.read.balanceOf([hrContractAddr]);
+    expect(contractFeeBalance).to.equal(0n);
   });
 
   it("should auto claim validator fee on the next purchase", async function () {
-    const { web3, cloneFactoryAddr, lumerinTokenAddr, hrContracts, cfg } = await loadFixture(
-      deployAllFixture
-    );
-    const { buyer, validatorAddr } = LocalTestnetAddresses;
+    const { contracts, accounts, config } = await loadFixture(deployLocalFixture);
+    const buyer = accounts.buyer.account.address;
+    const validatorAddr = accounts.validator.account.address;
 
-    const cf = CloneFactory(web3, cloneFactoryAddr);
-    const lmr = Lumerin(web3, lumerinTokenAddr);
-    const hrContractAddr = hrContracts[0];
-    const hrContractData = await Implementation(web3, hrContractAddr)
-      .methods.getPublicVariablesV2()
-      .call();
+    const cf = contracts.cloneFactory;
+    const paymentToken = contracts.usdcMock;
+    const feeToken = contracts.lumerinToken;
+    const hrContractAddr = config.cloneFactory.contractAddresses[0];
+    const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-    const validatorFee = Math.round(Number(hrContractData._terms._price) * cfg.validatorFeeRate);
-    const priceWithValidatorFee = Number(hrContractData._terms._price) + validatorFee;
+    const hrContractData = await impl.read.getPublicVariablesV2();
+    const [price, validatorFee] = await impl.read.priceAndFee();
 
     // PURCHASE 1
-    await lmr.methods
-      .approve(cloneFactoryAddr, String(priceWithValidatorFee))
-      .send({ from: buyer });
-    await cf.methods
-      .setPurchaseRentalContractV2(
-        hrContractAddr,
-        validatorAddr,
-        "encryptedValidatorURL",
-        "encryptedDestURL",
-        0
-      )
-      .send({ from: buyer, value: cfg.marketplaceFee.toString() });
+    await paymentToken.write.approve([cf.address, BigInt(price)], {
+      account: buyer,
+    });
+    await feeToken.write.approve([cf.address, BigInt(validatorFee)], {
+      account: buyer,
+    });
 
-    await time.increase(Number(hrContractData._terms._length));
+    await cf.write.setPurchaseRentalContractV2(
+      [hrContractAddr, validatorAddr, "encryptedValidatorURL", "encryptedDestURL", 0],
+      { account: buyer }
+    );
+
+    await time.increase(Number(hrContractData[1]._length));
 
     // make sure the contract is auto-closed
-    const impl = Implementation(web3, hrContractAddr);
-    const hrContractData2 = await impl.methods.getPublicVariablesV2().call();
-    expect(hrContractData2._state).to.equal("0");
+    const hrContractData2 = await impl.read.getPublicVariablesV2();
+    expect(hrContractData2[0]).to.equal(0); // ContractState.Available = 0
 
     // PURCHASE 2
-    const validatorBalanceBefore = Number(await lmr.methods.balanceOf(validatorAddr).call());
+    const validatorBalanceBefore = await feeToken.read.balanceOf([validatorAddr]);
 
-    await lmr.methods
-      .approve(cloneFactoryAddr, String(priceWithValidatorFee))
-      .send({ from: buyer });
-    await cf.methods
-      .setPurchaseRentalContractV2(
-        hrContractAddr,
-        validatorAddr,
-        "encryptedValidatorURL",
-        "encryptedDestURL",
-        0
-      )
-      .send({ from: buyer, value: cfg.marketplaceFee.toString() });
+    await paymentToken.write.approve([cf.address, BigInt(price)], {
+      account: buyer,
+    });
+    await feeToken.write.approve([cf.address, BigInt(validatorFee)], {
+      account: buyer,
+    });
 
-    const validatorBalanceAfter = Number(await lmr.methods.balanceOf(validatorAddr).call());
+    await cf.write.setPurchaseRentalContractV2(
+      [hrContractAddr, validatorAddr, "encryptedValidatorURL", "encryptedDestURL", 0],
+      { account: buyer }
+    );
+
+    const validatorBalanceAfter = await feeToken.read.balanceOf([validatorAddr]);
     const deltaValidatorBalance = validatorBalanceAfter - validatorBalanceBefore;
 
     // should claim the validator fee only for first purchase
@@ -167,14 +156,13 @@ describe("Validator fee", function () {
   });
 
   it("claimFundsValidator - should error if no funds or address is wrong", async function () {
-    const { web3, hrContracts } = await loadFixture(deployAllFixture);
-    const { validatorAddr } = LocalTestnetAddresses;
-    const hrContractAddr = hrContracts[0];
+    const { config, accounts } = await loadFixture(deployLocalFixture);
+    const validatorAddr = accounts.validator.account.address;
+    const hrContractAddr = config.cloneFactory.contractAddresses[0];
+    const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
     try {
-      await Implementation(web3, hrContractAddr)
-        .methods.claimFundsValidator()
-        .send({ from: validatorAddr });
+      await impl.write.claimFundsValidator({ account: validatorAddr });
       expect.fail("should not allow to claim funds if no funds");
     } catch (err) {
       expectIsError(err);
@@ -184,70 +172,63 @@ describe("Validator fee", function () {
   });
 
   it("claimFundsValidator - should correctly claim for multiple contracts", async function () {
-    const { web3, cloneFactoryAddr, lumerinTokenAddr, hrContracts, cfg } = await loadFixture(
-      deployAllFixture
-    );
-    const { buyer, validatorAddr, validator2Addr } = LocalTestnetAddresses;
+    const { contracts, accounts, config } = await loadFixture(deployLocalFixture);
+    const buyer = accounts.buyer.account.address;
+    const validatorAddr = accounts.validator.account.address;
+    const validator2Addr = accounts.validator2.account.address;
 
-    const cf = CloneFactory(web3, cloneFactoryAddr);
-    const lmr = Lumerin(web3, lumerinTokenAddr);
-    const hrContractAddr = hrContracts[0];
-    const hrContractData = await Implementation(web3, hrContractAddr)
-      .methods.getPublicVariablesV2()
-      .call();
+    const cf = contracts.cloneFactory;
+    const paymentToken = contracts.usdcMock;
+    const feeToken = contracts.lumerinToken;
+    const hrContractAddr = config.cloneFactory.contractAddresses[0];
+    const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-    const validatorFee = Math.round(Number(hrContractData._terms._price) * cfg.validatorFeeRate);
-    const priceWithValidatorFee = Number(hrContractData._terms._price) + validatorFee;
+    const hrContractData = await impl.read.getPublicVariablesV2();
+    const [price, validatorFee] = await impl.read.priceAndFee();
 
     // purchase 1 with validator 1
-    await lmr.methods
-      .approve(cloneFactoryAddr, String(priceWithValidatorFee))
-      .send({ from: buyer });
-    await cf.methods
-      .setPurchaseRentalContractV2(
-        hrContractAddr,
-        validatorAddr,
-        "encryptedValidatorURL",
-        "encryptedDestURL",
-        0
-      )
-      .send({ from: buyer, value: cfg.marketplaceFee.toString() });
+    await paymentToken.write.approve([cf.address, BigInt(price)], {
+      account: buyer,
+    });
+    await feeToken.write.approve([cf.address, BigInt(validatorFee)], {
+      account: buyer,
+    });
+
+    await cf.write.setPurchaseRentalContractV2(
+      [hrContractAddr, validatorAddr, "encryptedValidatorURL", "encryptedDestURL", 0],
+      { account: buyer }
+    );
 
     // wait for completion
-    await time.increase(Number(hrContractData._terms._length));
+    await time.increase(Number(hrContractData[1]._length));
 
     // claim funds by validator 1
-    const validatorBalanceBefore = Number(await lmr.methods.balanceOf(validatorAddr).call());
-    await Implementation(web3, hrContractAddr)
-      .methods.claimFundsValidator()
-      .send({ from: validatorAddr });
-    const validatorBalanceAfter = Number(await lmr.methods.balanceOf(validatorAddr).call());
+    const validatorBalanceBefore = await feeToken.read.balanceOf([validatorAddr]);
+    await impl.write.claimFundsValidator({ account: validatorAddr });
+    const validatorBalanceAfter = await feeToken.read.balanceOf([validatorAddr]);
     const deltaValidatorBalance = validatorBalanceAfter - validatorBalanceBefore;
     expect(deltaValidatorBalance).to.equal(validatorFee);
 
     // purchase 2 with validator 2
-    await lmr.methods
-      .approve(cloneFactoryAddr, String(priceWithValidatorFee))
-      .send({ from: buyer });
-    await cf.methods
-      .setPurchaseRentalContractV2(
-        hrContractAddr,
-        validator2Addr,
-        "encryptedValidatorURL",
-        "encryptedDestURL",
-        0
-      )
-      .send({ from: buyer, value: cfg.marketplaceFee.toString() });
+    await paymentToken.write.approve([cf.address, BigInt(price)], {
+      account: buyer,
+    });
+    await feeToken.write.approve([cf.address, BigInt(validatorFee)], {
+      account: buyer,
+    });
+
+    await cf.write.setPurchaseRentalContractV2(
+      [hrContractAddr, validator2Addr, "encryptedValidatorURL", "encryptedDestURL", 0],
+      { account: buyer }
+    );
 
     // wait for completion
-    await time.increase(Number(hrContractData._terms._length));
+    await time.increase(Number(hrContractData[1]._length));
 
     // claim funds by validator 2
-    const validator2BalanceBefore = Number(await lmr.methods.balanceOf(validator2Addr).call());
-    await Implementation(web3, hrContractAddr)
-      .methods.claimFundsValidator()
-      .send({ from: validator2Addr });
-    const validator2BalanceAfter = Number(await lmr.methods.balanceOf(validator2Addr).call());
+    const validator2BalanceBefore = await feeToken.read.balanceOf([validator2Addr]);
+    await impl.write.claimFundsValidator({ account: validator2Addr });
+    const validator2BalanceAfter = await feeToken.read.balanceOf([validator2Addr]);
     const deltaValidator2Balance = validator2BalanceAfter - validator2BalanceBefore;
     expect(deltaValidator2Balance).to.equal(validatorFee);
   });

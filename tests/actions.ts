@@ -1,62 +1,60 @@
 import { expect } from "chai";
-import type Web3 from "web3";
-import { Lumerin, CloneFactory, Implementation } from "../build-js/dist";
+import { viem } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { ZERO_ADDRESS } from "./utils";
 
 /** @param progress 0.0 - 1.0 early closeout contract progress */
 export async function testEarlyCloseout(
   approxProgress: number, // 0.0 - 1.0, progress at which the contract is closed
-  fee: string,
-  seller: string,
-  buyerAddr: string,
-  validatorAddr: string,
-  cloneFactoryAddress: string,
-  lumerinAddress: string,
-  web3: Web3
+  hrContractAddr: `0x${string}`,
+  buyerAddr: `0x${string}`,
+  validatorAddr: `0x${string}`,
+  cfAddress: `0x${string}`,
+  paymentTokenAddress: `0x${string}`,
+  feeTokenAddress: `0x${string}`
 ) {
   // TODO: move to args
-  const effectiveValidatorFeeRate = validatorAddr !== ZERO_ADDRESS ? 0.01 : 0;
-  const cf = CloneFactory(web3, cloneFactoryAddress);
-  const lumerin = Lumerin(web3, lumerinAddress);
-  const speed = 1_000_000;
-  const length = 1000;
-  const price = 1_000_000;
-  const version = 0;
-  const validatorFee = price * effectiveValidatorFeeRate;
-  const priceWithValidatorFee = price + validatorFee;
 
-  const receipt = await cf.methods
-    .setCreateNewRentalContractV2(
-      String(price),
-      "0",
-      String(speed),
-      String(length),
-      "0",
-      cloneFactoryAddress,
-      "0x0"
-    )
-    .send({ from: seller, value: fee });
-  const hrContractAddr = receipt.events?.contractCreated.returnValues._address;
+  const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-  await lumerin.methods
-    .approve(cloneFactoryAddress, String(priceWithValidatorFee))
-    .send({ from: buyerAddr });
+  const hrContractData = await impl.read.getPublicVariablesV2();
+  const speed = Number(hrContractData[1]._speed);
+  const length = Number(hrContractData[1]._length);
+  const version = Number(hrContractData[1]._version);
+  const seller = hrContractData[4];
 
-  const purchase = await cf.methods
-    .setPurchaseRentalContractV2(
-      hrContractAddr,
-      validatorAddr,
-      "encryptedValidatorURL",
-      "encryptedDestURL",
-      version
-    )
-    .send({ from: buyerAddr, value: fee });
+  // Only assuming the oracles are not updating prices
+  const [price, fee] = await impl.read.priceAndFee();
+  const effectiveFee = validatorAddr !== ZERO_ADDRESS ? fee : 0n;
 
-  const purchaseBlock = await web3.eth.getBlock(purchase.blockNumber);
+  // Get contract instances using Viem
+  const cf = await viem.getContractAt("CloneFactory", cfAddress);
+  const paymentToken = await viem.getContractAt(
+    "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20",
+    paymentTokenAddress
+  );
+  const feeToken = await viem.getContractAt(
+    "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20",
+    feeTokenAddress
+  );
+  const pc = await viem.getPublicClient();
 
-  const buyerBalance = Number(await lumerin.methods.balanceOf(buyerAddr).call());
-  const validatorBalance = Number(await lumerin.methods.balanceOf(validatorAddr).call());
+  // Approve tokens
+  await paymentToken.write.approve([cfAddress, price], { account: buyerAddr });
+  await feeToken.write.approve([cfAddress, fee], { account: buyerAddr });
+
+  // Purchase the contract
+  const purchaseTx = await cf.write.setPurchaseRentalContractV2(
+    [hrContractAddr, validatorAddr, "encryptedValidatorURL", "encryptedDestURL", version],
+    { account: buyerAddr }
+  );
+  const purchaseReceipt = await pc.getTransactionReceipt({ hash: purchaseTx });
+  const purchaseBlock = await pc.getBlock({ blockNumber: purchaseReceipt.blockNumber });
+
+  // Get balances
+  const buyerBalance = Number(await paymentToken.read.balanceOf([buyerAddr]));
+  const validatorBalance = Number(await feeToken.read.balanceOf([validatorAddr]));
+  const sellerBalance = Number(await paymentToken.read.balanceOf([seller]));
 
   // advance blockchain time minus 1 second, so the next block will
   // have the timestamp that is exactly needed for the progress simulation.
@@ -66,22 +64,26 @@ export async function testEarlyCloseout(
   }
 
   // closeout by buyer
-  const impl = Implementation(web3, hrContractAddr);
-  const close = await impl.methods.closeEarly(0).send({ from: buyerAddr });
-  const closeBlock = await web3.eth.getBlock(close.blockNumber);
+  const closeTx = await impl.write.closeEarly([0], { account: buyerAddr });
+  const closeReceipt = await pc.getTransactionReceipt({ hash: closeTx });
+  const closeBlock = await pc.getBlock({ blockNumber: closeReceipt.blockNumber });
 
   // calculate real blockchain progress
   const progress =
     (Number(closeBlock.timestamp) - Number(purchaseBlock.timestamp)) / Number(length);
 
-  const buyerBalanceAfter = Number(await lumerin.methods.balanceOf(buyerAddr).call());
-  const validatorBalanceAfter = Number(await lumerin.methods.balanceOf(validatorAddr).call());
+  const buyerBalanceAfter = Number(await paymentToken.read.balanceOf([buyerAddr]));
+  const validatorBalanceAfter = Number(await feeToken.read.balanceOf([validatorAddr]));
+  const sellerBalanceAfter = Number(await paymentToken.read.balanceOf([seller]));
+
   const deltaBuyerBalance = buyerBalanceAfter - buyerBalance;
   const deltaValidatorBalance = validatorBalanceAfter - validatorBalance;
+  const deltaSellerBalance = sellerBalanceAfter - sellerBalance;
 
   const buyerRefundFraction = 1 - progress;
-  const buyerRefundAmount = buyerRefundFraction * priceWithValidatorFee;
-  const validatorEarnings = price * effectiveValidatorFeeRate * progress;
+  const buyerRefundAmount = buyerRefundFraction * Number(price);
+  const validatorEarnings = Number(fee) * progress;
+  const sellerClaimAmount = progress * Number(price);
 
   expect(deltaBuyerBalance).approximately(
     buyerRefundAmount,
@@ -93,16 +95,9 @@ export async function testEarlyCloseout(
     5,
     "validator should earn correct amount"
   );
-
-  // claim by seller
-  const sellerBalance = Number(await lumerin.methods.balanceOf(seller).call());
-  await impl.methods.claimFunds().send({ from: seller, value: fee });
-  const sellerBalanceAfter = Number(await lumerin.methods.balanceOf(seller).call());
-  const deltaSellerBalance = sellerBalanceAfter - sellerBalance;
-  const sellerClaimAmount = progress * Number(price);
-
-  expect(deltaSellerBalance).equal(
+  expect(deltaSellerBalance).approximately(
     sellerClaimAmount,
+    5,
     `seller should collect ${progress * 100}% of the price`
   );
 }

@@ -1,43 +1,51 @@
-import { network, ethers } from "hardhat";
-import Web3 from "web3";
-import { Wallet } from "ethers";
-import { CloneFactory } from "../build-js/dist";
-import { CreateContract } from "../lib/deploy";
-import { buildContractsList } from "../lib/populate-contracts";
-import { requireEnvsSet } from "../lib/utils";
-import type { HttpNetworkConfig } from "hardhat/types";
+import { hoursToSeconds, requireEnvsSet, THPStoHPS } from "../lib/utils";
+import { viem } from "hardhat";
+import { getBalance } from "viem/actions";
+import { sampleContracts } from "../tests/hardhatnode/fixtures-2";
+import { getPublicKey } from "../lib/pubkey";
+import { parseEventLogs } from "viem/utils";
+import { privateKeyToAccount } from "viem/accounts";
 
 async function main() {
   console.log("Contracts population script");
 
   const env = requireEnvsSet("CLONE_FACTORY_ADDRESS", "SELLER_PRIVATEKEY");
-  const buildFullMarketplace = process.env.BUILD_FULL_MARKETPLACE === "true";
+  const seller = privateKeyToAccount(`0x${env.SELLER_PRIVATEKEY}`);
+  const pc = await viem.getPublicClient();
 
-  const seller = new Wallet(env.SELLER_PRIVATEKEY).connect(ethers.provider);
   console.log("Deploying contracts with the seller account:", seller.address);
-  console.log("Account balance:", (await seller.getBalance()).toString());
+  const balance = await getBalance(pc, { address: seller.address });
+  console.log("Account balance:", balance.toString());
   console.log("CLONEFACTORY address:", env.CLONE_FACTORY_ADDRESS);
 
-  const web3 = new Web3((network.config as HttpNetworkConfig).url);
-  const account = web3.eth.accounts.privateKeyToAccount(seller.privateKey);
-  web3.eth.accounts.wallet.create(0).add(account);
-  const cf = CloneFactory(web3, env.CLONE_FACTORY_ADDRESS);
+  const cf = await viem.getContractAt("CloneFactory", env.CLONE_FACTORY_ADDRESS as `0x${string}`);
 
-  const contractList = buildContractsList(buildFullMarketplace);
-  const fee = await cf.methods.marketplaceFee().call();
-  console.log(`Marketplace fee: ${fee} wei`);
+  for (const contract of sampleContracts) {
+    for (let i = 0; i < contract.count; i++) {
+      const hash = await cf.write.setCreateNewRentalContractV2(
+        [
+          0n,
+          0n,
+          BigInt(THPStoHPS(contract.config.speedTHPS)),
+          BigInt(hoursToSeconds(contract.config.lengthHours)),
+          Number(contract.config.profitTargetPercent),
+          seller.address,
+          await getPublicKey({ account: seller }),
+        ],
+        { account: seller }
+      );
 
-  for (const c of contractList) {
-    const { address, txHash } = await CreateContract(
-      String(c.price),
-      String(c.length),
-      String(c.speed),
-      cf,
-      seller,
-      fee,
-      console.log
-    );
-    console.log(`contract created, address: ${address} tx hash: ${txHash}`);
+      /*const receipt =*/ await pc.waitForTransactionReceipt({ hash });
+      // const [event] = parseEventLogs({
+      //   logs: receipt.logs,
+      //   abi: cf.abi,
+      //   eventName: "contractCreated",
+      // });
+      // const address = event.args._address;
+
+      // const hrContract = await viem.getContractAt("Implementation", address);
+      // const [price, fee] = await hrContract.read.priceAndFee();
+    }
   }
 }
 

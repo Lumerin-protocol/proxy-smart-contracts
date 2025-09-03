@@ -1,7 +1,6 @@
 import { viem } from "hardhat";
-import { getAddress, parseUnits } from "viem";
-import { getPublicKey } from "./utils";
-import { compressPublicKey } from "../../../../lib/pubkey";
+import { encodeFunctionData, getAddress, parseUnits } from "viem";
+import { compressPublicKey, getPublicKey } from "../../../../lib/pubkey";
 
 export async function deployFixture() {
   const [owner, alice, bob, carol] = await viem.getWalletClients();
@@ -9,16 +8,10 @@ export async function deployFixture() {
   owner.account.publicKey = await getPublicKey(owner);
   alice.account.publicKey = await getPublicKey(alice);
   bob.account.publicKey = await getPublicKey(bob);
-  carol.account.publicKey = await getPublicKey(alice);
+  carol.account.publicKey = await getPublicKey(carol);
 
-  const token = await viem.deployContract(
-    "contracts/validator-registry/LumerinTokenMock.sol:LumerinToken",
-    []
-  );
-  const registry = await viem.deployContract(
-    "contracts/validator-registry/ValidatorRegistry.sol:ValidatorRegistry",
-    []
-  );
+  const token = await viem.deployContract("contracts/mocks/LumerinTokenMock.sol:LumerinToken", []);
+
   const pc = await viem.getPublicClient();
   const config = {
     token: getAddress(token.address),
@@ -27,13 +20,26 @@ export async function deployFixture() {
     punishAmount: parseUnits("0.3", 8),
     punishThreshold: 3,
   };
-  await registry.write.initialize([
-    token.address,
-    config.stakeMinimum,
-    config.stakeRegister,
-    config.punishAmount,
-    config.punishThreshold,
+  const registryImpl = await viem.deployContract(
+    "contracts/validator-registry/ValidatorRegistry.sol:ValidatorRegistry",
+    []
+  );
+  const registryProxy = await viem.deployContract("ERC1967Proxy", [
+    registryImpl.address,
+    encodeFunctionData({
+      abi: registryImpl.abi,
+      functionName: "initialize",
+      args: [
+        token.address,
+        config.stakeMinimum,
+        config.stakeRegister,
+        config.punishAmount,
+        config.punishThreshold,
+      ],
+    }),
   ]);
+
+  const registry = await viem.getContractAt("ValidatorRegistry", registryProxy.address);
 
   // top up the accounts
   await token.write.transfer([alice.account.address, parseUnits("1000", 8)]);
@@ -58,7 +64,6 @@ export async function addValidatorFixture() {
     addr: getAddress(alice.account.address),
   };
 
-  console.log("=================", accounts.alice.account.publicKey);
   const pubKey = compressPublicKey(accounts.alice.account.publicKey!);
 
   const hash = await registry.write.validatorRegister(

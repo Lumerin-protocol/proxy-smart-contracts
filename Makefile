@@ -7,17 +7,25 @@ test:
 	kill "$$(lsof -t -i:8545)" || true
 	make compile
 	make -B build-js 
-	yarn hardhat node --config hardhat-base.config.ts & ./node-local-deploy.sh && yarn hardhat test --network localhost --config hardhat-base.config.ts tests/localnode/*.ts
+	yarn hardhat node & ./node-local-deploy.sh && yarn hardhat test --network localhost tests/localnode/*.ts
 	kill "$$(lsof -t -i:8545)" || true
 
 test-hardhat:
-	yarn hardhat --network hardhat --config hardhat-base.config.ts test $$(find ./tests/hardhatnode/ -type f -iname "*.test.ts")
+	yarn hardhat --network hardhat test $$(find ./tests/hardhatnode/ -type f -iname "*.test.ts")
+
+test-hardhat-coverage:
+	SOLIDITY_COVERAGE=true yarn hardhat coverage --testfiles "./tests/hardhatnode/**/*.test.ts"
+
+.PHONY: coverage
+coverage:
+	open ./coverage/index.html
 
 test-upgrade:
-	yarn hardhat --network localhost --config hardhat-base.config.ts test --bail tests/upgrades/*.ts 
+	yarn hardhat --network localhost test --bail tests/upgrades/*.ts 
 
 compile:
-	yarn hardhat compile --config hardhat-base.config.ts
+	yarn ts-node ./scripts/replace-version.ts
+	yarn hardhat compile
 
 deploy-lumerin:
 	yarn hardhat run --network default ./scripts/deploy-lumerin.ts
@@ -43,12 +51,6 @@ update-validator-registry:
 populate-contracts:
 	yarn hardhat run --network default ./scripts/populate-contracts.ts
 
-whitelist-clonefactory:
-	yarn hardhat run --network default ./scripts/whitelist-clonefactory.ts
-
-set-fee-recipient:
-	yarn hardhat run --network default ./scripts/set-feeRecipient.ts
-
 build-go:
 	./build-go.sh
 
@@ -64,12 +66,6 @@ release-js:
 	make release-git path="build-js" remote="git@github.com:Lumerin-protocol/contracts-js.git"
 	echo "contracts-js released"
 
-update-public-contracts:
-	make release-git path="contracts" remote="git@github.com:Lumerin-protocol/smart-contracts.git"
-	echo "smart-contracts released"
-
-# release-js-npm:
-# 	./templates/js/release.sh $(version) $(token)
 
 release-git:
 	cd $(path) \
@@ -87,10 +83,16 @@ release-git:
 		&& git push -u --tags --set-upstream origin main
 	
 node-local:
-	yarn hardhat node --config hardhat-base.config.ts
+	yarn hardhat node
 
-node-local-deploy:
-	./node-local-deploy.sh
+deploy-local:
+	yarn hardhat run ./scripts/deploy-local.ts
 
 node-local-update:
 	./node-local-update.sh
+
+static-analysis:
+	slither . --checklist --include-paths "contracts/validator-registry|contracts/marketplace"
+
+static-analysis-aderyn:
+	yarn run aderyn
