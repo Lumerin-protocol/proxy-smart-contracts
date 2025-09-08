@@ -124,18 +124,25 @@ interface BalanceOf {
   };
 }
 
+type Account = {
+  account: {
+    address: `0x${string}`;
+  };
+};
+
 /** Returns the change of address token balance due to the transaction */
 export async function getTxDeltaBalance(
   pc: PublicClient,
   txHash: `0x${string}`,
-  address: `0x${string}`,
+  address: `0x${string}` | Account,
   token: BalanceOf
 ): Promise<bigint> {
   const receipt = await pc.waitForTransactionReceipt({ hash: txHash });
-  const before = await token.read.balanceOf([address], {
+  const addressToUse = typeof address === "object" ? address.account.address : address;
+  const before = await token.read.balanceOf([addressToUse], {
     blockNumber: receipt.blockNumber - 1n,
   });
-  const after = await token.read.balanceOf([address]);
+  const after = await token.read.balanceOf([addressToUse]);
   return after - before;
 }
 

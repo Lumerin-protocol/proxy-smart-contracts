@@ -69,7 +69,6 @@ async function main() {
     [mockImplementation.address, deployer.account.address]
   );
   console.log("Deployed at:", beacon.address);
-  await verifyContract(beacon.address, [mockImplementation.address, deployer.account.address]);
 
   console.log("Deploying clonefactory");
   const cloneFactoryImpl = await viem.deployContract(
@@ -94,7 +93,7 @@ async function main() {
       env.HASHRATE_ORACLE_ADDRESS as `0x${string}`, // beacon address
       env.USDC_TOKEN_ADDRESS as `0x${string}`, // payment token
       env.LUMERIN_TOKEN_ADDRESS as `0x${string}`, // fee token
-      BigInt(Number(env.VALIDATOR_FEE_RATE) * 10 ** feeDecimals), // validator fee rate
+      BigInt(Number(env.VALIDATOR_FEE_RATE) * 10 ** (feeDecimals + 8 - 6)), // validator fee rate
       BigInt(env.CF_MIN_SELLER_STAKE),
       Number(env.CF_MIN_CONTRACT_DURATION),
       Number(env.CF_MAX_CONTRACT_DURATION),
@@ -105,7 +104,6 @@ async function main() {
     [cloneFactoryImpl.address, encodedInitFn]
   );
   console.log("Deployed at:", cloneFactoryProxy.address);
-  await verifyContract(cloneFactoryProxy.address, [cloneFactoryImpl.address, encodedInitFn]);
   const cf = await viem.getContractAt("CloneFactory", cloneFactoryProxy.address);
   console.log("Version:", await cf.read.VERSION());
 
