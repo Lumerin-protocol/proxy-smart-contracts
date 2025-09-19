@@ -19,6 +19,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     uint8 public constant BREACH_PENALTY_DECIMALS = 18;
     uint32 private constant SECONDS_PER_DAY = 3600 * 24;
     uint8 private constant MAX_POSITIONS_PER_PARTICIPANT = 50;
+    uint256 private constant MAX_BREACH_PENALTY_RATE_PER_DAY = 5 * 10 ** (BREACH_PENALTY_DECIMALS - 2); // 5%
 
     uint8 public sellerLiquidationMarginPercent;
     uint8 public buyerLiquidationMarginPercent;
@@ -84,6 +85,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     error ValidatorCannotCloseOrderBeforeStartTime();
     error OrderExpired();
     error MaxPositionsPerParticipantReached();
+    error ValueOutOfRange(int256 min, int256 max);
 
     constructor() {
         _disableInitializers();
@@ -324,10 +326,12 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     }
 
     function getMarginPercent(bool _isBuy) public view returns (uint8) {
+        uint8 breachPenaltyMarginPercent =
+            uint8(breachPenaltyRatePerDay * deliveryDurationSeconds / 10 ** (BREACH_PENALTY_DECIMALS - 2));
         if (_isBuy) {
-            return buyerLiquidationMarginPercent;
+            return buyerLiquidationMarginPercent + breachPenaltyMarginPercent;
         } else {
-            return sellerLiquidationMarginPercent;
+            return sellerLiquidationMarginPercent + breachPenaltyMarginPercent;
         }
     }
 
@@ -510,6 +514,15 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         return orders[_orderId];
     }
 
+    function setBreachPenaltyRatePerDay(uint256 _breachPenaltyRatePerDay) public onlyOwner {
+        if (_breachPenaltyRatePerDay > MAX_BREACH_PENALTY_RATE_PER_DAY) {
+            revert ValueOutOfRange(0, int256(MAX_BREACH_PENALTY_RATE_PER_DAY));
+        }
+        breachPenaltyRatePerDay = _breachPenaltyRatePerDay;
+    }
+
+    // ERC20
+
     function decimals() public view override returns (uint8) {
         return _decimals;
     }
@@ -550,12 +563,3 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         _;
     }
 }
-
-// TODO: when order is created the seller is credited immediately
-// so the seller can withdraw extra funds
-// so the margin should be enough to cover the case of nondelivery
-
-// TODO: include breach penalty in the minMargin calculation
-
-// TODO: _createOrMatchPosition(order.price, order.startTime, false, order.buyer);
-// Impact: When closing orders before start time, new positions are created without checking if the buyer has sufficient margin.
