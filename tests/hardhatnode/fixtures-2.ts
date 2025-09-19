@@ -320,8 +320,6 @@ export async function deployLocalFixture() {
 
       const hrContract = await viem.getContractAt("Implementation", address);
 
-      const [price, fee] = await hrContract.read.priceAndFee();
-
       cloneFactoryConfig.contractAddresses.push(address);
       hashrateContracts.push(hrContract);
     }
@@ -335,39 +333,40 @@ export async function deployLocalFixture() {
     usdcMock,
     validator
   );
-  await buyContract(
-    cloneFactoryConfig.contractAddresses[1],
-    lumerinToken,
-    cloneFactory,
-    buyer,
-    usdcMock,
-    validator
-  );
+  // await buyContract(
+  //   cloneFactoryConfig.contractAddresses[1],
+  //   lumerinToken,
+  //   cloneFactory,
+  //   buyer,
+  //   usdcMock,
+  //   validator
+  // );
 
   // await time.increaseTo(
   //   Math.round(new Date().getTime() / 1000) - (sampleContracts[0].config.lengthHours * 3600) / 2
   // );
 
-  await tc.increaseTime({ seconds: sampleContracts[0].config.lengthHours * 3600 + 1 });
+  // await tc.increaseTime({ seconds: sampleContracts[0].config.lengthHours * 3600 + 1 });
 
-  await buyContract(
-    cloneFactoryConfig.contractAddresses[0],
-    lumerinToken,
-    cloneFactory,
-    buyer,
-    usdcMock,
-    validator
-  );
-  await buyContract(
-    cloneFactoryConfig.contractAddresses[1],
-    lumerinToken,
-    cloneFactory,
-    buyer,
-    usdcMock,
-    validator
-  );
+  // await buyContract(
+  //   cloneFactoryConfig.contractAddresses[0],
+  //   lumerinToken,
+  //   cloneFactory,
+  //   buyer,
+  //   usdcMock,
+  //   validator
+  // );
 
-  // await time.increaseTo(Math.round(new Date().getTime() / 1000));
+  // await buyContract(
+  //   cloneFactoryConfig.contractAddresses[1],
+  //   lumerinToken,
+  //   cloneFactory,
+  //   buyer,
+  //   usdcMock,
+  //   validator
+  // );
+
+  // // await time.increaseTo(Math.round(new Date().getTime() / 1000));
 
   await tc.increaseTime({ seconds: (sampleContracts[0].config.lengthHours * 3600) / 2 });
 
@@ -375,7 +374,7 @@ export async function deployLocalFixture() {
   await c1.write.closeEarly([0], {
     account: buyer.account,
   });
-  await pc.waitForTransactionReceipt({ hash });
+  // await pc.waitForTransactionReceipt({ hash });
 
   // Return all deployed contracts and accounts
   return {

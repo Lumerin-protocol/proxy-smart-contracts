@@ -6,7 +6,7 @@ async function main() {
   await run("compile");
 
   const runPromise = run("node");
-  const { contracts } = await deployLocalFixture();
+  const { contracts, config } = await deployLocalFixture();
 
   console.log("Deployment completed successfully!");
   console.log("Contract addresses:");
@@ -19,6 +19,9 @@ async function main() {
   console.log("CloneFactory:", contracts.cloneFactory.address);
   console.log("ValidatorRegistry:", contracts.validatorRegistry.address);
   console.log("Multicall3:", contracts.multicall3.address);
+  console.log();
+  console.log("Contract addresses: ");
+  config.cloneFactory.contractAddresses.map((addr, index) => console.log(`${index}:`, addr));
 
   await runPromise;
 }

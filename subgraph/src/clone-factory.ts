@@ -77,6 +77,7 @@ export function handlesellerRegisteredUpdated(event: sellerRegisteredUpdated): v
 
   if (!seller) {
     seller = new Seller(event.params._seller);
+    seller.address = event.params._seller;
     seller.registeredTimestamp = event.block.timestamp;
     seller.registeredBlockNumber = event.block.number;
     seller.stake = new BigInt(0);

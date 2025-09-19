@@ -48,6 +48,7 @@ type CloneFactory @entity(immutable: false) {
 
 type Seller @entity(immutable: false) {
   id: Bytes!
+  address: Bytes!
   stake: BigInt!
   registeredTimestamp: BigInt!
   registeredBlockNumber: BigInt!
@@ -85,6 +86,7 @@ type Seller @entity(immutable: false) {
 
 type Validator @entity(immutable: false) {
   id: Bytes!
+  address: Bytes!
   stake: BigInt!
   registeredTimestamp: BigInt!
   registeredBlockNumber: BigInt!
@@ -112,7 +114,8 @@ type Validator @entity(immutable: false) {
 
 type Buyer @entity(immutable: false) {
   id: Bytes!
-  contracts: [Implementation!]!
+  address: Bytes!
+  purchases: [Purchase!]!
 
   # stats
   purchaseCount: Int!
@@ -149,6 +152,18 @@ type Implementation @entity(immutable: false) {
   resellsCount: Int!
   "Total number of early closeouts"
   earlyCloseoutsCount: Int!
+}
+
+type Purchase @entity(immutable: false) {
+  id: Bytes!
+  seller: Seller!
+  buyer: Buyer!
+  validator: Validator
+  price: BigInt!
+  fee: BigInt!
+  resellProfitTarget: Int!
+  isResell: Boolean!
+  startTime: BigInt!
 }
 
 type Terms @entity(immutable: true) {
