@@ -1,0 +1,69 @@
+specVersion: 1.3.0
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: Futures
+    network: "{{ network }}"
+    source:
+      address: "{{ futuresAddress }}"
+      # avoid messing mustache syntax with autoformatting
+      # prettier-ignore
+      startBlock: {{ startBlock }}
+      abi: Futures
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Futures
+        - Participant
+        - Position
+        - Order
+      abis:
+        - name: Futures
+          file: ../abi/Futures.json
+      eventHandlers:
+        # - event: Initialized(uint64)
+        #   handler: handleInitialized
+        # - event: sellerRegisteredUpdated(indexed address,uint256)
+        #   handler: handlesellerRegisteredUpdated
+        # - event: sellerDeregistered(indexed address)
+        #   handler: handlesellerDeregistered
+        # - event: minSellerStakeUpdated(uint256)
+        #   handler: handlemminSellerStakeUpdated
+        # - event: contractCreatedV2(indexed address,indexed address,int8,uint256,uint256)
+        #   handler: handlecontractCreatedV2
+      file: ./src/futures.ts
+  - kind: ethereum
+    name: HashrateOracle
+    network: "{{ network }}"
+    source:
+      address: "{{ hashrateOracleAddress }}"
+      # avoid messing mustache syntax with autoformatting
+      # prettier-ignore
+      startBlock: {{ startBlock }}
+      abi: HashrateOracle
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - HashesForBTC
+      abis:
+        - name: HashrateOracle
+          file: ../abi/HashrateOracle.json
+      eventHandlers:
+        # - event: Initialized(uint64)
+        #   handler: handleInitialized
+        # - event: sellerRegisteredUpdated(indexed address,uint256)
+        #   handler: handlesellerRegisteredUpdated
+        # - event: sellerDeregistered(indexed address)
+        #   handler: handlesellerDeregistered
+        # - event: minSellerStakeUpdated(uint256)
+        #   handler: handlemminSellerStakeUpdated
+        # - event: contractCreatedV2(indexed address,indexed address,int8,uint256,uint256)
+        #   handler: handlecontractCreatedV2
+      file: ./src/hashrate-oracle.ts

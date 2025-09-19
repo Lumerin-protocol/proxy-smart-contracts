@@ -1,69 +1,21 @@
 import { viem } from "hardhat";
-import { parseUnits, parseEventLogs, maxUint256, encodeFunctionData, zeroAddress } from "viem";
-import type { WalletClient } from "@nomicfoundation/hardhat-viem/types";
+import { parseUnits, maxUint256, encodeFunctionData } from "viem";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
+import { deployTokenOraclesAndMulticall3 } from "../fixtures-2";
+import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
 export async function deployFuturesFixture() {
   // Get wallet clients
-  const [owner, seller, buyer, validator, buyer2, seller2] = await viem.getWalletClients();
-  const pc = await viem.getPublicClient();
-  const tc = await viem.getTestClient();
-  const topUpBalance = parseUnits("10000", 6); // 10,000 USDC
+  const data = await loadFixture(deployTokenOraclesAndMulticall3);
+}
 
-  // Deploy USDC Mock (for payments)
-  const _usdcMock = await viem.deployContract("contracts/mocks/USDCMock.sol:USDCMock", []);
-  const usdcMock = await getIERC20Metadata(_usdcMock.address);
-
-  // Deploy BTC Price Oracle Mock
-  const btcPriceOracleMock = await viem.deployContract(
-    "contracts/mocks/BTCPriceOracleMock.sol:BTCPriceOracleMock",
-    []
-  );
-
-  // Top up all accounts with USDC
-  await usdcMock.write.transfer([seller.account.address, topUpBalance]);
-  await usdcMock.write.transfer([buyer.account.address, topUpBalance]);
-  await usdcMock.write.transfer([buyer2.account.address, topUpBalance]);
-  await usdcMock.write.transfer([seller2.account.address, topUpBalance]);
-  await usdcMock.write.transfer([validator.account.address, topUpBalance]);
-
-  const oracle = (() => {
-    const BITCOIN_DECIMALS = 8;
-    const USDC_DECIMALS = 6;
-    const DIFFICULTY_TO_HASHRATE_FACTOR = 2n ** 32n;
-
-    const btcPrice = parseUnits("84524.2", USDC_DECIMALS);
-    const blockReward = parseUnits("3.125", BITCOIN_DECIMALS);
-    const difficulty = 121n * 10n ** 12n;
-    const hashesForBTC = (difficulty * DIFFICULTY_TO_HASHRATE_FACTOR) / blockReward;
-    return {
-      btcPrice,
-      blockReward,
-      difficulty,
-      decimals: USDC_DECIMALS,
-      hashesForBTC,
-    };
-  })();
-
-  await btcPriceOracleMock.write.setPrice([oracle.btcPrice, oracle.decimals]);
-
-  // Deploy HashrateOracle
-  const hashrateOracleImpl = await viem.deployContract(
-    "contracts/marketplace/HashrateOracle.sol:HashrateOracle",
-    [btcPriceOracleMock.address, await _usdcMock.read.decimals()]
-  );
-  const hashrateOracleProxy = await viem.deployContract("ERC1967Proxy", [
-    hashrateOracleImpl.address,
-    encodeFunctionData({
-      abi: hashrateOracleImpl.abi,
-      functionName: "initialize",
-      args: [],
-    }),
-  ]);
-  const hashrateOracle = await viem.getContractAt("HashrateOracle", hashrateOracleProxy.address);
-
-  await hashrateOracle.write.setTTL([maxUint256, maxUint256]);
-  await hashrateOracle.write.setHashesForBTC([oracle.hashesForBTC]);
+export async function deployOnlyFuturesFixture(
+  data: Awaited<ReturnType<typeof deployTokenOraclesAndMulticall3>>
+) {
+  const { contracts, accounts, config } = data;
+  const { usdcMock, hashrateOracle, btcPriceOracleMock } = contracts;
+  const { validator, seller, buyer, buyer2, owner, pc, tc } = accounts;
+  const { oracle } = config;
 
   const sellerLiquidationMarginPercent = 100;
   const buyerLiquidationMarginPercent = 50;
@@ -91,21 +43,10 @@ export async function deployFuturesFixture() {
   const futures = await viem.getContractAt("Futures", futuresProxy.address);
 
   // Approve futures contract to spend USDC for all accounts
-  await usdcMock.write.approve([futures.address, maxUint256], {
-    account: seller.account,
-  });
-  await usdcMock.write.approve([futures.address, maxUint256], {
-    account: buyer.account,
-  });
-  await usdcMock.write.approve([futures.address, maxUint256], {
-    account: buyer2.account,
-  });
-  await usdcMock.write.approve([futures.address, maxUint256], {
-    account: seller2.account,
-  });
-  await usdcMock.write.approve([futures.address, maxUint256], {
-    account: validator.account,
-  });
+  await usdcMock.write.approve([futures.address, maxUint256], { account: seller.account });
+  await usdcMock.write.approve([futures.address, maxUint256], { account: buyer.account });
+  await usdcMock.write.approve([futures.address, maxUint256], { account: buyer2.account });
+  await usdcMock.write.approve([futures.address, maxUint256], { account: validator.account });
 
   // Add some delivery dates for testing
   const currentTime = BigInt(await time.latest());
@@ -141,21 +82,9 @@ export async function deployFuturesFixture() {
       seller,
       buyer,
       buyer2,
-      seller2,
       validator,
       pc,
       tc,
     },
   };
-}
-
-function getIERC20(addr: `0x${string}`) {
-  return viem.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", addr);
-}
-
-function getIERC20Metadata(addr: `0x${string}`) {
-  return viem.getContractAt(
-    "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol:IERC20Metadata",
-    addr
-  );
 }
