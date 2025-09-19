@@ -1,3 +1,4 @@
+# Use subgraph.template.yaml to add changes to the subgraph.yaml file
 specVersion: 1.3.0
 indexerHints:
   prune: auto
@@ -40,6 +41,8 @@ dataSources:
           handler: handleOrderClosed
         - event: DeliveryDateAdded(uint256)
           handler: handleDeliveryDateAdded
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleTransfer
       file: ./src/futures.ts
   - kind: ethereum
     name: HashrateOracle

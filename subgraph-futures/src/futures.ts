@@ -6,9 +6,47 @@ import {
   OrderCreated,
   OrderClosed,
   DeliveryDateAdded,
+  Transfer,
 } from "../generated/Futures/Futures";
 import { Futures, Participant, Position, Order, DeliveryDate } from "../generated/schema";
-import { log, Bytes } from "@graphprotocol/graph-ts";
+import { log, Bytes, Address } from "@graphprotocol/graph-ts";
+
+// Helper function to get or create a participant with balance tracking
+function getOrCreateParticipant(address: Address): Participant {
+  let participant = Participant.load(address);
+  if (!participant) {
+    participant = new Participant(address);
+    participant.address = address;
+    participant.positions = [];
+    participant.orders = [];
+    participant.positionCount = 0;
+    participant.orderCount = 0;
+    participant.totalVolume = new BigInt(0);
+    participant.balance = new BigInt(0);
+    participant.totalDeposited = new BigInt(0);
+    participant.totalWithdrawn = new BigInt(0);
+    participant.lastBalanceUpdate = new BigInt(0);
+  }
+  return participant;
+}
+
+// Helper function to update participant balance
+function updateParticipantBalance(
+  participant: Participant,
+  amount: BigInt,
+  isDeposit: boolean,
+  timestamp: BigInt
+): void {
+  if (isDeposit) {
+    participant.balance = participant.balance.plus(amount);
+    participant.totalDeposited = participant.totalDeposited.plus(amount);
+  } else {
+    participant.balance = participant.balance.minus(amount);
+    participant.totalWithdrawn = participant.totalWithdrawn.plus(amount);
+  }
+  participant.lastBalanceUpdate = timestamp;
+  participant.save();
+}
 
 export function handleInitialized(event: Initialized): void {
   log.info("Futures contract initialized with version: {}", [event.params.version.toString()]);
@@ -48,16 +86,7 @@ export function handlePositionCreated(event: PositionCreated): void {
   }
 
   // Load or create Participant
-  let participant = Participant.load(event.params.participant);
-  if (!participant) {
-    participant = new Participant(event.params.participant);
-    participant.address = event.params.participant;
-    participant.positions = [];
-    participant.orders = [];
-    participant.positionCount = 0;
-    participant.orderCount = 0;
-    participant.totalVolume = new BigInt(0);
-  }
+  let participant = getOrCreateParticipant(event.params.participant);
 
   // Create Position
   const position = new Position(event.params.positionId);
@@ -133,18 +162,10 @@ export function handleOrderCreated(event: OrderCreated): void {
   }
 
   // Load or create Seller
-  let seller = Participant.load(event.params.seller);
-  if (!seller) {
-    log.error("Seller not found: {}", [event.params.seller.toHexString()]);
-    return;
-  }
+  let seller = getOrCreateParticipant(event.params.seller);
 
   // Load or create Buyer
-  let buyer = Participant.load(event.params.buyer);
-  if (!buyer) {
-    log.error("Buyer not found: {}", [event.params.buyer.toHexString()]);
-    return;
-  }
+  let buyer = getOrCreateParticipant(event.params.buyer);
 
   // Create Order
   const order = new Order(event.params.orderId);
@@ -216,4 +237,46 @@ export function handleOrderClosed(event: OrderClosed): void {
     futures.closeoutCount++;
     futures.save();
   }
+}
+
+export function handleTransfer(event: Transfer): void {
+  log.info("Transfer event: {} from {} to {}", [
+    event.params.value.toString(),
+    event.params.from.toHexString(),
+    event.params.to.toHexString(),
+  ]);
+
+  const amount = event.params.value;
+  const from = event.params.from;
+  const to = event.params.to;
+  const timestamp = event.block.timestamp;
+
+  // Handle minting (from zero address) - this represents adding margin
+  if (from.equals(Address.zero())) {
+    const participant = getOrCreateParticipant(to);
+    updateParticipantBalance(participant, amount, true, timestamp);
+    log.info("Minted {} tokens to participant {}", [amount.toString(), to.toHexString()]);
+    return;
+  }
+
+  // Handle burning (to zero address) - this represents removing margin
+  if (to.equals(Address.zero())) {
+    const participant = getOrCreateParticipant(from);
+    updateParticipantBalance(participant, amount, false, timestamp);
+    log.info("Burned {} tokens from participant {}", [amount.toString(), from.toHexString()]);
+    return;
+  }
+
+  // Handle regular transfers between participants
+  const fromParticipant = getOrCreateParticipant(from);
+  const toParticipant = getOrCreateParticipant(to);
+
+  updateParticipantBalance(fromParticipant, amount, false, timestamp);
+  updateParticipantBalance(toParticipant, amount, true, timestamp);
+
+  log.info("Transferred {} tokens from {} to {}", [
+    amount.toString(),
+    from.toHexString(),
+    to.toHexString(),
+  ]);
 }
