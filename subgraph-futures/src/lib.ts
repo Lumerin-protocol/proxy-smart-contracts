@@ -21,3 +21,7 @@ export function concatU64s(a: u64, b: u64): Bytes {
 
   return changetype<Bytes>(result);
 }
+
+export function bigIntToBytes(a: BigInt): Bytes {
+  return changetype<Bytes>(ByteArray.fromBigInt(a).reverse());
+}

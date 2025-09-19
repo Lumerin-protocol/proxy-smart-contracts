@@ -1,6 +1,9 @@
 import { deployLocalFixture } from "../tests/hardhatnode/fixtures-2";
 import { run } from "hardhat";
-import { deployOnlyFuturesFixture } from "../tests/hardhatnode/futures/fixtures";
+import {
+  deployOnlyFuturesFixture,
+  deployOnlyFuturesWithDummyData,
+} from "../tests/hardhatnode/futures/fixtures";
 
 async function main() {
   console.log("Starting local deployment...");
@@ -8,7 +11,7 @@ async function main() {
 
   const runPromise = run("node");
   const data = await deployLocalFixture();
-  const dataFutures = await deployOnlyFuturesFixture(data);
+  const dataFutures = await deployOnlyFuturesWithDummyData(data);
   const { contracts, config } = data;
 
   console.log("Deployment completed successfully!");

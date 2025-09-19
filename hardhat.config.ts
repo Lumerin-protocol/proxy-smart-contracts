@@ -81,6 +81,7 @@ const config: HardhatUserConfig = {
       "AggregatorV3Interface",
       "Multicall3",
       "HashrateOracle",
+      "Futures",
     ],
   },
   mocha: {},

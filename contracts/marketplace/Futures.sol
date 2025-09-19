@@ -63,6 +63,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     mapping(address => EnumerableSet.Bytes32Set) private participantPositionsIdIndex; // index of  positions by participant
     mapping(address => EnumerableSet.Bytes32Set) private participantOrdersIdIndex; // index of orders by participant
 
+    event DeliveryDateAdded(uint256 deliveryDate);
     event PositionCreated(
         bytes32 indexed positionId, address indexed participant, uint256 price, uint256 deliveryDate, bool isBuy
     );
@@ -123,6 +124,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             revert DeliveryDateShouldBeInTheFuture();
         }
         deliveryDates.add(_deliveryDate);
+        emit DeliveryDateAdded(_deliveryDate);
     }
 
     function deliveryDatesLength() public view returns (uint256) {

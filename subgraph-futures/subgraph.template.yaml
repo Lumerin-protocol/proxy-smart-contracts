@@ -6,12 +6,13 @@ schema:
 dataSources:
   - kind: ethereum
     name: Futures
-    network: "{{ network }}"
+    network: "{{network}}"
     source:
-      address: "{{ futuresAddress }}"
+      # prettier-ignore
+      address: "{{futuresAddress}}"
       # avoid messing mustache syntax with autoformatting
       # prettier-ignore
-      startBlock: {{ startBlock }}
+      startBlock: {{startBlock}}
       abi: Futures
     mapping:
       kind: ethereum/events
@@ -22,20 +23,23 @@ dataSources:
         - Participant
         - Position
         - Order
+        - DeliveryDate
       abis:
         - name: Futures
           file: ../abi/Futures.json
       eventHandlers:
-        # - event: Initialized(uint64)
-        #   handler: handleInitialized
-        # - event: sellerRegisteredUpdated(indexed address,uint256)
-        #   handler: handlesellerRegisteredUpdated
-        # - event: sellerDeregistered(indexed address)
-        #   handler: handlesellerDeregistered
-        # - event: minSellerStakeUpdated(uint256)
-        #   handler: handlemminSellerStakeUpdated
-        # - event: contractCreatedV2(indexed address,indexed address,int8,uint256,uint256)
-        #   handler: handlecontractCreatedV2
+        - event: Initialized(uint64)
+          handler: handleInitialized
+        - event: PositionCreated(indexed bytes32,indexed address,uint256,uint256,bool)
+          handler: handlePositionCreated
+        - event: PositionClosed(indexed bytes32,indexed address)
+          handler: handlePositionClosed
+        - event: OrderCreated(indexed bytes32,indexed address,indexed address,uint256,uint256)
+          handler: handleOrderCreated
+        - event: OrderClosed(indexed bytes32,indexed address)
+          handler: handleOrderClosed
+        - event: DeliveryDateAdded(uint256)
+          handler: handleDeliveryDateAdded
       file: ./src/futures.ts
   - kind: ethereum
     name: HashrateOracle
@@ -51,19 +55,16 @@ dataSources:
       apiVersion: 0.0.9
       language: wasm/assemblyscript
       entities:
-        - HashesForBTC
+        - HashrateIndex
       abis:
         - name: HashrateOracle
           file: ../abi/HashrateOracle.json
       eventHandlers:
-        # - event: Initialized(uint64)
-        #   handler: handleInitialized
-        # - event: sellerRegisteredUpdated(indexed address,uint256)
-        #   handler: handlesellerRegisteredUpdated
-        # - event: sellerDeregistered(indexed address)
-        #   handler: handlesellerDeregistered
-        # - event: minSellerStakeUpdated(uint256)
-        #   handler: handlemminSellerStakeUpdated
-        # - event: contractCreatedV2(indexed address,indexed address,int8,uint256,uint256)
-        #   handler: handlecontractCreatedV2
+        - event: Initialized(uint64)
+          handler: handleInitialized
+      blockHandlers:
+        - handler: handleBlock
+          filter:
+            kind: polling
+            every: 1
       file: ./src/hashrate-oracle.ts

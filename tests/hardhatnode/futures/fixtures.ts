@@ -88,3 +88,34 @@ export async function deployOnlyFuturesFixture(
     },
   };
 }
+
+export async function deployOnlyFuturesWithDummyData(
+  data: Awaited<ReturnType<typeof deployTokenOraclesAndMulticall3>>
+) {
+  const _data = await deployOnlyFuturesFixture(data);
+  const { contracts, accounts, config } = _data;
+  const { futures } = contracts;
+  const { seller, buyer, buyer2 } = accounts;
+
+  // create participants
+  const marginAmount = parseUnits("1000", 6);
+  await futures.write.addMargin([marginAmount], { account: seller.account });
+  await futures.write.addMargin([marginAmount], { account: buyer.account });
+  await futures.write.addMargin([marginAmount], { account: buyer2.account });
+
+  // create positions
+  let d = config.deliveryDates.date1;
+  // sell positions
+  await futures.write.createPosition([parseUnits("160", 6), d, false], { account: seller.account });
+  await futures.write.createPosition([parseUnits("155", 6), d, false], { account: seller.account });
+  await futures.write.createPosition([parseUnits("150", 6), d, false], { account: seller.account });
+
+  // buy positions
+  await futures.write.createPosition([parseUnits("140", 6), d, true], { account: buyer.account });
+  await futures.write.createPosition([parseUnits("135", 6), d, true], { account: buyer.account });
+  await futures.write.createPosition([parseUnits("130", 6), d, true], { account: buyer.account });
+
+  // matched position => order
+  await futures.write.createPosition([parseUnits("150", 6), d, true], { account: buyer.account });
+  return _data;
+}
