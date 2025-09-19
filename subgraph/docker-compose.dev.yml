@@ -12,7 +12,7 @@ services:
       - ipfs
       - postgres
     extra_hosts:
-      - localhost:host-gateway
+      - host.docker.internal:host-gateway
     env_file:
       - ../.env
     environment:
@@ -21,9 +21,8 @@ services:
       postgres_pass: let-me-in
       postgres_db: graph-node
       ipfs: "ipfs:5001"
-      ethereum: "localhost:http://localhost:8545"
+      ethereum: "arbitrum-sepolia:${ETH_NODE_ADDRESS}"
       GRAPH_LOG: debug
-      DISABLE_BLOCK_INGESTOR: "true"
   ipfs:
     image: ipfs/kubo:v0.17.0
     ports:

@@ -14,13 +14,14 @@ import {
   EventPurchased,
   EventTermsUpdated,
   Implementation,
+  Purchase,
   ResellTerms,
   Seller,
   Terms,
 } from "../generated/schema";
-import { BigInt, Bytes } from "@graphprotocol/graph-ts";
+import { BigInt, Bytes, log } from "@graphprotocol/graph-ts";
 import { unpackBools } from "./lib";
-import { blockNumberLogIndex } from "./event";
+import { blockNumberLogIndex, blockNumberLogIndexAddress } from "./event";
 
 export function handlecontractPurchased(event: contractPurchased): void {
   const implementation = Implementation.load(event.address);
@@ -80,7 +81,8 @@ export function handlecontractPurchased(event: contractPurchased): void {
   let buyer = Buyer.load(event.params._buyer);
   if (!buyer) {
     buyer = new Buyer(event.params._buyer);
-    buyer.contracts = [];
+    buyer.address = event.params._buyer;
+    buyer.purchases = [];
     buyer.purchaseCount = 0;
     buyer.resellCount = 0;
     buyer.earlyCloseoutCount = 0;
@@ -91,10 +93,23 @@ export function handlecontractPurchased(event: contractPurchased): void {
     cf.buyerCount++;
   }
 
+  const purchase = new Purchase(
+    blockNumberLogIndexAddress(event.block.number, event.logIndex, event.address)
+  );
+  purchase.seller = event.params._seller;
+  purchase.buyer = event.params._buyer;
+  purchase.validator = event.params._validator;
+  purchase.price = event.params._price;
+  purchase.fee = event.params._fee;
+  purchase.resellProfitTarget = event.params._resellProfitTarget;
+  purchase.isResell = implementation.resellChain.length > 1;
+  purchase.startTime = event.block.timestamp;
+  purchase.save();
+
   buyer.purchaseCount++;
   buyer.hashratePurchased = buyer.hashratePurchased.plus(terms._speed);
   buyer.hashesPurchased = buyer.hashesPurchased.plus(terms._speed.times(terms._length));
-  buyer.contracts = buyer.contracts.concat([implementation.id]);
+  buyer.purchases = buyer.purchases.concat([purchase.id]);
   buyer.save();
 
   const seller = Seller.load(event.params._seller);
@@ -147,7 +162,14 @@ export function handlecontractClosedEarly(event: contractClosedEarly): void {
   historyEvent._reason = event.params._reason;
   historyEvent.save();
 
-  implementation.resellChain = implementation.resellChain.splice(-1);
+  log.warning("resellChain before {}", [
+    implementation.resellChain.map<string>((r) => r.toHexString()).join(", "),
+  ]);
+  implementation.resellChain = implementation.resellChain.slice(0, -1);
+  log.warning("resellChain after {}", [
+    implementation.resellChain.map<string>((r) => r.toHexString()).join(", "),
+  ]);
+
   const lastResell = ResellTerms.load(
     implementation.resellChain[implementation.resellChain.length - 1]
   );

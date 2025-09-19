@@ -33,7 +33,7 @@ it("should purchase and resell to default buyer for the whole duration", async (
   );
 });
 
-it.only("should purchase and resell to default buyer for the half of the duration", async () => {
+it("should purchase and resell to default buyer for the half of the duration", async () => {
   const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
   const { cloneFactory, usdcMock, hashrate } = contracts;
   const { buyer, buyer2, seller, pc, tc, defaultBuyer } = accounts;
