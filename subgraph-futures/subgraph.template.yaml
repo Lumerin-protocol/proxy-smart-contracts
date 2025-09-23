@@ -1,0 +1,73 @@
+# Use subgraph.template.yaml to add changes to the subgraph.yaml file
+specVersion: 1.3.0
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: Futures
+    network: "{{network}}"
+    source:
+      # prettier-ignore
+      address: "{{futuresAddress}}"
+      # avoid messing mustache syntax with autoformatting
+      # prettier-ignore
+      startBlock: {{startBlock}}
+      abi: Futures
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Futures
+        - Participant
+        - Position
+        - Order
+        - DeliveryDate
+      abis:
+        - name: Futures
+          file: ../abi/Futures.json
+      eventHandlers:
+        - event: Initialized(uint64)
+          handler: handleInitialized
+        - event: PositionCreated(indexed bytes32,indexed address,uint256,uint256,bool)
+          handler: handlePositionCreated
+        - event: PositionClosed(indexed bytes32,indexed address)
+          handler: handlePositionClosed
+        - event: OrderCreated(indexed bytes32,indexed address,indexed address,uint256,uint256)
+          handler: handleOrderCreated
+        - event: OrderClosed(indexed bytes32,indexed address)
+          handler: handleOrderClosed
+        - event: DeliveryDateAdded(uint256)
+          handler: handleDeliveryDateAdded
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleTransfer
+      file: ./src/futures.ts
+  - kind: ethereum
+    name: HashrateOracle
+    network: "{{ network }}"
+    source:
+      address: "{{ hashrateOracleAddress }}"
+      # avoid messing mustache syntax with autoformatting
+      # prettier-ignore
+      startBlock: {{ startBlock }}
+      abi: HashrateOracle
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - HashrateIndex
+      abis:
+        - name: HashrateOracle
+          file: ../abi/HashrateOracle.json
+      eventHandlers:
+        - event: Initialized(uint64)
+          handler: handleInitialized
+      blockHandlers:
+        - handler: handleBlock
+          filter:
+            kind: polling
+            every: 1
+      file: ./src/hashrate-oracle.ts

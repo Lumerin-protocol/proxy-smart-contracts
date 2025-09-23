@@ -1,0 +1,88 @@
+# Futures Contract Root Entity
+type Futures @entity(immutable: false) {
+  "Use id=0"
+  id: Int8!
+  initializedBlockNumber: BigInt!
+  initializeTimestamp: BigInt!
+  minSellerStake: BigInt!
+
+  "Number of contracts including archived"
+  contractCount: Int!
+  "Number of not archived contracts"
+  contractActiveCount: Int!
+
+  # purchase stats
+  purchaseCount: Int!
+  closeoutCount: Int!
+}
+
+type DeliveryDate @entity(immutable: true) {
+  id: Bytes!
+  deliveryDate: BigInt!
+}
+
+# Futures Contract Entities
+type Participant @entity(immutable: false) {
+  id: Bytes!
+  address: Bytes!
+  positions: [Position!]!
+  orders: [Order!]!
+
+  # Stats
+  positionCount: Int!
+  orderCount: Int!
+  totalVolume: BigInt!
+
+  # Balance tracking
+  balance: BigInt!
+  totalDeposited: BigInt!
+  totalWithdrawn: BigInt!
+  lastBalanceUpdate: BigInt!
+}
+
+type Position @entity(immutable: false) {
+  id: Bytes!
+  participant: Participant!
+  price: BigInt!
+  deliveryDate: BigInt!
+  isBuy: Boolean!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+
+  # Status
+  isActive: Boolean!
+  closedAt: BigInt
+  closedBy: Bytes
+}
+
+type Order @entity(immutable: false) {
+  id: Bytes!
+  seller: Participant!
+  buyer: Participant!
+  price: BigInt!
+  startTime: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+
+  # Status
+  isActive: Boolean!
+  closedAt: BigInt
+  closedBy: Bytes
+}
+
+type HashrateOracle @entity(immutable: false) {
+  id: Int8!
+  initializedBlockNumber: BigInt!
+  initializeTimestamp: BigInt!
+}
+
+# HashrateOracle Timeseries Entities
+type HashrateIndex @entity(immutable: true) @timeseries {
+  id: Int8!
+  hashesForBTC: BigInt!
+  hashesForToken: BigInt!
+  updatedAt: BigInt!
+  blockNumber: BigInt!
+}

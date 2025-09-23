@@ -11,7 +11,7 @@ import { hoursToSeconds } from "../../lib/utils";
 import { THPStoHPS } from "../../lib/utils";
 import { compressPublicKey, getPublicKey } from "../../lib/pubkey";
 import type { WalletClient } from "@nomicfoundation/hardhat-viem/types";
-import { time } from "@nomicfoundation/hardhat-network-helpers";
+import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
 type ContractConfigWithCount = {
   config: {
@@ -30,7 +30,7 @@ export const sampleContracts: ContractConfigWithCount[] = [
   { config: { speedTHPS: 100, lengthHours: 24, profitTargetPercent: 0 }, count: 1 },
 ];
 
-export async function deployLocalFixture() {
+export async function deployTokenOraclesAndMulticall3() {
   // Get wallet clients
   const [owner, seller, buyer, validator, validator2, buyer2, defaultBuyer] =
     await viem.getWalletClients();
@@ -38,13 +38,15 @@ export async function deployLocalFixture() {
   const tc = await viem.getTestClient();
   const topUpBalance = parseUnits("1000", 8);
 
+  const multicall3 = await viem.deployContract("Multicall3", []);
+
   // Deploy Lumerin Token (for fees)
   const _lumerinToken = await viem.deployContract("contracts/token/LumerinToken.sol:Lumerin", []);
-  const lumerinToken = await getIERC20(_lumerinToken.address);
+  const lumerinToken = await getIERC20Metadata(_lumerinToken.address);
 
   // Deploy USDC Mock (for payments)
   const _usdcMock = await viem.deployContract("contracts/mocks/USDCMock.sol:USDCMock", []);
-  const usdcMock = await getIERC20(_usdcMock.address);
+  const usdcMock = await getIERC20Metadata(_usdcMock.address);
 
   // Deploy BTC Price Oracle Mock
   const btcPriceOracleMock = await viem.deployContract(
@@ -100,6 +102,37 @@ export async function deployLocalFixture() {
   await hashrateOracle.write.setTTL([maxUint256, maxUint256]);
   await hashrateOracle.write.setHashesForBTC([oracle.hashesForBTC]);
 
+  return {
+    config: {
+      oracle,
+    },
+    contracts: {
+      lumerinToken,
+      usdcMock,
+      btcPriceOracleMock,
+      hashrateOracle,
+      multicall3,
+    },
+    accounts: {
+      owner,
+      seller,
+      buyer,
+      buyer2,
+      defaultBuyer,
+      validator,
+      validator2,
+      pc,
+      tc,
+    },
+  };
+}
+
+export async function deployLocalFixture() {
+  const { contracts, accounts, config } = await loadFixture(deployTokenOraclesAndMulticall3);
+  const { lumerinToken, usdcMock, btcPriceOracleMock, hashrateOracle, multicall3 } = contracts;
+  const { oracle } = config;
+  const { owner, seller, buyer, buyer2, defaultBuyer, validator, validator2, pc, tc } = accounts;
+
   const btcPrice = await btcPriceOracleMock.read.latestRoundData();
   // console.log("BTC price:", btcPrice);
 
@@ -118,7 +151,6 @@ export async function deployLocalFixture() {
   ]);
 
   // Deploy Multicall3
-  const multicall3 = await viem.deployContract("Multicall3", []);
 
   // Deploy Implementation and Beacon
   const mockImplementation = await viem.deployContract(
@@ -135,7 +167,7 @@ export async function deployLocalFixture() {
   const cloneFactoryConfig = {
     validatorFeeRateScaled:
       parseUnits("0.01", 18) *
-      10n ** BigInt((await _lumerinToken.read.decimals()) - (await _usdcMock.read.decimals())),
+      10n ** BigInt((await lumerinToken.read.decimals()) - (await usdcMock.read.decimals())),
     contractAddresses: [] as `0x${string}`[],
     minSellerStake: parseUnits("100", 8),
     minContractDuration: 0,
@@ -411,10 +443,10 @@ export async function deployLocalFixture() {
 
 async function buyContract(
   contractAddress: string,
-  lumerinToken: IERC20,
+  lumerinToken: IERC20Metadata,
   cloneFactory: ICloneFactory,
   buyer: WalletClient,
-  usdcMock: IERC20,
+  usdcMock: IERC20Metadata,
   validator: WalletClient
 ) {
   console.log("buying contract", contractAddress);
@@ -438,7 +470,14 @@ function getCloneFactory(addr: `0x${string}`) {
 }
 
 function getIERC20(addr: `0x${string}`) {
-  return viem.getContractAt("@openzeppelin/contracts-v4/token/ERC20/IERC20.sol:IERC20", addr);
+  return viem.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", addr);
+}
+
+function getIERC20Metadata(addr: `0x${string}`) {
+  return viem.getContractAt(
+    "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol:IERC20Metadata",
+    addr
+  );
 }
 
 function getImplementation(addr: `0x${string}`) {
@@ -447,3 +486,4 @@ function getImplementation(addr: `0x${string}`) {
 
 type ICloneFactory = Awaited<ReturnType<typeof getCloneFactory>>;
 type IERC20 = Awaited<ReturnType<typeof getIERC20>>;
+type IERC20Metadata = Awaited<ReturnType<typeof getIERC20Metadata>>;
