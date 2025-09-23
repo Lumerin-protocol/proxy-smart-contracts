@@ -10,9 +10,11 @@ async function main() {
   await run("compile");
 
   const runPromise = run("node");
+
   const data = await deployLocalFixture();
   const dataFutures = await deployOnlyFuturesWithDummyData(data);
   const { contracts, config } = data;
+
 
   console.log("Deployment completed successfully!");
 
@@ -37,6 +39,7 @@ async function main() {
   console.log("CloneFactory:", contracts.cloneFactory.address);
   console.log("ValidatorRegistry:", contracts.validatorRegistry.address);
   console.log("Futures:", dataFutures.contracts.futures.address);
+
   console.log();
   console.log("Contract addresses: ");
   config.cloneFactory.contractAddresses.map((addr, index) => console.log(`${index}:`, addr));
