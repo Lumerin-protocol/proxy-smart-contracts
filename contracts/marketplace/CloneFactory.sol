@@ -10,6 +10,7 @@ import { Implementation } from "./Implementation.sol";
 import { Versionable } from "../util/versionable.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { Paginator } from "@solarity/solidity-lib/libs/arrays/Paginator.sol";
+import "hardhat/console.sol";
 
 /// @title CloneFactory
 /// @author Josh Kean (Lumerin), Oleksandr (Shev) Shevchuk
@@ -37,10 +38,13 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     /// @dev  validatorFeeRateScaled = priceWithDecimals / feeWithDecimals * 10**VALIDATOR_FEE_DECIMALS
     /// @dev  validatorFeeRateScaled = 10 * 10**8 / 100 * 10**6 * 10**18 = 10 * 10**18
     uint256 public validatorFeeRateScaled;
-    uint8 public constant VALIDATOR_FEE_DECIMALS = 18;
-    string public constant VERSION = "2.0.8"; // This will be replaced during build time
     uint32 private minContractDuration;
     uint32 private maxContractDuration;
+    BuyerInfo private defaultBuyer;
+    int8 private defaultBuyerProfitTarget;
+
+    uint8 public constant VALIDATOR_FEE_DECIMALS = 18;
+    string public constant VERSION = "2.0.8"; // This will be replaced during build time
 
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -53,6 +57,13 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     event validatorFeeRateUpdated(uint256 _validatorFeeRateScaled);
     event contractHardDeleted(address indexed _address);
 
+    event contractCreatedV2(
+        address indexed _address, address indexed _seller, int8 profitTarget, uint256 length, uint256 speed
+    );
+    event sellerRegisteredUpdated(address indexed _seller, uint256 _stake);
+    event sellerDeregistered(address indexed _seller);
+    event minSellerStakeUpdated(uint256 _minSellerStake);
+
     modifier _onlyOwner() {
         require(_msgSender() == owner(), "you are not authorized");
         _;
@@ -60,6 +71,12 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
 
     struct Seller {
         uint256 stake;
+    }
+
+    struct BuyerInfo {
+        address addr;
+        string encrValidatorURL;
+        string encrDestURL;
     }
 
     mapping(address => Seller) private sellers;
@@ -123,6 +140,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         BeaconProxy beaconProxy = new BeaconProxy(baseImplementation, data);
         address newContractAddr = address(beaconProxy);
         emit contractCreated(newContractAddr, _pubKey);
+        emit contractCreatedV2(newContractAddr, _msgSender(), _profitTarget, _length, _speed);
         rentalContracts.push(newContractAddr);
         rentalContractsMap[newContractAddr] = true;
         addSellerContract(_msgSender(), newContractAddr);
@@ -139,36 +157,107 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         address _validatorAddress,
         string calldata _encrValidatorURL,
         string calldata _encrDestURL,
-        uint32 termsVersion
+        uint32 termsVersion,
+        bool _isResellable,
+        bool _resellToDefaultBuyer,
+        int8 _resellProfitTarget
     ) external payable {
         // Validation block - variables scoped to reduce stack depth
-        {
-            Implementation targetContract = Implementation(_contractAddress);
-            require(rentalContractsMap[_contractAddress], "unknown contract address");
-            require(!targetContract.isDeleted(), "cannot purchase deleted contract");
-            require(targetContract.seller() != _msgSender(), "cannot purchase your own contract");
-            ensureActiveSeller(targetContract.seller());
-
-            uint32 _version;
-            (,,,, _version,) = targetContract.futureTerms();
-            if (_version == 0) {
-                (,,,, _version,) = targetContract.terms();
-            }
-            require(_version == termsVersion, "cannot purchase, contract terms were updated");
-        }
-
+        Implementation(_contractAddress).claimFunds();
+        validatePurchase(_contractAddress, termsVersion, _isResellable);
         emit clonefactoryContractPurchased(_contractAddress, _validatorAddress);
+        _handlePurchase(
+            Implementation(_contractAddress),
+            _encrValidatorURL,
+            _encrDestURL,
+            _validatorAddress,
+            packBools(_isResellable, _resellToDefaultBuyer),
+            _resellProfitTarget
+        );
+    }
 
-        // Payment handling block - get price and fee directly in transfers
-        (uint256 _price, uint256 _fee) = Implementation(_contractAddress).priceAndFee();
+    function packBools(bool a, bool b) public pure returns (uint8) {
+        return uint8(a ? 1 : 0) | (uint8(b ? 1 : 0) << 1);
+    }
 
-        Implementation(_contractAddress).setPurchaseContract(
-            _encrValidatorURL, _encrDestURL, _price, _msgSender(), _validatorAddress, validatorFeeRateScaled
+    function unpackFirstBool(uint8 packed) public pure returns (bool a) {
+        return (packed & 1) != 0;
+    }
+
+    function unpackSecondBool(uint8 packed) public pure returns (bool b) {
+        return (packed & (1 << 1)) != 0;
+    }
+
+    function validatePurchase(address _contractAddress, uint32 termsVersion, bool _isResellable) internal view {
+        Implementation targetContract = Implementation(_contractAddress);
+        require(rentalContractsMap[_contractAddress], "unknown contract address");
+        require(!targetContract.isDeleted(), "cannot purchase deleted contract");
+        require(targetContract.seller() != _msgSender(), "cannot purchase your own contract");
+        console.log("targetContract.seller()", targetContract.seller());
+        ensureActiveSeller(targetContract.seller());
+
+        uint32 _version;
+        (,, _version) = targetContract.futureTerms();
+        if (_version == 0) {
+            (,, _version) = targetContract.terms();
+        }
+        require(_version == termsVersion, "cannot purchase, contract terms were updated");
+
+        if (_isResellable) {
+            ensureActiveSeller(_msgSender());
+        }
+    }
+
+    function _handlePurchase(
+        // address _contractAddress,
+        Implementation targetContract,
+        string calldata _encrValidatorURL,
+        string calldata _encrDestURL,
+        address _validatorAddress,
+        uint8 _resellFlags,
+        int8 _resellProfitTarget
+    ) internal {
+        // Implementation targetContract = Implementation(_contractAddress);
+        (uint256 _price, uint256 _fee) = targetContract.priceAndFee();
+
+        console.log("purchasing contact part-1, price", _price);
+        targetContract.setPurchaseContract(
+            _encrValidatorURL,
+            _encrDestURL,
+            _price,
+            _fee,
+            _msgSender(),
+            _msgSender(),
+            _validatorAddress,
+            _resellFlags,
+            _resellProfitTarget
         );
 
-        paymentToken.safeTransferFrom(_msgSender(), _contractAddress, _price);
+        paymentToken.safeTransferFrom(_msgSender(), address(targetContract), _price);
+
         if (_validatorAddress != address(0) && _fee > 0) {
-            feeToken.safeTransferFrom(_msgSender(), _contractAddress, _fee);
+            feeToken.safeTransferFrom(_msgSender(), address(targetContract), _fee);
+        }
+
+        // TODO: should be a remaining duration of the contract
+        if (_resellFlags & 2 != 0) {
+            requireDefaultBuyerSet();
+            uint256 _resellPrice = targetContract.priceV2(defaultBuyerProfitTarget);
+
+            console.log("purchasing contact part-2, price", _resellPrice);
+            targetContract.setPurchaseContract(
+                defaultBuyer.encrValidatorURL,
+                defaultBuyer.encrDestURL,
+                _resellPrice,
+                0,
+                defaultBuyer.addr,
+                _msgSender(),
+                address(0),
+                packBools(true, false),
+                _resellProfitTarget
+            );
+
+            paymentToken.safeTransferFrom(defaultBuyer.addr, address(targetContract), _resellPrice);
         }
     }
 
@@ -234,24 +323,16 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     /// @param _contractAddress The address of the contract to update
     /// @param _speed The new speed value
     /// @param _length The new length value
-    /// @param _profitTarget The new profit target value
-    function setUpdateContractInformationV2(
-        address _contractAddress,
-        uint256,
-        uint256,
-        uint256 _speed,
-        uint256 _length,
-        int8 _profitTarget
-    ) external {
+    function setUpdateContractInformationV2(address _contractAddress, uint256 _speed, uint256 _length) external {
         ensureRegisteredSeller(_msgSender());
         enforceContractDuration(_length);
 
         require(rentalContractsMap[_contractAddress], "unknown contract address");
         Implementation _contract = Implementation(_contractAddress);
-        require(_msgSender() == _contract.seller(), "you are not authorized");
+        require(_msgSender() == _contract.owner(), "you are not authorized");
 
         emit purchaseInfoUpdated(_contractAddress);
-        Implementation(_contractAddress).setUpdatePurchaseInformation(_speed, _length, _profitTarget);
+        Implementation(_contractAddress).setTerms(_speed, _length);
     }
 
     function sellerByAddress(address _seller)
@@ -269,6 +350,10 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
             revert("stake is less than required minimum");
         }
 
+        console.log("seller registered, stake", sellers[_seller].stake);
+
+        emit sellerRegisteredUpdated(_seller, sellers[_seller].stake);
+
         sellerAddresses.add(_seller);
         feeToken.safeTransferFrom(_seller, address(this), _stake);
     }
@@ -279,6 +364,9 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         if (sellerContracts[_seller].length() > 0) {
             revert("seller has contracts");
         }
+
+        emit sellerDeregistered(_seller);
+
         uint256 stakeToReturn = sellers[_seller].stake;
         sellers[_seller].stake = 0;
         sellerAddresses.remove(_seller);
@@ -314,15 +402,16 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
 
     function setMinSellerStake(uint256 _minSellerStake) external _onlyOwner {
         minSellerStake = _minSellerStake;
+        emit minSellerStakeUpdated(_minSellerStake);
     }
 
-    // function getSellerContracts(address _seller, uint256 _offset, uint8 _limit)
-    //     external
-    //     view
-    //     returns (address[] memory)
-    // {
-    //     return sellerContracts[_seller].part(_offset, _limit);
-    // }
+    function getSellerContracts(address _seller, uint256 _offset, uint8 _limit)
+        external
+        view
+        returns (address[] memory)
+    {
+        return sellerContracts[_seller].part(_offset, _limit);
+    }
 
     function getSellers(uint256 _offset, uint8 _limit) external view returns (address[] memory) {
         return sellerAddresses.part(_offset, _limit);
@@ -342,6 +431,20 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         return (minContractDuration, maxContractDuration);
     }
 
+    function setDefaultBuyer(
+        address _buyerAddress,
+        int8 _profitTarget,
+        string calldata _encrValidatorURL,
+        string calldata _encrDestURL
+    ) external _onlyOwner {
+        defaultBuyer = BuyerInfo(_buyerAddress, _encrValidatorURL, _encrDestURL);
+        defaultBuyerProfitTarget = _profitTarget;
+    }
+
+    function getDefaultBuyer() external view returns (BuyerInfo memory, int8) {
+        return (defaultBuyer, defaultBuyerProfitTarget);
+    }
+
     /// @dev Throws if the contract duration is not within the allowed interval
     function enforceContractDuration(uint256 _duration) private view {
         if (!isContractDurationValid(_duration)) {
@@ -351,5 +454,11 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
 
     function isContractDurationValid(uint256 _duration) private view returns (bool) {
         return _duration >= minContractDuration && _duration <= maxContractDuration;
+    }
+
+    function requireDefaultBuyerSet() private view {
+        if (defaultBuyer.addr == address(0)) {
+            revert("default buyer is not set");
+        }
     }
 }

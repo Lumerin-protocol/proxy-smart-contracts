@@ -30,12 +30,18 @@ const config: HardhatUserConfig = {
       },
       // for validation regitry
       {
-        version: "0.8.26",
+        version: "0.8.30",
         settings: {
           optimizer: {
             enabled: true,
             runs: 200,
+            // details: {
+            //   yulDetails: {
+            //     optimizerSteps: "u",
+            //   },
+            // },
           },
+          // viaIR: true,
         },
       },
     ],

@@ -21,6 +21,16 @@ export async function getTxTimestamp(client: PublicClient, txHash: `0x${string}`
   return block.timestamp;
 }
 
+export async function getTxDeltaTime(
+  client: PublicClient,
+  txHash: `0x${string}`,
+  txHash2: `0x${string}`
+): Promise<bigint> {
+  const timestamp1 = await getTxTimestamp(client, txHash);
+  const timestamp2 = await getTxTimestamp(client, txHash2);
+  return timestamp2 - timestamp1;
+}
+
 /** helper function to catch errors and check if the error is the expected one
  * @example
  * await catchError(abi, "ErrorName", async () => {
@@ -114,18 +124,25 @@ interface BalanceOf {
   };
 }
 
+type Account = {
+  account: {
+    address: `0x${string}`;
+  };
+};
+
 /** Returns the change of address token balance due to the transaction */
 export async function getTxDeltaBalance(
   pc: PublicClient,
   txHash: `0x${string}`,
-  address: `0x${string}`,
+  address: `0x${string}` | Account,
   token: BalanceOf
 ): Promise<bigint> {
   const receipt = await pc.waitForTransactionReceipt({ hash: txHash });
-  const before = await token.read.balanceOf([address], {
+  const addressToUse = typeof address === "object" ? address.account.address : address;
+  const before = await token.read.balanceOf([addressToUse], {
     blockNumber: receipt.blockNumber - 1n,
   });
-  const after = await token.read.balanceOf([address]);
+  const after = await token.read.balanceOf([addressToUse]);
   return after - before;
 }
 

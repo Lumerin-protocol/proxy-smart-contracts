@@ -1,0 +1,13 @@
+{
+  "localhost": {
+    "CloneFactory": {
+      "address": "0x59b670e9fa9d0a427751af201d676719a970857b"
+    }
+  },
+  "arbitrum-sepolia": {
+    "CloneFactory": {
+      "address": "0x31628c64e42c276c093e721d1e840ea68fcfaef5",
+      "startBlock": 192513759
+    }
+  }
+}
