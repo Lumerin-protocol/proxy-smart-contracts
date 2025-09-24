@@ -1,10 +1,10 @@
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import { deployLocalFixture } from "./fixtures-2";
-import { getAddress, maxUint256, maxUint256, zeroAddress } from "viem";
+import { deployLocalFixture } from "../fixtures-2";
+import { getAddress, maxUint256, zeroAddress } from "viem";
 import { viem } from "hardhat";
 import { expect } from "chai";
-import { getTxDeltaBalance, getTxDeltaTime, getTxTimestamp } from "../lib";
-import { getFullResellChain, getResellChain } from "../../scripts/lib/resell";
+import { getTxDeltaBalance, getTxDeltaTime, getTxTimestamp } from "../../lib";
+import { getFullResellChain, getResellChain } from "../../../scripts/lib/resell";
 
 describe("Resell", () => {
   it("should be able to resell a contract", async () => {
@@ -203,7 +203,7 @@ it("should auto close and resolve payments to everyone", async () => {
   });
 });
 
-it.only("should track resell chain", async () => {
+it("should track resell chain", async () => {
   const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
   const { cloneFactory, usdcMock, lumerinToken } = contracts;
   const { buyer, seller, buyer2, pc } = accounts;

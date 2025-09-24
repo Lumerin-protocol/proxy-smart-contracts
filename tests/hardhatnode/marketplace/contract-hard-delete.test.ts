@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { viem } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import { deployLocalFixture } from "./fixtures-2";
+import { deployLocalFixture } from "../fixtures-2";
 import { parseEventLogs, zeroAddress } from "viem";
 
 describe("Contract hard delete", function () {

@@ -1,9 +1,9 @@
 import { expect } from "chai";
-import { expectIsError } from "../utils";
-import { testEarlyCloseout } from "../actions";
+import { expectIsError } from "../../utils";
+import { testEarlyCloseout } from "../../actions";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
-import { deployLocalFixture } from "./fixtures-2";
+import { deployLocalFixture } from "../fixtures-2";
 import { viem } from "hardhat";
 
 describe("Validator fee", function () {

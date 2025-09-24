@@ -3,9 +3,9 @@ import { viem } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { encrypt } from "ecies-geth";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
-import { deployLocalFixture } from "./fixtures-2";
-import { remove0xPrefix } from "../../lib/utils";
-import { getPublicKey } from "../../lib/pubkey";
+import { deployLocalFixture } from "../fixtures-2";
+import { remove0xPrefix } from "../../../lib/utils";
+import { getPublicKey } from "../../../lib/pubkey";
 
 describe("Contract purchase", function () {
   it("should purchase with cloud validator", async function () {

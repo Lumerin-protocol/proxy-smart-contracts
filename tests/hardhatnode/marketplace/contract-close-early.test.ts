@@ -1,10 +1,10 @@
 import { expect } from "chai";
-import { expectIsError } from "../utils";
+import { expectIsError } from "../../utils";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
-import { deployLocalFixture } from "./fixtures-2";
+import { deployLocalFixture } from "../fixtures-2";
 import { viem } from "hardhat";
-import { CloseReason } from "../utils";
+import { CloseReason } from "../../utils";
 import { parseEventLogs } from "viem";
 
 describe("Contract close early", function () {

@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { viem } from "hardhat";
 import { getAddress, parseEventLogs, zeroAddress } from "viem";
-import { deployLocalFixture } from "./fixtures-2";
+import { deployLocalFixture } from "../fixtures-2";
 
 describe("Contract create", function () {
   const speed = 1_000_000n;
@@ -10,14 +10,14 @@ describe("Contract create", function () {
   const profitTarget = 10;
   const pubKey = "123";
 
-  it("should create a new contract", async function () {
+  it.only("should create a new contract", async function () {
     const { accounts, contracts } = await loadFixture(deployLocalFixture);
     const { seller, pc } = accounts;
     const { cloneFactory } = contracts;
 
     // Create new rental contract (using V2 method)
     const txHash = await cloneFactory.write.setCreateNewRentalContractV2(
-      [0n, 0n, speed, length, profitTarget, zeroAddress, pubKey],
+      [speed, length, profitTarget, pubKey],
       { account: seller.account }
     );
 
@@ -36,34 +36,22 @@ describe("Contract create", function () {
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
     // Get public variables (using V2 method)
-    const [
-      state,
-      terms,
-      startingBlockTimestamp,
-      buyer,
-      _seller,
-      encryptedPoolData,
-      isDeleted,
-      balance,
-      hasFutureTerms,
-    ] = await impl.read.getPublicVariablesV2();
+    const [_speed, _length, _version] = await impl.read.terms();
+    const _entry = await impl.read.resellChain([0n]);
+    const entry = mapResellTerms(entry);
 
-    expect(state).to.equal(0);
-    expect(getAddress(_seller)).to.equal(getAddress(seller.account.address));
-    expect(startingBlockTimestamp).to.equal(0n);
-    expect(buyer).to.equal(zeroAddress);
-    expect(encryptedPoolData).to.equal("");
-    expect(isDeleted).to.equal(false);
+    expect(entry.state).to.equal(0);
+    expect(getAddress(entry._seller)).to.equal(getAddress(seller.account.address));
+    expect(entry.startingBlockTimestamp).to.equal(0n);
+    expect(entry.buyer).to.equal(zeroAddress);
+    expect(entry.encryptedPoolData).to.equal("");
+    expect(entry.isDeleted).to.equal(false);
     expect(balance).to.equal(0n);
-    expect(hasFutureTerms).to.equal(false);
+    expect(entry.hasFutureTerms).to.equal(false);
 
-    expect(terms._speed).to.equal(speed);
-    expect(terms._length).to.equal(length);
-    expect(terms._profitTarget).to.equal(profitTarget);
-
-    // Get history - use correct types: uint256 (bigint) and uint8 (number)
-    const history = await impl.read.getHistory([0n, 10]);
-    expect(history.length).to.equal(0);
+    expect(_speed).to.equal(speed);
+    expect(_length).to.equal(length);
+    expect(entry._resellProfitTarget).to.equal(profitTarget);
 
     // Get future terms
     const futureTerms = await impl.read.futureTerms();
@@ -466,3 +454,46 @@ describe("Contract create", function () {
     });
   });
 });
+
+function getImplementation(contractAddress: `0x${string}`) {
+  return viem.getContractAt("Implementation", contractAddress);
+}
+
+async function getResellChain(contractAddress: `0x${string}`, index: number) {
+  return await (
+    await viem.getContractAt("Implementation", contractAddress)
+  ).read.resellChain([BigInt(index)]);
+}
+
+function mapResellTerms(entry: Awaited<ReturnType<typeof getResellChain>>) {
+  const [
+    _account,
+    _validator,
+    _price,
+    _fee,
+    _startTime,
+    _encrDestURL,
+    _encrValidatorURL,
+    _lastSettlementTime,
+    _seller,
+    _resellProfitTarget,
+    _isResellable,
+    _isResellToDefaultBuyer,
+  ] = entry;
+
+  return {
+    _account,
+    _validator,
+    _price,
+    _fee,
+    _startTime,
+    _encrDestURL,
+    _encrValidatorURL,
+    _lastSettlementTime, // timestamp when the contract was settled last time
+    // resell terms
+    _seller, // seller of the contract !== account when there is a default buyer
+    _resellProfitTarget,
+    _isResellable,
+    _isResellToDefaultBuyer, //
+  };
+}

@@ -1,9 +1,9 @@
 import { viem } from "hardhat";
 import { expect } from "chai";
 import { parseUnits } from "viem";
-import { deployLocalFixture } from "./fixtures-2";
+import { deployLocalFixture } from "../fixtures-2";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import { catchError } from "../lib";
+import { catchError } from "../../lib";
 
 describe("CloneFactory Coverage Tests (Fixed)", function () {
   describe("Authorization and Ownership", function () {

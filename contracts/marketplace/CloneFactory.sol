@@ -121,15 +121,11 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     /// @param _profitTarget The profit target of the contract in percent
     /// @param _pubKey The public key of the contract
     /// @return address The address of the new contract
-    function setCreateNewRentalContractV2(
-        uint256,
-        uint256,
-        uint256 _speed,
-        uint256 _length,
-        int8 _profitTarget,
-        address,
-        string calldata _pubKey
-    ) external payable returns (address) {
+    function setCreateNewRentalContractV2(uint256 _speed, uint256 _length, int8 _profitTarget, string calldata _pubKey)
+        external
+        payable
+        returns (address)
+    {
         ensureActiveSeller(_msgSender());
         enforceContractDuration(_length);
 

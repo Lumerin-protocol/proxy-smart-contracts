@@ -1,10 +1,10 @@
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
-import { deployLocalFixture } from "./fixtures-2";
+import { deployLocalFixture } from "../fixtures-2";
 import { expect } from "chai";
 import { viem } from "hardhat";
-import { getTxDeltaBalance } from "../lib";
+import { getTxDeltaBalance } from "../../lib";
 
-describe("Claim funds", function () {
+describe("Implementation - Claim funds", function () {
   it("should claim half of the funds after half of the contract duration", async function () {
     const { config, accounts, contracts } = await loadFixture(deployLocalFixture);
     const [contractAddr] = config.cloneFactory.contractAddresses;

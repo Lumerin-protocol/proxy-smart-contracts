@@ -329,12 +329,9 @@ export async function deployLocalFixture() {
     for (let i = 0; i < contract.count; i++) {
       const hash = await cloneFactory.write.setCreateNewRentalContractV2(
         [
-          0n,
-          0n,
           BigInt(THPStoHPS(contract.config.speedTHPS)),
           BigInt(hoursToSeconds(contract.config.lengthHours)),
           Number(contract.config.profitTargetPercent),
-          seller.account.address,
           await getPublicKey(seller),
         ],
         {
