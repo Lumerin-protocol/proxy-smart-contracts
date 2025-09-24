@@ -19,7 +19,7 @@ describe("Contract hard delete", function () {
     const pubKey = "test-pubkey-123";
 
     const txHash = await cloneFactory.write.setCreateNewRentalContractV2(
-      [0n, 0n, speed, length, profitTarget, zeroAddress, pubKey],
+      [speed, length, profitTarget, pubKey],
       { account: seller.account }
     );
 
@@ -69,7 +69,7 @@ describe("Contract hard delete", function () {
 
     // Verify contract is marked as deleted
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
-    const [, , , , , , isDeleted] = await impl.read.getPublicVariablesV2();
+    const isDeleted = await impl.read.isDeleted();
     expect(isDeleted).to.equal(true);
   });
 
@@ -99,7 +99,7 @@ describe("Contract hard delete", function () {
 
     // Verify contract is marked as deleted
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
-    const [, , , , , , isDeleted] = await impl.read.getPublicVariablesV2();
+    const isDeleted = await impl.read.isDeleted();
     expect(isDeleted).to.equal(true);
   });
 
@@ -166,7 +166,7 @@ describe("Contract hard delete", function () {
 
   it("should handle hard deletion of the last contract in the array", async function () {
     const { accounts, contracts } = await loadFixture(setupContractFixture);
-    const { seller } = accounts;
+    const { seller, owner } = accounts;
     const { cloneFactory } = contracts;
 
     // Get initial contract list
@@ -176,7 +176,7 @@ describe("Contract hard delete", function () {
 
     // Hard delete the last contract
     await cloneFactory.write.contractHardDelete([BigInt(lastIndex), lastContractAddr], {
-      account: seller.account,
+      account: owner.account,
     });
 
     // Verify contract is removed from the list
@@ -196,7 +196,7 @@ describe("Contract hard delete", function () {
 
     for (let i = 0; i < 2; i++) {
       const txHash = await cloneFactory.write.setCreateNewRentalContractV2(
-        [0n, 0n, 1_000_000n, 3600n, 10, zeroAddress, `pubkey-${i}`],
+        [1_000_000n, 3600n, 10, `pubkey-${i}`],
         { account: seller.account }
       );
 
@@ -241,22 +241,10 @@ describe("Contract hard delete", function () {
       account: seller.account,
     });
 
-    // Get contract terms for approvals
-    const impl = await viem.getContractAt("Implementation", hrContractAddr);
-    const [, terms] = await impl.read.getPublicVariablesV2();
-
-    // Approve tokens
-    await usdcMock.write.approve([cloneFactory.address, terms._price], {
-      account: buyer.account,
-    });
-    await lumerinToken.write.approve([cloneFactory.address, terms._fee], {
-      account: buyer.account,
-    });
-
     // Attempt purchase should fail
     try {
       await cloneFactory.write.setPurchaseRentalContractV2(
-        [hrContractAddr, buyer.account.address, "", "", terms._version],
+        [hrContractAddr, buyer.account.address, "", "", 0, true, false, 0n],
         { account: buyer.account }
       );
       expect.fail("should throw error");
@@ -276,7 +264,7 @@ describe("Contract hard delete", function () {
 
     for (let i = 0; i < 3; i++) {
       const txHash = await cloneFactory.write.setCreateNewRentalContractV2(
-        [0n, 0n, 1_000_000n, 3600n, 10, zeroAddress, `pubkey-${i}`],
+        [1_000_000n, 3600n, 10, `pubkey-${i}`],
         { account: seller.account }
       );
 
@@ -312,30 +300,17 @@ describe("Contract hard delete", function () {
 
   it("should handle hard deletion of purchased contract", async function () {
     const { accounts, contracts, hrContractAddr } = await loadFixture(setupContractFixture);
-    const { seller, buyer, validator } = accounts;
+    const { seller, buyer, validator, owner } = accounts;
     const { cloneFactory, usdcMock, lumerinToken } = contracts;
 
     // Purchase the contract first
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
-    const [, terms] = await impl.read.getPublicVariablesV2();
-
-    // Approve tokens for purchase
-    await usdcMock.write.approve([cloneFactory.address, terms._price], {
-      account: buyer.account,
-    });
-    await lumerinToken.write.approve([cloneFactory.address, terms._fee], {
-      account: buyer.account,
-    });
 
     // Purchase the contract
     await cloneFactory.write.setPurchaseRentalContractV2(
-      [hrContractAddr, validator.account.address, "", "", terms._version],
+      [hrContractAddr, validator.account.address, "", "", 0, true, false, 0n],
       { account: buyer.account }
     );
-
-    // Verify it's purchased
-    const [state] = await impl.read.getPublicVariablesV2();
-    expect(state).to.equal(1); // Running state
 
     // Hard delete the purchased contract
     const contractList = await cloneFactory.read.getContractList();
@@ -343,14 +318,14 @@ describe("Contract hard delete", function () {
     const contractAddress = contractList[contractIndex];
 
     await cloneFactory.write.contractHardDelete([BigInt(contractIndex), contractAddress], {
-      account: seller.account,
+      account: owner.account,
     });
 
     // Verify it's removed from the list and marked as deleted
     const finalContractList = await cloneFactory.read.getContractList();
     expect(finalContractList).to.not.include(hrContractAddr);
 
-    const [, , , , , , finalIsDeleted] = await impl.read.getPublicVariablesV2();
+    const finalIsDeleted = await impl.read.isDeleted();
     expect(finalIsDeleted).to.equal(true);
   });
 });

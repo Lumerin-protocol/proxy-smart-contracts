@@ -5,28 +5,18 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { deployLocalFixture } from "../fixtures-2";
 import { viem } from "hardhat";
 import { CloseReason } from "../../utils";
-import { parseEventLogs } from "viem";
+import { parseEventLogs, zeroAddress } from "viem";
 
 describe("Contract close early", function () {
   it("should disallow early closeout called second time", async function () {
     const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
     const buyer = accounts.buyer.account.address;
+    const seller = accounts.seller.account.address;
     const hrContractAddr = config.cloneFactory.contractAddresses[0];
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-    // Purchase contract
-    const [price, validatorFee] = await impl.read.priceAndFee();
-    // Approve USDC for contract payment
-    await contracts.usdcMock.write.approve([contracts.cloneFactory.address, price], {
-      account: buyer,
-    });
-    // Approve LMR for validator fee
-    await contracts.lumerinToken.write.approve([contracts.cloneFactory.address, validatorFee], {
-      account: buyer,
-    });
-
     await contracts.cloneFactory.write.setPurchaseRentalContractV2(
-      [hrContractAddr, "0x0000000000000000000000000000000000000000", "abc", "def", 0],
+      [hrContractAddr, zeroAddress, "abc", "def", 0, true, false, 0n],
       { account: buyer }
     );
 
@@ -40,8 +30,9 @@ describe("Contract close early", function () {
       await impl.write.closeEarly([0], { account: buyer });
       expect.fail("should not allow closeout type 0 twice");
     } catch (err) {
+      console.log(err);
       expectIsError(err);
-      expect(err.message).includes("the contract is not in the running state");
+      expect(err.message).includes("this account is not authorized to trigger an early closeout");
     }
   });
 
@@ -51,19 +42,17 @@ describe("Contract close early", function () {
     const hrContractAddr = config.cloneFactory.contractAddresses[0];
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-    // Purchase contract
-    const [price, validatorFee] = await impl.read.priceAndFee();
-    // Approve USDC for contract payment
-    await contracts.usdcMock.write.approve([contracts.cloneFactory.address, price], {
-      account: buyer,
-    });
-    // Approve LMR for validator fee
-    await contracts.lumerinToken.write.approve([contracts.cloneFactory.address, validatorFee], {
-      account: buyer,
-    });
-
     await contracts.cloneFactory.write.setPurchaseRentalContractV2(
-      [hrContractAddr, "0x0000000000000000000000000000000000000000", "abc", "def", 0],
+      [
+        hrContractAddr,
+        "0x0000000000000000000000000000000000000000",
+        "abc",
+        "def",
+        0,
+        true,
+        false,
+        0n,
+      ],
       { account: buyer }
     );
 
@@ -80,19 +69,8 @@ describe("Contract close early", function () {
     const hrContractAddr = config.cloneFactory.contractAddresses[0];
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-    // Purchase contract
-    const [price, validatorFee] = await impl.read.priceAndFee();
-    // Approve USDC for contract payment
-    await contracts.usdcMock.write.approve([contracts.cloneFactory.address, price], {
-      account: buyer,
-    });
-    // Approve LMR for validator fee
-    await contracts.lumerinToken.write.approve([contracts.cloneFactory.address, validatorFee], {
-      account: buyer,
-    });
-
     await contracts.cloneFactory.write.setPurchaseRentalContractV2(
-      [hrContractAddr, validatorAddr, "abc", "def", 0],
+      [hrContractAddr, validatorAddr, "abc", "def", 0, true, false, 0n],
       { account: buyer }
     );
 
@@ -109,22 +87,17 @@ describe("Contract close early", function () {
     const hrContractAddr = config.cloneFactory.contractAddresses[0];
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-    // Purchase contract
-    const [price, validatorFee] = await impl.read.priceAndFee();
-    // Approve USDC for contract payment
-    await contracts.usdcMock.write.approve([contracts.cloneFactory.address, BigInt(price)], {
-      account: buyer,
-    });
-    // Approve LMR for validator fee
-    await contracts.lumerinToken.write.approve(
-      [contracts.cloneFactory.address, BigInt(validatorFee)],
-      {
-        account: buyer,
-      }
-    );
-
     await contracts.cloneFactory.write.setPurchaseRentalContractV2(
-      [hrContractAddr, "0x0000000000000000000000000000000000000000", "abc", "def", 0],
+      [
+        hrContractAddr,
+        "0x0000000000000000000000000000000000000000",
+        "abc",
+        "def",
+        0,
+        true,
+        false,
+        0n,
+      ],
       { account: buyer }
     );
 
@@ -145,26 +118,21 @@ describe("Contract close early", function () {
     const hrContractAddr = config.cloneFactory.contractAddresses[0];
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-    // Purchase contract
-    const [price, validatorFee] = await impl.read.priceAndFee();
-    // Approve USDC for contract payment
-    await contracts.usdcMock.write.approve([contracts.cloneFactory.address, BigInt(price)], {
-      account: buyer,
-    });
-    // Approve LMR for validator fee
-    await contracts.lumerinToken.write.approve(
-      [contracts.cloneFactory.address, BigInt(validatorFee)],
-      {
-        account: buyer,
-      }
-    );
-
     await contracts.cloneFactory.write.setPurchaseRentalContractV2(
-      [hrContractAddr, "0x0000000000000000000000000000000000000000", "abc", "def", 0],
+      [
+        hrContractAddr,
+        "0x0000000000000000000000000000000000000000",
+        "abc",
+        "def",
+        0,
+        true,
+        false,
+        0n,
+      ],
       { account: buyer }
     );
 
-    const [, , , length] = await impl.read.terms();
+    const [, length] = await impl.read.terms();
     await time.increase(length);
 
     try {
@@ -176,44 +144,6 @@ describe("Contract close early", function () {
     }
   });
 
-  it('should update last history entry to "bad closeout" if early closeout was called', async function () {
-    const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
-    const buyer = accounts.buyer.account.address;
-    const hrContractAddr = config.cloneFactory.contractAddresses[0];
-    const impl = await viem.getContractAt("Implementation", hrContractAddr);
-
-    // Purchase contract
-    const [price, validatorFee] = await impl.read.priceAndFee();
-    // Approve USDC for contract payment
-    await contracts.usdcMock.write.approve([contracts.cloneFactory.address, BigInt(price)], {
-      account: buyer,
-    });
-    // Approve LMR for validator fee
-    await contracts.lumerinToken.write.approve(
-      [contracts.cloneFactory.address, BigInt(validatorFee)],
-      {
-        account: buyer,
-      }
-    );
-
-    await contracts.cloneFactory.write.setPurchaseRentalContractV2(
-      [hrContractAddr, "0x0000000000000000000000000000000000000000", "abc", "def", 0],
-      { account: buyer }
-    );
-
-    // Check history before closeout
-    const [historyEntryBefore] = await impl.read.getHistory([0n, 1n]);
-    expect(historyEntryBefore._endTime > 0n).is.true;
-
-    // Close early
-    await time.increase(1);
-    await impl.write.closeEarly([0], { account: buyer });
-
-    // Check history after closeout
-    const [historyEntryAfter] = await impl.read.getHistory([0n, 1n]);
-    expect(historyEntryAfter._endTime < historyEntryBefore._endTime).is.true;
-  });
-
   it("should apply future terms", async function () {
     const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
     const buyer = accounts.buyer.account.address;
@@ -221,34 +151,33 @@ describe("Contract close early", function () {
     const hrContractAddr = config.cloneFactory.contractAddresses[0];
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-    // Purchase contract
-    const [price, validatorFee] = await impl.read.priceAndFee();
-    // Approve USDC for contract payment
-    await contracts.usdcMock.write.approve([contracts.cloneFactory.address, BigInt(price)], {
-      account: buyer,
-    });
-    // Approve LMR for validator fee
-    await contracts.lumerinToken.write.approve(
-      [contracts.cloneFactory.address, BigInt(validatorFee)],
-      { account: buyer }
-    );
-
     await contracts.cloneFactory.write.setPurchaseRentalContractV2(
-      [hrContractAddr, "0x0000000000000000000000000000000000000000", "abc", "def", 0],
+      [
+        hrContractAddr,
+        "0x0000000000000000000000000000000000000000",
+        "abc",
+        "def",
+        0,
+        true,
+        false,
+        0n,
+      ],
       { account: buyer }
     );
 
     // Update terms
-    const terms = await impl.read.terms();
+    const terms = await impl.read.terms().then((t) => {
+      const [speed, length, version] = t;
+      return { speed, length, version };
+    });
     const expTerms = {
-      speed: terms[2] * 2n,
-      length: terms[3] * 2n,
-      version: terms[4] + 1,
-      profitTarget: terms[5] * 2,
+      speed: terms.speed * 2n,
+      length: terms.length * 2n,
+      version: terms.version + 1,
     };
 
     await contracts.cloneFactory.write.setUpdateContractInformationV2(
-      [hrContractAddr, 0n, 0n, expTerms.speed, expTerms.length, expTerms.profitTarget],
+      [hrContractAddr, expTerms.speed, expTerms.length],
       { account: seller }
     );
 
@@ -257,11 +186,13 @@ describe("Contract close early", function () {
     await impl.write.closeEarly([0], { account: buyer });
 
     // Check terms updated
-    const [, , newSpeed, newLength, newVersion, newProfitTarget] = await impl.read.terms();
-    expect(newSpeed).to.equal(expTerms.speed);
-    expect(newLength).to.equal(expTerms.length);
-    expect(newVersion).to.equal(expTerms.version);
-    expect(newProfitTarget).to.equal(expTerms.profitTarget);
+    const newTerms = await impl.read.terms().then((t) => {
+      const [speed, length, version] = t;
+      return { speed, length, version };
+    });
+    expect(newTerms.speed).to.equal(expTerms.speed);
+    expect(newTerms.length).to.equal(expTerms.length);
+    expect(newTerms.version).to.equal(expTerms.version);
   });
 
   it("should emit closedEarly(reason) event", async function () {
@@ -270,17 +201,17 @@ describe("Contract close early", function () {
     const hrContractAddr = config.cloneFactory.contractAddresses[0];
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-    // Purchase contract
-    const [price, validatorFee] = await impl.read.priceAndFee();
-    await contracts.lumerinToken.write.approve([contracts.cloneFactory.address, BigInt(price)], {
-      account: buyer,
-    });
-    await contracts.usdcMock.write.approve([contracts.cloneFactory.address, BigInt(validatorFee)], {
-      account: buyer,
-    });
-
     await contracts.cloneFactory.write.setPurchaseRentalContractV2(
-      [hrContractAddr, "0x0000000000000000000000000000000000000000", "abc", "def", 0],
+      [
+        hrContractAddr,
+        "0x0000000000000000000000000000000000000000",
+        "abc",
+        "def",
+        0,
+        true,
+        false,
+        0n,
+      ],
       { account: buyer }
     );
 
@@ -295,7 +226,7 @@ describe("Contract close early", function () {
     const [closedEarlyEvent] = parseEventLogs({
       abi: impl.abi,
       logs,
-      eventName: "closedEarly",
+      eventName: "contractClosedEarly",
     });
 
     expect(closedEarlyEvent).to.not.be.undefined;

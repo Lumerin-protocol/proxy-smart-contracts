@@ -162,6 +162,7 @@ type Purchase @entity(immutable: false) {
   price: BigInt!
   fee: BigInt!
   resellProfitTarget: Int!
+  resellPrice: BigInt!
   isResell: Boolean!
   startTime: BigInt!
 }
@@ -185,6 +186,7 @@ type ResellTerms @entity(immutable: false) {
   _startTime: BigInt!
   _lastSettlementTime: BigInt!
   _seller: Bytes!
+  _resellPrice: BigInt!
   _resellProfitTarget: Int!
   _isResellable: Boolean!
   _isResellToDefaultBuyer: Boolean!
@@ -253,6 +255,7 @@ type EventPurchased implements HistoryEvent @entity(immutable: true) {
   _isResellToDefaultBuyer: Boolean!
   _isResellable: Boolean!
   _resellProfitTarget: Int!
+  _resellPrice: BigInt!
 }
 
 type EventCloseout implements HistoryEvent @entity(immutable: true) {

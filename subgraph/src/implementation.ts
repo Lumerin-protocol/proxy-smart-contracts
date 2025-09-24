@@ -20,7 +20,6 @@ import {
   Terms,
 } from "../generated/schema";
 import { BigInt, Bytes, log } from "@graphprotocol/graph-ts";
-import { unpackBools } from "./lib";
 import { blockNumberLogIndex, blockNumberLogIndexAddress } from "./event";
 
 export function handlecontractPurchased(event: contractPurchased): void {
@@ -29,9 +28,8 @@ export function handlecontractPurchased(event: contractPurchased): void {
     throw new Error("Implementation not found");
   }
 
-  const data = unpackBools(event.params._resellFlags);
-  const isResellable = data[0];
-  const isResellToDefaultBuyer = data[1];
+  const isResellable = event.params._resellFlags.isResellable;
+  const isResellToDefaultBuyer = event.params._resellFlags.isResellToDefaultBuyer;
 
   const resellTerms = new ResellTerms(blockNumberLogIndex(event.block.number, event.logIndex));
   resellTerms._account = event.params._buyer;
@@ -41,7 +39,8 @@ export function handlecontractPurchased(event: contractPurchased): void {
   resellTerms._fee = event.params._fee;
   resellTerms._startTime = event.block.timestamp;
   resellTerms._lastSettlementTime = event.block.timestamp;
-  resellTerms._resellProfitTarget = event.params._resellProfitTarget;
+  resellTerms._resellProfitTarget = 0;
+  resellTerms._resellPrice = event.params._resellPrice;
   resellTerms._isResellable = isResellable;
   resellTerms._isResellToDefaultBuyer = isResellToDefaultBuyer;
   resellTerms.save();
@@ -59,7 +58,8 @@ export function handlecontractPurchased(event: contractPurchased): void {
   historyEvent._isResell = implementation.resellChain.length > 1;
   historyEvent._isResellToDefaultBuyer = isResellToDefaultBuyer;
   historyEvent._isResellable = isResellable;
-  historyEvent._resellProfitTarget = event.params._resellProfitTarget;
+  historyEvent._resellProfitTarget = 0;
+  historyEvent._resellPrice = event.params._resellPrice;
   historyEvent.save();
 
   const terms = Terms.load(implementation._terms);
@@ -101,7 +101,8 @@ export function handlecontractPurchased(event: contractPurchased): void {
   purchase.validator = event.params._validator;
   purchase.price = event.params._price;
   purchase.fee = event.params._fee;
-  purchase.resellProfitTarget = event.params._resellProfitTarget;
+  purchase.resellProfitTarget = 0;
+  purchase.resellPrice = event.params._resellPrice;
   purchase.isResell = implementation.resellChain.length > 1;
   purchase.startTime = event.block.timestamp;
   purchase.save();
