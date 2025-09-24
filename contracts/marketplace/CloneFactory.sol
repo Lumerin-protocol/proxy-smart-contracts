@@ -11,7 +11,7 @@ import { Versionable } from "../util/versionable.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { Paginator } from "@solarity/solidity-lib/libs/arrays/Paginator.sol";
 import { ResellFlags } from "./lib.sol";
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 
 /// @title CloneFactory
 /// @author Josh Kean (Lumerin), Oleksandr (Shev) Shevchuk
@@ -177,7 +177,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         require(rentalContractsMap[_contractAddress], "unknown contract address");
         require(!targetContract.isDeleted(), "cannot purchase deleted contract");
         require(targetContract.seller() != _msgSender(), "cannot purchase your own contract");
-        console.log("targetContract.seller()", targetContract.seller());
+        // console.log("targetContract.seller()", targetContract.seller());
         ensureActiveSeller(targetContract.seller());
 
         uint32 _version;
@@ -202,7 +202,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     ) internal {
         (uint256 _price, uint256 _fee) = targetContract.priceAndFee();
 
-        console.log("purchasing contact part-1, price", _price);
+        // console.log("purchasing contact part-1, price", _price);
         targetContract.setPurchaseContract(
             _encrValidatorURL,
             _encrDestURL,
@@ -335,7 +335,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
             revert("stake is less than required minimum");
         }
 
-        console.log("seller registered, stake", sellers[_seller].stake);
+        // console.log("seller registered, stake", sellers[_seller].stake);
 
         emit sellerRegisteredUpdated(_seller, sellers[_seller].stake);
 

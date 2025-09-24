@@ -9,7 +9,7 @@ import { CloneFactory } from "./CloneFactory.sol";
 import { HashrateOracle } from "./HashrateOracle.sol";
 import { Versionable } from "../util/versionable.sol";
 import { ResellFlags } from "./lib.sol";
-import { console } from "hardhat/console.sol";
+// import { console } from "hardhat/console.sol";
 
 /// @title Implementation
 /// @author Oleksandr (Shev) Shevchuk (Lumerin)
@@ -190,16 +190,16 @@ contract Implementation is Versionable, ContextUpgradeable {
                 _isResellToDefaultBuyer: _resellFlags.isResellToDefaultBuyer
             })
         );
-        console.log("\n\nadded to resellChain", resellChain.length);
-        console.log("resellChain[0]._account", _buyer);
-        console.log("resellChain[0]._seller", _seller);
-        console.log("resellChain[0]._validator", _validator);
-        console.log("resellChain[0]._price", _price);
-        console.log("resellChain[0]._fee", _fee);
-        console.log("resellChain[0]._startTime", block.timestamp);
-        console.log("resellChain[0]._lastSettlementTime", block.timestamp);
-        console.log("resellChain[0]._isResellable", _resellFlags.isResellable);
-        console.log("resellChain[0]._isResellToDefaultBuyer", _resellFlags.isResellToDefaultBuyer);
+        // console.log("\n\nadded to resellChain", resellChain.length);
+        // console.log("resellChain[0]._account", _buyer);
+        // console.log("resellChain[0]._seller", _seller);
+        // console.log("resellChain[0]._validator", _validator);
+        // console.log("resellChain[0]._price", _price);
+        // console.log("resellChain[0]._fee", _fee);
+        // console.log("resellChain[0]._startTime", block.timestamp);
+        // console.log("resellChain[0]._lastSettlementTime", block.timestamp);
+        // console.log("resellChain[0]._isResellable", _resellFlags.isResellable);
+        // console.log("resellChain[0]._isResellToDefaultBuyer", _resellFlags.isResellToDefaultBuyer);
 
         successCount++;
 
@@ -253,25 +253,25 @@ contract Implementation is Versionable, ContextUpgradeable {
         for (uint256 i = resellChain.length; i > 1; i--) {
             ResellTerms storage resell = resellChain[i - 1];
 
-            console.log("\n\n");
-            console.log("now", block.timestamp);
-            console.log("i", i);
-            console.log("resellChain.length", resellChain.length);
-            console.log("resell._buyer", resell._buyer);
-            console.log("resell._seller", resell._seller);
-            console.log("resell._validator", resell._validator);
-            console.log("resell._price", resell._price);
-            console.log("resell._fee", resell._fee);
-            console.log("resell._startTime", resell._startTime);
-            console.log("resell._lastSettlementTime", resell._lastSettlementTime);
-            console.log("resell._isResellable", resell._isResellable);
-            console.log("resell._isResellToDefaultBuyer", resell._isResellToDefaultBuyer);
-            console.log("resell._resellProfitTarget");
-            console.logInt(resell._resellProfitTarget);
-            console.log("endTime", getEndTime());
             bool isDefaultBuyer = resell._seller != resell._buyer;
-            console.log("isDefaultBuyer", isDefaultBuyer);
-            console.log();
+            // console.log("\n\n");
+            // console.log("now", block.timestamp);
+            // console.log("i", i);
+            // console.log("resellChain.length", resellChain.length);
+            // console.log("resell._buyer", resell._buyer);
+            // console.log("resell._seller", resell._seller);
+            // console.log("resell._validator", resell._validator);
+            // console.log("resell._price", resell._price);
+            // console.log("resell._fee", resell._fee);
+            // console.log("resell._startTime", resell._startTime);
+            // console.log("resell._lastSettlementTime", resell._lastSettlementTime);
+            // console.log("resell._isResellable", resell._isResellable);
+            // console.log("resell._isResellToDefaultBuyer", resell._isResellToDefaultBuyer);
+            // console.log("resell._resellProfitTarget");
+            // console.logInt(resell._resellProfitTarget);
+            // console.log("endTime", getEndTime());
+            // console.log("isDefaultBuyer", isDefaultBuyer);
+            // console.log();
 
             if (resell._buyer == address(0)) {
                 break;
@@ -287,7 +287,7 @@ contract Implementation is Versionable, ContextUpgradeable {
         }
 
         if (endTime > 0 && block.timestamp >= endTime) {
-            console.log("===End of contract,removing history");
+            // console.log("===End of contract,removing history");
             for (; resellChain.length > 1;) {
                 resellChain.pop();
             }
@@ -360,7 +360,7 @@ contract Implementation is Versionable, ContextUpgradeable {
     /// @param reason The reason for the early closeout
     function closeEarly(CloseReason reason) external {
         ResellTerms memory latestPurchase = _getLatestResell();
-        console.log("latestBuyer", latestPurchase._buyer);
+        // console.log("latestBuyer", latestPurchase._buyer);
 
         require(
             _msgSender() == latestPurchase._buyer || _msgSender() == latestPurchase._validator,
@@ -378,7 +378,7 @@ contract Implementation is Versionable, ContextUpgradeable {
         resellChain.pop();
 
         ResellTerms storage _latestResell = _getLatestResell();
-        console.log("updated seller", _latestResell._buyer);
+        // console.log("updated seller", _latestResell._buyer);
         emit contractClosedEarly(
             latestPurchase._buyer,
             latestPurchase._validator,
@@ -481,22 +481,22 @@ contract Implementation is Versionable, ContextUpgradeable {
 
         if (sellerPayment > 0) {
             isPaid = true;
-            console.log("===Sending seller payment", sellerPayment, _seller);
+            // console.log("===Sending seller payment", sellerPayment, _seller);
             paymentToken.safeTransfer(_seller, sellerPayment);
         }
         if (validatorFee > 0 && _validator != address(0)) {
             isPaid = true;
-            console.log("===Sending validator fee", validatorFee, _validator);
+            // console.log("===Sending validator fee", validatorFee, _validator);
             feeToken.safeTransfer(_validator, validatorFee);
         }
         if (buyerRefundPayment > 0) {
             isPaid = true;
-            console.log("===Sending buyer refund payment", buyerRefundPayment, _buyer);
+            // console.log("===Sending buyer refund payment", buyerRefundPayment, _buyer);
             paymentToken.safeTransfer(_buyer, buyerRefundPayment);
         }
         if (buyerRefundFee > 0) {
             isPaid = true;
-            console.log("===Sending buyer refund fee", buyerRefundFee, _buyer);
+            // console.log("===Sending buyer refund fee", buyerRefundFee, _buyer);
             feeToken.safeTransfer(_buyer, buyerRefundFee);
         }
 
