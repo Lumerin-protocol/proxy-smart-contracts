@@ -72,9 +72,9 @@ export function handleDeliveryDateAdded(event: DeliveryDateAdded): void {
   deliveryDate.save();
 }
 
-export function handlePositionCreated(event: PositionCreated): void {
-  log.info("Position created: {} by {}", [
-    event.params.positionId.toHexString(),
+export function handleOrderCreated(event: OrderCreated): void {
+  log.info("Order created: {} by {}", [
+    event.params.orderId.toHexString(),
     event.params.participant.toHexString(),
   ]);
 
@@ -89,21 +89,21 @@ export function handlePositionCreated(event: PositionCreated): void {
   let participant = getOrCreateParticipant(event.params.participant);
 
   // Create Position
-  const position = new Position(event.params.positionId);
-  position.id = event.params.positionId;
-  position.participant = participant.id;
-  position.price = event.params.price;
-  position.deliveryDate = event.params.deliveryDate;
-  position.isBuy = event.params.isBuy;
-  position.timestamp = event.block.timestamp;
-  position.blockNumber = event.block.number;
-  position.transactionHash = event.transaction.hash;
-  position.isActive = true;
-  position.save();
+  const order = new Order(event.params.orderId);
+  order.id = event.params.orderId;
+  order.participant = participant.id;
+  order.price = event.params.price;
+  order.deliveryDate = event.params.deliveryDate;
+  order.isBuy = event.params.isBuy;
+  order.timestamp = event.block.timestamp;
+  order.blockNumber = event.block.number;
+  order.transactionHash = event.transaction.hash;
+  order.isActive = true;
+  order.save();
 
   // Update Participant
-  participant.positions = participant.positions.concat([position.id]);
-  participant.positionCount++;
+  participant.orders = participant.orders.concat([order.id]);
+  participant.orderCount++;
   participant.totalVolume = participant.totalVolume.plus(event.params.price);
   participant.save();
 
@@ -113,26 +113,26 @@ export function handlePositionCreated(event: PositionCreated): void {
   futures.save();
 }
 
-export function handlePositionClosed(event: PositionClosed): void {
-  log.info("Position closed: {} by {}", [
-    event.params.positionId.toHexString(),
+export function handleOrderClosed(event: OrderClosed): void {
+  log.info("Order closed: {} by {}", [
+    event.params.orderId.toHexString(),
     event.params.participant.toHexString(),
   ]);
 
-  const position = Position.load(event.params.positionId);
-  if (!position) {
-    log.warning("Position not found: {}", [event.params.positionId.toHexString()]);
+  const order = Order.load(event.params.orderId);
+  if (!order) {
+    log.warning("Order not found: {}", [event.params.orderId.toHexString()]);
     return;
   }
 
   // Update position status
-  position.isActive = false;
-  position.closedAt = event.block.timestamp;
-  position.closedBy = event.params.participant;
-  position.save();
+  order.isActive = false;
+  order.closedAt = event.block.timestamp;
+  order.closedBy = event.params.participant;
+  order.save();
 
   // Update participant
-  const participant = Participant.load(position.participant);
+  const participant = Participant.load(order.participant);
   if (participant) {
     participant.positionCount--;
     participant.save();
@@ -147,9 +147,9 @@ export function handlePositionClosed(event: PositionClosed): void {
   }
 }
 
-export function handleOrderCreated(event: OrderCreated): void {
-  log.info("Order created: {} by seller {} and buyer {}", [
-    event.params.orderId.toHexString(),
+export function handlePositionCreated(event: PositionCreated): void {
+  log.info("Position created: {} by seller {} and buyer {}", [
+    event.params.positionId.toHexString(),
     event.params.seller.toHexString(),
     event.params.buyer.toHexString(),
   ]);
@@ -167,27 +167,27 @@ export function handleOrderCreated(event: OrderCreated): void {
   // Load or create Buyer
   let buyer = getOrCreateParticipant(event.params.buyer);
 
-  // Create Order
-  const order = new Order(event.params.orderId);
-  order.id = event.params.orderId;
-  order.seller = seller.id;
-  order.buyer = buyer.id;
-  order.price = event.params.price;
-  order.startTime = event.params.startTime;
-  order.timestamp = event.block.timestamp;
-  order.blockNumber = event.block.number;
-  order.transactionHash = event.transaction.hash;
-  order.isActive = true;
-  order.save();
+  // Create Position
+  const position = new Position(event.params.positionId);
+  position.id = event.params.positionId;
+  position.seller = seller.id;
+  position.buyer = buyer.id;
+  position.price = event.params.price;
+  position.startTime = event.params.startTime;
+  position.timestamp = event.block.timestamp;
+  position.blockNumber = event.block.number;
+  position.transactionHash = event.transaction.hash;
+  position.isActive = true;
+  position.save();
 
   // Update Seller
-  seller.orders = seller.orders.concat([order.id]);
+  seller.orders = seller.orders.concat([position.id]);
   seller.orderCount++;
   seller.totalVolume = seller.totalVolume.plus(event.params.price);
   seller.save();
 
   // Update Buyer
-  buyer.orders = buyer.orders.concat([order.id]);
+  buyer.orders = buyer.orders.concat([position.id]);
   buyer.orderCount++;
   buyer.totalVolume = buyer.totalVolume.plus(event.params.price);
   buyer.save();
@@ -199,32 +199,32 @@ export function handleOrderCreated(event: OrderCreated): void {
   futures.save();
 }
 
-export function handleOrderClosed(event: OrderClosed): void {
-  log.info("Order closed: {} by {}", [
-    event.params.orderId.toHexString(),
+export function handlePositionClosed(event: PositionClosed): void {
+  log.info("Position closed: {} by {}", [
+    event.params.positionId.toHexString(),
     event.params.closedBy.toHexString(),
   ]);
 
-  const order = Order.load(event.params.orderId);
-  if (!order) {
-    log.warning("Order not found: {}", [event.params.orderId.toHexString()]);
+  const position = Position.load(event.params.positionId);
+  if (!position) {
+    log.warning("Order not found: {}", [event.params.positionId.toHexString()]);
     return;
   }
 
   // Update order status
-  order.isActive = false;
-  order.closedAt = event.block.timestamp;
-  order.closedBy = event.params.closedBy;
-  order.save();
+  position.isActive = false;
+  position.closedAt = event.block.timestamp;
+  position.closedBy = event.params.closedBy;
+  position.save();
 
   // Update participants
-  const seller = Participant.load(order.seller);
+  const seller = Participant.load(position.seller);
   if (seller) {
     seller.orderCount--;
     seller.save();
   }
 
-  const buyer = Participant.load(order.buyer);
+  const buyer = Participant.load(position.buyer);
   if (buyer) {
     buyer.orderCount--;
     buyer.save();

@@ -40,7 +40,7 @@ type Participant @entity(immutable: false) {
   lastBalanceUpdate: BigInt!
 }
 
-type Position @entity(immutable: false) {
+type Order @entity(immutable: false) {
   id: Bytes!
   participant: Participant!
   price: BigInt!
@@ -56,7 +56,7 @@ type Position @entity(immutable: false) {
   closedBy: Bytes
 }
 
-type Order @entity(immutable: false) {
+type Position @entity(immutable: false) {
   id: Bytes!
   seller: Participant!
   buyer: Participant!
