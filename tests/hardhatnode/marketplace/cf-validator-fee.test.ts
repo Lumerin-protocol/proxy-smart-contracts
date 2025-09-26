@@ -1,12 +1,57 @@
 import { expect } from "chai";
-import { expectIsError } from "../utils";
-import { testEarlyCloseout } from "../actions";
+import { expectIsError } from "../../utils";
+import { testEarlyCloseout } from "../../actions";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
-import { deployLocalFixture } from "./fixtures-2";
+import { deployLocalFixture } from "../fixtures-2";
 import { viem } from "hardhat";
+import { parseEventLogs, parseUnits } from "viem";
 
 describe("Validator fee", function () {
+  describe("Validator Fee Rate Management", function () {
+    it("should update validator fee rate and emit event", async function () {
+      const { contracts, accounts } = await loadFixture(deployLocalFixture);
+      const { cloneFactory } = contracts;
+      const { owner } = accounts;
+
+      const newFeeRate = parseUnits("0.015", 18);
+
+      const hash = await cloneFactory.write.setValidatorFeeRate([newFeeRate], {
+        account: owner.account,
+      });
+
+      // Check that fee rate was updated
+      const updatedFeeRate = await cloneFactory.read.validatorFeeRateScaled();
+      expect(updatedFeeRate).to.equal(newFeeRate);
+
+      // Verify event was emitted
+      const receipt = await accounts.pc.waitForTransactionReceipt({ hash });
+      const [validatorFeeRateUpdatedEvent] = parseEventLogs({
+        abi: cloneFactory.abi,
+        logs: receipt.logs,
+        eventName: "validatorFeeRateUpdated",
+      });
+      expect(validatorFeeRateUpdatedEvent).to.not.be.undefined;
+      expect(validatorFeeRateUpdatedEvent?.args._validatorFeeRateScaled).to.equal(newFeeRate);
+    });
+
+    it("should not update fee rate if same value is set", async function () {
+      const { contracts, accounts } = await loadFixture(deployLocalFixture);
+      const { cloneFactory } = contracts;
+      const { owner } = accounts;
+
+      const currentFeeRate = await cloneFactory.read.validatorFeeRateScaled();
+
+      await cloneFactory.write.setValidatorFeeRate([currentFeeRate], {
+        account: owner.account,
+      });
+
+      // Fee rate should remain the same
+      const updatedFeeRate = await cloneFactory.read.validatorFeeRateScaled();
+      expect(updatedFeeRate).to.equal(currentFeeRate);
+    });
+  });
+
   for (const progress of [0, 0.01, 0.1, 0.5, 0.75]) {
     it(`should verify balances after ${progress * 100}% early closeout`, async function () {
       const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
@@ -56,7 +101,10 @@ describe("Validator fee", function () {
     const hrContractAddr = config.cloneFactory.contractAddresses[0];
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-    const hrContractData = await impl.read.getPublicVariablesV2();
+    const hrContractData = await impl.read.terms().then((t) => {
+      const [speed, length, version] = t;
+      return { speed, length, version };
+    });
     const [price, validatorFee] = await impl.read.priceAndFee();
 
     await paymentToken.write.approve([cf.address, BigInt(price)], {
@@ -67,15 +115,24 @@ describe("Validator fee", function () {
     });
 
     await cf.write.setPurchaseRentalContractV2(
-      [hrContractAddr, validatorAddr, "encryptedValidatorURL", "encryptedDestURL", 0],
+      [
+        hrContractAddr,
+        validatorAddr,
+        "encryptedValidatorURL",
+        "encryptedDestURL",
+        0,
+        true,
+        false,
+        0n,
+      ],
       { account: buyer }
     );
 
-    await time.increase(Number(hrContractData[1]._length));
+    await time.increase(Number(hrContractData.length));
 
     // make sure the contract is auto-closed
-    const hrContractData2 = await impl.read.getPublicVariablesV2();
-    expect(hrContractData2[0]).to.equal(0); // ContractState.Available = 0
+    const state = await impl.read.contractState();
+    expect(state).to.equal(0); // ContractState.Available = 0
 
     // claim funds by validator
     const validatorBalanceBefore = await feeToken.read.balanceOf([validatorAddr]);
@@ -111,7 +168,10 @@ describe("Validator fee", function () {
     const hrContractAddr = config.cloneFactory.contractAddresses[0];
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-    const hrContractData = await impl.read.getPublicVariablesV2();
+    const hrContractData = await impl.read.terms().then((t) => {
+      const [speed, length, version] = t;
+      return { speed, length, version };
+    });
     const [price, validatorFee] = await impl.read.priceAndFee();
 
     // PURCHASE 1
@@ -123,15 +183,24 @@ describe("Validator fee", function () {
     });
 
     await cf.write.setPurchaseRentalContractV2(
-      [hrContractAddr, validatorAddr, "encryptedValidatorURL", "encryptedDestURL", 0],
+      [
+        hrContractAddr,
+        validatorAddr,
+        "encryptedValidatorURL",
+        "encryptedDestURL",
+        0,
+        true,
+        false,
+        0n,
+      ],
       { account: buyer }
     );
 
-    await time.increase(Number(hrContractData[1]._length));
+    await time.increase(Number(hrContractData.length));
 
     // make sure the contract is auto-closed
-    const hrContractData2 = await impl.read.getPublicVariablesV2();
-    expect(hrContractData2[0]).to.equal(0); // ContractState.Available = 0
+    const state = await impl.read.contractState();
+    expect(state).to.equal(0); // ContractState.Available = 0
 
     // PURCHASE 2
     const validatorBalanceBefore = await feeToken.read.balanceOf([validatorAddr]);
@@ -144,7 +213,16 @@ describe("Validator fee", function () {
     });
 
     await cf.write.setPurchaseRentalContractV2(
-      [hrContractAddr, validatorAddr, "encryptedValidatorURL", "encryptedDestURL", 0],
+      [
+        hrContractAddr,
+        validatorAddr,
+        "encryptedValidatorURL",
+        "encryptedDestURL",
+        0,
+        true,
+        false,
+        0n,
+      ],
       { account: buyer }
     );
 
@@ -155,20 +233,13 @@ describe("Validator fee", function () {
     expect(deltaValidatorBalance).to.equal(validatorFee);
   });
 
-  it("claimFundsValidator - should error if no funds or address is wrong", async function () {
+  it("should allow claiming funds", async function () {
     const { config, accounts } = await loadFixture(deployLocalFixture);
     const validatorAddr = accounts.validator.account.address;
     const hrContractAddr = config.cloneFactory.contractAddresses[0];
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-    try {
-      await impl.write.claimFundsValidator({ account: validatorAddr });
-      expect.fail("should not allow to claim funds if no funds");
-    } catch (err) {
-      expectIsError(err);
-      console.log(err.message);
-      expect(err.message).includes("no funds to withdraw");
-    }
+    await impl.write.claimFunds({ account: validatorAddr });
   });
 
   it("claimFundsValidator - should correctly claim for multiple contracts", async function () {
@@ -183,7 +254,10 @@ describe("Validator fee", function () {
     const hrContractAddr = config.cloneFactory.contractAddresses[0];
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-    const hrContractData = await impl.read.getPublicVariablesV2();
+    const hrContractData = await impl.read.terms().then((t) => {
+      const [speed, length, version] = t;
+      return { speed, length, version };
+    });
     const [price, validatorFee] = await impl.read.priceAndFee();
 
     // purchase 1 with validator 1
@@ -195,16 +269,25 @@ describe("Validator fee", function () {
     });
 
     await cf.write.setPurchaseRentalContractV2(
-      [hrContractAddr, validatorAddr, "encryptedValidatorURL", "encryptedDestURL", 0],
+      [
+        hrContractAddr,
+        validatorAddr,
+        "encryptedValidatorURL",
+        "encryptedDestURL",
+        0,
+        true,
+        false,
+        0n,
+      ],
       { account: buyer }
     );
 
     // wait for completion
-    await time.increase(Number(hrContractData[1]._length));
+    await time.increase(Number(hrContractData.length));
 
     // claim funds by validator 1
     const validatorBalanceBefore = await feeToken.read.balanceOf([validatorAddr]);
-    await impl.write.claimFundsValidator({ account: validatorAddr });
+    await impl.write.claimFunds({ account: validatorAddr });
     const validatorBalanceAfter = await feeToken.read.balanceOf([validatorAddr]);
     const deltaValidatorBalance = validatorBalanceAfter - validatorBalanceBefore;
     expect(deltaValidatorBalance).to.equal(validatorFee);
@@ -218,16 +301,25 @@ describe("Validator fee", function () {
     });
 
     await cf.write.setPurchaseRentalContractV2(
-      [hrContractAddr, validator2Addr, "encryptedValidatorURL", "encryptedDestURL", 0],
+      [
+        hrContractAddr,
+        validator2Addr,
+        "encryptedValidatorURL",
+        "encryptedDestURL",
+        0,
+        true,
+        false,
+        0n,
+      ],
       { account: buyer }
     );
 
     // wait for completion
-    await time.increase(Number(hrContractData[1]._length));
+    await time.increase(Number(hrContractData.length));
 
     // claim funds by validator 2
     const validator2BalanceBefore = await feeToken.read.balanceOf([validator2Addr]);
-    await impl.write.claimFundsValidator({ account: validator2Addr });
+    await impl.write.claimFunds({ account: validator2Addr });
     const validator2BalanceAfter = await feeToken.read.balanceOf([validator2Addr]);
     const deltaValidator2Balance = validator2BalanceAfter - validator2BalanceBefore;
     expect(deltaValidator2Balance).to.equal(validatorFee);

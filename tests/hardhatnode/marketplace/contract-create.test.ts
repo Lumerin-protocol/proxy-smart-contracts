@@ -2,7 +2,8 @@ import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { viem } from "hardhat";
 import { getAddress, parseEventLogs, zeroAddress } from "viem";
-import { deployLocalFixture } from "./fixtures-2";
+import { deployLocalFixture } from "../fixtures-2";
+import { mapResellTerms } from "../../mappers";
 
 describe("Contract create", function () {
   const speed = 1_000_000n;
@@ -17,7 +18,7 @@ describe("Contract create", function () {
 
     // Create new rental contract (using V2 method)
     const txHash = await cloneFactory.write.setCreateNewRentalContractV2(
-      [0n, 0n, speed, length, profitTarget, zeroAddress, pubKey],
+      [speed, length, profitTarget, pubKey],
       { account: seller.account }
     );
 
@@ -35,39 +36,30 @@ describe("Contract create", function () {
     // Get the Implementation contract instance
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-    // Get public variables (using V2 method)
-    const [
-      state,
-      terms,
-      startingBlockTimestamp,
-      buyer,
-      _seller,
-      encryptedPoolData,
-      isDeleted,
-      balance,
-      hasFutureTerms,
-    ] = await impl.read.getPublicVariablesV2();
+    const [_speed, _length, _version] = await impl.read.terms();
+    const _entry = await impl.read.resellChain([0n]);
+    const entry = mapResellTerms(_entry);
+    const futureTerms = await impl.read.futureTerms();
+    console.log("entry", entry);
 
-    expect(state).to.equal(0);
-    expect(getAddress(_seller)).to.equal(getAddress(seller.account.address));
-    expect(startingBlockTimestamp).to.equal(0n);
-    expect(buyer).to.equal(zeroAddress);
-    expect(encryptedPoolData).to.equal("");
-    expect(isDeleted).to.equal(false);
-    expect(balance).to.equal(0n);
-    expect(hasFutureTerms).to.equal(false);
+    expect(entry._resellPrice).to.equal(0n);
+    expect(getAddress(entry._seller)).to.equal(getAddress(seller.account.address));
+    expect(entry._startTime).to.equal(0n);
+    expect(entry._account).to.equal(getAddress(seller.account.address));
+    expect(entry._encrDestURL).to.equal("");
+    expect(entry._encrValidatorURL).to.equal("");
+    expect(entry._lastSettlementTime).to.equal(0n);
+    expect(entry._resellProfitTarget).to.equal(profitTarget);
+    expect(entry._isResellable).to.equal(true);
+    expect(entry._isResellToDefaultBuyer).to.equal(false);
+    expect(futureTerms[0]).to.equal(0n);
 
-    expect(terms._speed).to.equal(speed);
-    expect(terms._length).to.equal(length);
-    expect(terms._profitTarget).to.equal(profitTarget);
-
-    // Get history - use correct types: uint256 (bigint) and uint8 (number)
-    const history = await impl.read.getHistory([0n, 10]);
-    expect(history.length).to.equal(0);
+    expect(_speed).to.equal(speed);
+    expect(_length).to.equal(length);
+    expect(entry._resellProfitTarget).to.equal(profitTarget);
 
     // Get future terms
-    const futureTerms = await impl.read.futureTerms();
-    expect(futureTerms).to.deep.equal([0n, 0n, 0n, 0n, 0, 0]);
+    expect(futureTerms).to.deep.equal([0n, 0n, 0]);
   });
 
   describe("Duration validation", function () {
@@ -97,7 +89,7 @@ describe("Contract create", function () {
       const { cloneFactory } = contracts;
 
       const txHash = await cloneFactory.write.setCreateNewRentalContractV2(
-        [0n, 0n, speed, minDuration, profitTarget, zeroAddress, pubKey],
+        [speed, minDuration, profitTarget, pubKey],
         { account: seller.account }
       );
 
@@ -112,8 +104,8 @@ describe("Contract create", function () {
 
       // Verify contract was created with correct duration
       const impl = await viem.getContractAt("Implementation", event.args._address);
-      const [, terms] = await impl.read.getPublicVariablesV2();
-      expect(terms._length).to.equal(minDuration);
+      const [, length] = await impl.read.terms();
+      expect(length).to.equal(minDuration);
     });
 
     it("should create contract with maximum duration", async function () {
@@ -122,7 +114,7 @@ describe("Contract create", function () {
       const { cloneFactory } = contracts;
 
       const txHash = await cloneFactory.write.setCreateNewRentalContractV2(
-        [0n, 0n, speed, maxDuration, profitTarget, zeroAddress, pubKey],
+        [speed, maxDuration, profitTarget, pubKey],
         { account: seller.account }
       );
 
@@ -137,8 +129,8 @@ describe("Contract create", function () {
 
       // Verify contract was created with correct duration
       const impl = await viem.getContractAt("Implementation", event.args._address);
-      const [, terms] = await impl.read.getPublicVariablesV2();
-      expect(terms._length).to.equal(maxDuration);
+      const [, length] = await impl.read.terms();
+      expect(length).to.equal(maxDuration);
     });
 
     it("should create contract with valid duration within range", async function () {
@@ -151,7 +143,7 @@ describe("Contract create", function () {
       const validDuration = (minDuration + maxDuration) / 2n; // middle value
 
       const txHash = await cloneFactory.write.setCreateNewRentalContractV2(
-        [0n, 0n, speed, validDuration, profitTarget, zeroAddress, pubKey],
+        [speed, validDuration, profitTarget, pubKey],
         { account: seller.account }
       );
 
@@ -166,8 +158,8 @@ describe("Contract create", function () {
 
       // Verify contract was created with correct duration
       const impl = await viem.getContractAt("Implementation", event.args._address);
-      const [, terms] = await impl.read.getPublicVariablesV2();
-      expect(terms._length).to.equal(validDuration);
+      const [, length] = await impl.read.terms();
+      expect(length).to.equal(validDuration);
     });
 
     it("should reject contract creation with duration below minimum", async function () {
@@ -179,7 +171,7 @@ describe("Contract create", function () {
 
       try {
         await cloneFactory.write.setCreateNewRentalContractV2(
-          [0n, 0n, speed, belowMinDuration, profitTarget, zeroAddress, pubKey],
+          [speed, belowMinDuration, profitTarget, pubKey],
           { account: seller.account }
         );
         expect.fail("Should have thrown an error for duration below minimum");
@@ -197,7 +189,7 @@ describe("Contract create", function () {
 
       try {
         await cloneFactory.write.setCreateNewRentalContractV2(
-          [0n, 0n, speed, aboveMaxDuration, profitTarget, zeroAddress, pubKey],
+          [speed, aboveMaxDuration, profitTarget, pubKey],
           { account: seller.account }
         );
         expect.fail("Should have thrown an error for duration above maximum");
@@ -212,10 +204,9 @@ describe("Contract create", function () {
       const { cloneFactory } = contracts;
 
       try {
-        await cloneFactory.write.setCreateNewRentalContractV2(
-          [0n, 0n, speed, 0n, profitTarget, zeroAddress, pubKey],
-          { account: seller.account }
-        );
+        await cloneFactory.write.setCreateNewRentalContractV2([speed, 0n, profitTarget, pubKey], {
+          account: seller.account,
+        });
         expect.fail("Should have thrown an error for zero duration");
       } catch (error: any) {
         expect(error.message).to.include("contract duration is not within the allowed interval");
@@ -230,7 +221,7 @@ describe("Contract create", function () {
       const { cloneFactory } = contracts;
 
       const txHash = await cloneFactory.write.setCreateNewRentalContractV2(
-        [0n, 0n, 0n, length, profitTarget, zeroAddress, pubKey],
+        [0n, length, profitTarget, pubKey],
         { account: seller.account }
       );
 
@@ -242,8 +233,8 @@ describe("Contract create", function () {
       });
 
       const impl = await viem.getContractAt("Implementation", event.args._address);
-      const [, terms] = await impl.read.getPublicVariablesV2();
-      expect(terms._speed).to.equal(0n);
+      const [speed] = await impl.read.terms();
+      expect(speed).to.equal(0n);
     });
 
     it("should create contract with negative profit target", async function () {
@@ -254,7 +245,7 @@ describe("Contract create", function () {
       const negativeProfitTarget = -10;
 
       const txHash = await cloneFactory.write.setCreateNewRentalContractV2(
-        [0n, 0n, speed, length, negativeProfitTarget, zeroAddress, pubKey],
+        [speed, length, negativeProfitTarget, pubKey],
         { account: seller.account }
       );
 
@@ -266,8 +257,8 @@ describe("Contract create", function () {
       });
 
       const impl = await viem.getContractAt("Implementation", event.args._address);
-      const [, terms] = await impl.read.getPublicVariablesV2();
-      expect(terms._profitTarget).to.equal(negativeProfitTarget);
+      const { _resellProfitTarget } = await impl.read.resellChain([0n]).then(mapResellTerms);
+      expect(_resellProfitTarget).to.equal(negativeProfitTarget);
     });
 
     it("should create contract with large speed value", async function () {
@@ -279,7 +270,7 @@ describe("Contract create", function () {
       const largeSpeed = 1n * 10n ** 21n;
 
       const txHash = await cloneFactory.write.setCreateNewRentalContractV2(
-        [0n, 0n, largeSpeed, length, profitTarget, zeroAddress, pubKey],
+        [largeSpeed, length, profitTarget, pubKey],
         { account: seller.account }
       );
 
@@ -291,8 +282,8 @@ describe("Contract create", function () {
       });
 
       const impl = await viem.getContractAt("Implementation", event.args._address);
-      const [, terms] = await impl.read.getPublicVariablesV2();
-      expect(terms._speed).to.equal(largeSpeed);
+      const [speed] = await impl.read.terms();
+      expect(speed).to.equal(largeSpeed);
     });
   });
 
@@ -312,7 +303,7 @@ describe("Contract create", function () {
 
       // Create a contract to update
       const txHash = await cloneFactory.write.setCreateNewRentalContractV2(
-        [0n, 0n, speed, BigInt(minDuration), profitTarget, zeroAddress, pubKey],
+        [speed, BigInt(minDuration), profitTarget, pubKey],
         { account: seller.account }
       );
 
@@ -337,19 +328,19 @@ describe("Contract create", function () {
       );
       const { seller } = accounts;
       const { cloneFactory } = contracts;
+      const speed = 1n;
 
       const validDuration = (minDuration + maxDuration) / 2n;
 
       await cloneFactory.write.setUpdateContractInformationV2(
-        [contractAddress, 0n, 0n, speed * 2n, validDuration, profitTarget + 5],
+        [contractAddress, speed * 2n, validDuration],
         { account: seller.account }
       );
 
       const impl = await viem.getContractAt("Implementation", contractAddress);
-      const [, terms] = await impl.read.getPublicVariablesV2();
-      expect(terms._length).to.equal(validDuration);
-      expect(terms._speed).to.equal(speed * 2n);
-      expect(terms._profitTarget).to.equal(profitTarget + 5);
+      const [_speed, _length] = await impl.read.terms();
+      expect(_length).to.equal(validDuration);
+      expect(_speed).to.equal(speed * 2n);
     });
 
     it("should reject update with duration below minimum", async function () {
@@ -363,7 +354,7 @@ describe("Contract create", function () {
 
       try {
         await cloneFactory.write.setUpdateContractInformationV2(
-          [contractAddress, 0n, 0n, speed, belowMinDuration, profitTarget],
+          [contractAddress, speed, belowMinDuration],
           { account: seller.account }
         );
         expect.fail("Should have thrown an error for duration below minimum");
@@ -383,7 +374,7 @@ describe("Contract create", function () {
 
       try {
         await cloneFactory.write.setUpdateContractInformationV2(
-          [contractAddress, 0n, 0n, speed, aboveMaxDuration, profitTarget],
+          [contractAddress, speed, aboveMaxDuration],
           { account: seller.account }
         );
         expect.fail("Should have thrown an error for duration above maximum");
@@ -402,7 +393,7 @@ describe("Contract create", function () {
       const customPubKey = "custom-test-pubkey-123";
 
       const txHash = await cloneFactory.write.setCreateNewRentalContractV2(
-        [0n, 0n, speed, length, profitTarget, zeroAddress, customPubKey],
+        [speed, length, profitTarget, customPubKey],
         { account: seller.account }
       );
 
@@ -427,7 +418,7 @@ describe("Contract create", function () {
       const initialLength = contractListBefore.length;
 
       const txHash = await cloneFactory.write.setCreateNewRentalContractV2(
-        [0n, 0n, speed, length, profitTarget, zeroAddress, pubKey],
+        [speed, length, profitTarget, pubKey],
         { account: seller.account }
       );
 
@@ -449,7 +440,7 @@ describe("Contract create", function () {
       const { cloneFactory } = contracts;
 
       const txHash = await cloneFactory.write.setCreateNewRentalContractV2(
-        [0n, 0n, speed, length, profitTarget, zeroAddress, pubKey],
+        [speed, length, profitTarget, pubKey],
         { account: seller.account }
       );
 

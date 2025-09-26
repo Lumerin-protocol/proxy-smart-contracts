@@ -10,7 +10,8 @@ import { Implementation } from "./Implementation.sol";
 import { Versionable } from "../util/versionable.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { Paginator } from "@solarity/solidity-lib/libs/arrays/Paginator.sol";
-import "hardhat/console.sol";
+import { ResellFlags } from "./lib.sol";
+// import "hardhat/console.sol";
 
 /// @title CloneFactory
 /// @author Josh Kean (Lumerin), Oleksandr (Shev) Shevchuk
@@ -28,7 +29,6 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     address public hashrateOracle;
     address[] public rentalContracts; //dynamically allocated list of rental contracts
     mapping(address => bool) rentalContractsMap; //mapping of rental contracts to verify cheaply if implementation was created by this clonefactory
-    uint256 private __gap; // gap for upgrade compatibility
 
     /// @notice The fee rate paid to a validator, expressed as a fraction of the total amount.
     /// @dev Stored as an integer scaled by VALIDATOR_FEE_DECIMALS to represent a float ratio.
@@ -99,8 +99,8 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         uint32 _minContractDuration,
         uint32 _maxContractDuration
     ) external initializer {
-        __Ownable_init(_msgSender());
         __UUPSUpgradeable_init();
+        __Ownable_init(_msgSender());
         paymentToken = IERC20(_paymentToken);
         feeToken = IERC20(_feeToken);
         hashrateOracle = _hashrateOracle;
@@ -121,15 +121,11 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     /// @param _profitTarget The profit target of the contract in percent
     /// @param _pubKey The public key of the contract
     /// @return address The address of the new contract
-    function setCreateNewRentalContractV2(
-        uint256,
-        uint256,
-        uint256 _speed,
-        uint256 _length,
-        int8 _profitTarget,
-        address,
-        string calldata _pubKey
-    ) external payable returns (address) {
+    function setCreateNewRentalContractV2(uint256 _speed, uint256 _length, int8 _profitTarget, string calldata _pubKey)
+        external
+        payable
+        returns (address)
+    {
         ensureActiveSeller(_msgSender());
         enforceContractDuration(_length);
 
@@ -160,7 +156,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         uint32 termsVersion,
         bool _isResellable,
         bool _resellToDefaultBuyer,
-        int8 _resellProfitTarget
+        uint256 _resellPrice
     ) external payable {
         // Validation block - variables scoped to reduce stack depth
         Implementation(_contractAddress).claimFunds();
@@ -171,21 +167,9 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
             _encrValidatorURL,
             _encrDestURL,
             _validatorAddress,
-            packBools(_isResellable, _resellToDefaultBuyer),
-            _resellProfitTarget
+            ResellFlags({ isResellable: _isResellable, isResellToDefaultBuyer: _resellToDefaultBuyer }),
+            _resellPrice
         );
-    }
-
-    function packBools(bool a, bool b) public pure returns (uint8) {
-        return uint8(a ? 1 : 0) | (uint8(b ? 1 : 0) << 1);
-    }
-
-    function unpackFirstBool(uint8 packed) public pure returns (bool a) {
-        return (packed & 1) != 0;
-    }
-
-    function unpackSecondBool(uint8 packed) public pure returns (bool b) {
-        return (packed & (1 << 1)) != 0;
     }
 
     function validatePurchase(address _contractAddress, uint32 termsVersion, bool _isResellable) internal view {
@@ -193,7 +177,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         require(rentalContractsMap[_contractAddress], "unknown contract address");
         require(!targetContract.isDeleted(), "cannot purchase deleted contract");
         require(targetContract.seller() != _msgSender(), "cannot purchase your own contract");
-        console.log("targetContract.seller()", targetContract.seller());
+        // console.log("targetContract.seller()", targetContract.seller());
         ensureActiveSeller(targetContract.seller());
 
         uint32 _version;
@@ -209,18 +193,16 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     }
 
     function _handlePurchase(
-        // address _contractAddress,
         Implementation targetContract,
         string calldata _encrValidatorURL,
         string calldata _encrDestURL,
         address _validatorAddress,
-        uint8 _resellFlags,
-        int8 _resellProfitTarget
+        ResellFlags memory _resellFlags,
+        uint256 _resellPrice
     ) internal {
-        // Implementation targetContract = Implementation(_contractAddress);
         (uint256 _price, uint256 _fee) = targetContract.priceAndFee();
 
-        console.log("purchasing contact part-1, price", _price);
+        // console.log("purchasing contact part-1, price", _price);
         targetContract.setPurchaseContract(
             _encrValidatorURL,
             _encrDestURL,
@@ -230,7 +212,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
             _msgSender(),
             _validatorAddress,
             _resellFlags,
-            _resellProfitTarget
+            _resellPrice
         );
 
         paymentToken.safeTransferFrom(_msgSender(), address(targetContract), _price);
@@ -238,27 +220,30 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         if (_validatorAddress != address(0) && _fee > 0) {
             feeToken.safeTransferFrom(_msgSender(), address(targetContract), _fee);
         }
+    }
 
-        // TODO: should be a remaining duration of the contract
-        if (_resellFlags & 2 != 0) {
-            requireDefaultBuyerSet();
-            uint256 _resellPrice = targetContract.priceV2(defaultBuyerProfitTarget);
+    function purchaseAsDefaultBuyer(address _contractAddress) external {
+        require(_msgSender() == defaultBuyer.addr, "you are not the default buyer");
+        Implementation targetContract = Implementation(_contractAddress);
+        require(
+            targetContract.getLatestResell()._isResellToDefaultBuyer, "contract is not resellable to the default buyer"
+        );
+        requireDefaultBuyerSet();
+        uint256 defaultBuyerPrice = targetContract.priceV2(defaultBuyerProfitTarget);
 
-            console.log("purchasing contact part-2, price", _resellPrice);
-            targetContract.setPurchaseContract(
-                defaultBuyer.encrValidatorURL,
-                defaultBuyer.encrDestURL,
-                _resellPrice,
-                0,
-                defaultBuyer.addr,
-                _msgSender(),
-                address(0),
-                packBools(true, false),
-                _resellProfitTarget
-            );
+        targetContract.setPurchaseContract(
+            defaultBuyer.encrValidatorURL,
+            defaultBuyer.encrDestURL,
+            defaultBuyerPrice,
+            0,
+            defaultBuyer.addr,
+            _msgSender(),
+            address(0),
+            ResellFlags({ isResellable: true, isResellToDefaultBuyer: false }),
+            targetContract.getLatestResell()._resellPrice
+        );
 
-            paymentToken.safeTransferFrom(defaultBuyer.addr, address(targetContract), _resellPrice);
-        }
+        paymentToken.safeTransferFrom(defaultBuyer.addr, address(targetContract), defaultBuyerPrice);
     }
 
     /// @notice Returns the list of all rental contracts
@@ -285,7 +270,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
             require(rentalContractsMap[_contractAddress], "unknown contract address");
 
             Implementation _contract = Implementation(_contractAddress);
-            require(_msgSender() == _contract.seller() || _msgSender() == owner(), "you are not authorized");
+            require(_msgSender() == _contract.owner() || _msgSender() == owner(), "you are not authorized");
 
             emit contractDeleteUpdated(_contractAddress, _isDeleted);
             if (_isDeleted) {
@@ -350,7 +335,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
             revert("stake is less than required minimum");
         }
 
-        console.log("seller registered, stake", sellers[_seller].stake);
+        // console.log("seller registered, stake", sellers[_seller].stake);
 
         emit sellerRegisteredUpdated(_seller, sellers[_seller].stake);
 

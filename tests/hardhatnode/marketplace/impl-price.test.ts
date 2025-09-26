@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
-import { deployLocalFixture } from "./fixtures-2";
+import { deployLocalFixture } from "../fixtures-2";
 import { viem } from "hardhat";
 
 const ZETTA = 10n ** 21n;

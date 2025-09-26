@@ -1,9 +1,9 @@
 import { expect } from "chai";
 import { viem } from "hardhat";
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
-import { deployLocalFixture } from "./fixtures-2";
+import { deployLocalFixture } from "../fixtures-2";
 import { getAddress, parseEventLogs } from "viem";
-import { getPublicKey } from "../../lib/pubkey";
+import { getPublicKey } from "../../../lib/pubkey";
 
 describe("Contract history", function () {
   async function setupContractFixture() {

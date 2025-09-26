@@ -61,9 +61,9 @@ templates:
         - name: Implementation
           file: ../abi/Implementation.json
       eventHandlers:
-        - event: contractPurchased(indexed address,indexed address,indexed address,uint256,uint256,int8,uint8)
+        - event: contractPurchased(indexed address,indexed address,indexed address,uint256,uint256,uint256,(bool,bool))
           handler: handlecontractPurchased
-        - event: contractClosedEarly(indexed address,indexed address,indexed address,uint8)
+        - event: contractClosedEarly(indexed address,indexed address,indexed address,uint8,(bool,bool))
           handler: handlecontractClosedEarly
         - event: contractTermsUpdated(uint256,uint256,uint32)
           handler: handlecontractTermsUpdated

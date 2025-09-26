@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { viem } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import { deployLocalFixture } from "./fixtures-2";
+import { deployLocalFixture } from "../fixtures-2";
 import { parseEventLogs } from "viem";
 
 describe("Contract delete", function () {
@@ -10,15 +10,7 @@ describe("Contract delete", function () {
     const [, , hrContractAddr] = config.cloneFactory.contractAddresses;
 
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
-    const [
-      state,
-      terms,
-      startingBlockTimestamp,
-      buyerAddr,
-      sellerAddr,
-      encryptedPoolData,
-      isDeleted,
-    ] = await impl.read.getPublicVariablesV2();
+    const isDeleted = await impl.read.isDeleted();
 
     expect(isDeleted).equal(false);
   });
@@ -51,15 +43,7 @@ describe("Contract delete", function () {
     });
 
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
-    const [
-      state,
-      terms,
-      startingBlockTimestamp,
-      buyerAddr,
-      sellerAddr,
-      encryptedPoolData,
-      isDeleted,
-    ] = await impl.read.getPublicVariablesV2();
+    const isDeleted = await impl.read.isDeleted();
 
     expect(isDeleted).equal(true);
 
@@ -106,22 +90,10 @@ describe("Contract delete", function () {
       account: seller.account,
     });
 
-    // Get contract terms for approvals
-    const impl = await viem.getContractAt("Implementation", hrContractAddr);
-    const [, terms] = await impl.read.getPublicVariablesV2();
-
-    // Approve tokens
-    await usdcMock.write.approve([cloneFactory.address, terms._price], {
-      account: buyer.account,
-    });
-    await lumerinToken.write.approve([cloneFactory.address, terms._fee], {
-      account: buyer.account,
-    });
-
     // Attempt purchase should fail
     try {
       await cloneFactory.write.setPurchaseRentalContractV2(
-        [hrContractAddr, buyer.account.address, "", "", terms._version],
+        [hrContractAddr, buyer.account.address, "", "", 0, true, false, 0n],
         { account: buyer.account }
       );
       expect.fail("should throw error");
@@ -148,15 +120,7 @@ describe("Contract delete", function () {
     });
 
     const impl = await viem.getContractAt("Implementation", hrContractAddr);
-    const [
-      state,
-      terms,
-      startingBlockTimestamp,
-      buyerAddr,
-      sellerAddr,
-      encryptedPoolData,
-      isDeleted,
-    ] = await impl.read.getPublicVariablesV2();
+    const isDeleted = await impl.read.isDeleted();
 
     expect(isDeleted).equal(false);
 
@@ -189,44 +153,21 @@ describe("Contract delete", function () {
       account: seller.account,
     });
 
-    // Get contract terms for approvals
-    const impl = await viem.getContractAt("Implementation", hrContractAddr);
-    const [state, terms] = await impl.read.getPublicVariablesV2();
-
-    // Approve tokens
-    await usdcMock.write.approve([cloneFactory.address, terms._price], {
-      account: buyer.account,
-    });
-    await lumerinToken.write.approve([cloneFactory.address, terms._fee], {
-      account: buyer.account,
-    });
-
     // Purchase should succeed
     await cloneFactory.write.setPurchaseRentalContractV2(
-      [hrContractAddr, buyer.account.address, "", "", terms._version],
+      [hrContractAddr, buyer.account.address, "", "", 0, true, false, 0n],
       { account: buyer.account }
     );
   });
 
   it("should allow delete contract if contract is purchased", async function () {
     const { config, accounts, contracts } = await loadFixture(deployLocalFixture);
-    const { cloneFactory, usdcMock, lumerinToken } = contracts;
+    const { cloneFactory } = contracts;
     const { seller, buyer } = accounts;
     const [, , hrContractAddr] = config.cloneFactory.contractAddresses;
 
-    // Purchase the contract first
-    const impl = await viem.getContractAt("Implementation", hrContractAddr);
-    const [state, terms] = await impl.read.getPublicVariablesV2();
-
-    await usdcMock.write.approve([cloneFactory.address, terms._price], {
-      account: buyer.account,
-    });
-    await lumerinToken.write.approve([cloneFactory.address, terms._fee], {
-      account: buyer.account,
-    });
-
     await cloneFactory.write.setPurchaseRentalContractV2(
-      [hrContractAddr, buyer.account.address, "", "", terms._version],
+      [hrContractAddr, buyer.account.address, "", "", 0, true, false, 0n],
       { account: buyer.account }
     );
 
@@ -235,21 +176,13 @@ describe("Contract delete", function () {
       account: seller.account,
     });
 
-    const [
-      finalState,
-      finalTerms,
-      finalStartingBlockTimestamp,
-      finalBuyerAddr,
-      finalSellerAddr,
-      finalEncryptedPoolData,
-      finalIsDeleted,
-    ] = await impl.read.getPublicVariablesV2();
+    const impl = await viem.getContractAt("Implementation", hrContractAddr);
+    const finalIsDeleted = await impl.read.isDeleted();
     expect(finalIsDeleted).equal(true);
   });
 
   it("should prohibit deletion on the contract instance", async function () {
     const { config, accounts, contracts } = await loadFixture(deployLocalFixture);
-    const { cloneFactory } = contracts;
     const { seller } = accounts;
     const [, , hrContractAddr] = config.cloneFactory.contractAddresses;
 

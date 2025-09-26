@@ -1,36 +1,10 @@
 import { viem } from "hardhat";
+import { mapResellTerms } from "../../tests/mappers";
 
 export async function getResellChain(contractAddress: `0x${string}`, index: number) {
   const implementation = await viem.getContractAt("Implementation", contractAddress);
   const data = await implementation.read.resellChain([BigInt(index)]);
-  const [
-    _account,
-    _validator,
-    _price,
-    _fee,
-    _startTime,
-    _encrDestURL,
-    _encrValidatorURL,
-    _lastSettlementTime,
-    _seller,
-    _isResellable,
-    _resellProfitTarget,
-    _isResellToDefaultBuyer,
-  ] = data;
-  return {
-    _account,
-    _validator,
-    _price,
-    _fee,
-    _startTime,
-    _encrDestURL,
-    _encrValidatorURL,
-    _lastSettlementTime,
-    _seller,
-    _isResellable,
-    _resellProfitTarget,
-    _isResellToDefaultBuyer,
-  };
+  return mapResellTerms(data);
 }
 
 type ResellTerms = Awaited<ReturnType<typeof getResellChain>>;

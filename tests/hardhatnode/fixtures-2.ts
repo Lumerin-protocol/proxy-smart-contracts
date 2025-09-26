@@ -32,7 +32,7 @@ export const sampleContracts: ContractConfigWithCount[] = [
 
 export async function deployTokenOraclesAndMulticall3() {
   // Get wallet clients
-  const [owner, seller, buyer, validator, validator2, buyer2, defaultBuyer] =
+  const [owner, seller, buyer, validator, validator2, buyer2, defaultBuyer, unregistered] =
     await viem.getWalletClients();
   const pc = await viem.getPublicClient();
   const tc = await viem.getTestClient();
@@ -63,6 +63,8 @@ export async function deployTokenOraclesAndMulticall3() {
   await lumerinToken.write.transfer([seller.account.address, topUpBalance]);
   await usdcMock.write.transfer([defaultBuyer.account.address, topUpBalance]);
   await lumerinToken.write.transfer([defaultBuyer.account.address, topUpBalance]);
+  await usdcMock.write.transfer([unregistered.account.address, topUpBalance]);
+  await lumerinToken.write.transfer([unregistered.account.address, topUpBalance]);
 
   const oracle = (() => {
     const BITCOIN_DECIMALS = 8;
@@ -123,6 +125,7 @@ export async function deployTokenOraclesAndMulticall3() {
       validator2,
       pc,
       tc,
+      unregistered,
     },
   };
 }
@@ -299,6 +302,13 @@ export async function deployLocalFixture() {
   await usdcMock.write.approve([cloneFactory.address, maxUint256], {
     account: buyer.account,
   });
+
+  console.log(
+    "==========\nbuyer approved\n buyer: ",
+    buyer.account.address,
+    "\ncloneFactory: ",
+    cloneFactory.address
+  );
   await cloneFactory.write.sellerRegister([cloneFactoryConfig.minSellerStake], {
     account: buyer.account,
   });
@@ -329,12 +339,9 @@ export async function deployLocalFixture() {
     for (let i = 0; i < contract.count; i++) {
       const hash = await cloneFactory.write.setCreateNewRentalContractV2(
         [
-          0n,
-          0n,
           BigInt(THPStoHPS(contract.config.speedTHPS)),
           BigInt(hoursToSeconds(contract.config.lengthHours)),
           Number(contract.config.profitTargetPercent),
-          seller.account.address,
           await getPublicKey(seller),
         ],
         {
@@ -427,17 +434,7 @@ export async function deployLocalFixture() {
       multicall3,
       hashrate: hashrateContracts,
     },
-    accounts: {
-      owner,
-      seller,
-      buyer,
-      buyer2,
-      defaultBuyer,
-      validator,
-      validator2,
-      pc,
-      tc,
-    },
+    accounts,
   };
 }
 
@@ -451,16 +448,9 @@ async function buyContract(
 ) {
   console.log("buying contract", contractAddress);
   const c1 = await viem.getContractAt("Implementation", contractAddress as `0x${string}`);
-  const [price, fee] = await c1.read.priceAndFee();
-  await lumerinToken.write.approve([cloneFactory.address, fee], {
-    account: buyer.account,
-  });
-  await usdcMock.write.approve([cloneFactory.address, price], {
-    account: buyer.account,
-  });
 
   const purchaseTx = await cloneFactory.write.setPurchaseRentalContractV2(
-    [c1.address, validator.account.address, "", "", 0, true, false, 10],
+    [c1.address, validator.account.address, "", "", 0, true, false, 10n],
     { account: buyer.account }
   );
 }

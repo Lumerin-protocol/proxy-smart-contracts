@@ -8,7 +8,8 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { CloneFactory } from "./CloneFactory.sol";
 import { HashrateOracle } from "./HashrateOracle.sol";
 import { Versionable } from "../util/versionable.sol";
-import { console } from "hardhat/console.sol";
+import { ResellFlags } from "./lib.sol";
+// import { console } from "hardhat/console.sol";
 
 /// @title Implementation
 /// @author Oleksandr (Shev) Shevchuk (Lumerin)
@@ -59,7 +60,7 @@ contract Implementation is Versionable, ContextUpgradeable {
     // and another part - resell terms (profitTarget)
     struct ResellTerms {
         // purchase terms
-        address _account;
+        address _buyer;
         address _validator;
         uint256 _price;
         uint256 _fee;
@@ -69,7 +70,8 @@ contract Implementation is Versionable, ContextUpgradeable {
         uint256 _lastSettlementTime; // timestamp when the contract was settled last time
         // resell terms
         address _seller; // seller of the contract !== account when there is a default buyer
-        int8 _resellProfitTarget;
+        uint256 _resellPrice; // fixed price of the resell, has priority over profit target
+        int8 _resellProfitTarget; // if resellPrice is not set then use profit target
         bool _isResellable;
         bool _isResellToDefaultBuyer; // indicates that this resell is to the default buyer, so if anyone buys the contract, they buy it from the reseller
     }
@@ -91,12 +93,16 @@ contract Implementation is Versionable, ContextUpgradeable {
         address indexed _seller,
         uint256 _price,
         uint256 _fee,
-        int8 _resellProfitTarget,
-        uint8 _resellFlags
+        uint256 _resellPrice,
+        ResellFlags _resellFlags
     );
 
     event contractClosedEarly(
-        address indexed _buyer, address indexed _validator, address indexed _seller, CloseReason _reason
+        address indexed _buyer,
+        address indexed _validator,
+        address indexed _seller,
+        CloseReason _reason,
+        ResellFlags _resellFlags
     );
     event destinationUpdated(string newValidatorURL, string newDestURL);
     event contractTermsUpdated(uint256 _speed, uint256 _length, uint32 _version);
@@ -129,7 +135,7 @@ contract Implementation is Versionable, ContextUpgradeable {
         // seller = _seller;
         resellChain.push(
             ResellTerms({
-                _account: _seller,
+                _buyer: _seller,
                 // buy terms
                 _validator: address(0),
                 _price: 0,
@@ -141,6 +147,7 @@ contract Implementation is Versionable, ContextUpgradeable {
                 // resell terms
                 _isResellable: true,
                 _seller: _seller,
+                _resellPrice: 0,
                 _resellProfitTarget: _profitTarget,
                 _isResellToDefaultBuyer: false
             })
@@ -159,18 +166,14 @@ contract Implementation is Versionable, ContextUpgradeable {
         address _buyer,
         address _seller,
         address _validator,
-        uint8 _resellFlags,
-        int8 _resellProfitTarget
+        ResellFlags calldata _resellFlags,
+        uint256 _resellPrice
     ) external onlyCloneFactory {
         require(contractState() == ContractState.Available, "contract is not in an available state");
 
-        console.log("resellFlags", _resellFlags);
-        console.log("isResellable", unpackFirstBool(_resellFlags));
-        console.log("isResellToDefaultBuyer", unpackSecondBool(_resellFlags));
-
         resellChain.push(
             ResellTerms({
-                _account: _buyer,
+                _buyer: _buyer,
                 // buy terms
                 _validator: _validator,
                 _price: _price,
@@ -180,34 +183,35 @@ contract Implementation is Versionable, ContextUpgradeable {
                 _encrValidatorURL: _encrValidatorURL,
                 _lastSettlementTime: block.timestamp,
                 // resell terms
-                _isResellable: unpackFirstBool(_resellFlags),
+                _isResellable: _resellFlags.isResellable,
                 _seller: _seller,
-                _resellProfitTarget: _resellProfitTarget,
-                _isResellToDefaultBuyer: unpackSecondBool(_resellFlags)
+                _resellPrice: _resellPrice,
+                _resellProfitTarget: 0,
+                _isResellToDefaultBuyer: _resellFlags.isResellToDefaultBuyer
             })
         );
-        console.log("\n\nadded to resellChain", resellChain.length);
-        console.log("resellChain[0]._account", _buyer);
-        console.log("resellChain[0]._seller", _seller);
-        console.log("resellChain[0]._validator", _validator);
-        console.log("resellChain[0]._price", _price);
-        console.log("resellChain[0]._fee", _fee);
-        console.log("resellChain[0]._startTime", block.timestamp);
-        console.log("resellChain[0]._lastSettlementTime", block.timestamp);
-        console.log("resellChain[0]._isResellable", unpackFirstBool(_resellFlags));
-        console.log("resellChain[0]._isResellToDefaultBuyer", unpackSecondBool(_resellFlags));
+        // console.log("\n\nadded to resellChain", resellChain.length);
+        // console.log("resellChain[0]._account", _buyer);
+        // console.log("resellChain[0]._seller", _seller);
+        // console.log("resellChain[0]._validator", _validator);
+        // console.log("resellChain[0]._price", _price);
+        // console.log("resellChain[0]._fee", _fee);
+        // console.log("resellChain[0]._startTime", block.timestamp);
+        // console.log("resellChain[0]._lastSettlementTime", block.timestamp);
+        // console.log("resellChain[0]._isResellable", _resellFlags.isResellable);
+        // console.log("resellChain[0]._isResellToDefaultBuyer", _resellFlags.isResellToDefaultBuyer);
 
         successCount++;
 
-        emit contractPurchased(_buyer, _validator, _seller, _price, _fee, _resellProfitTarget, _resellFlags);
+        emit contractPurchased(_buyer, _validator, _seller, _price, _fee, _resellPrice, _resellFlags);
     }
 
     /// @notice Updates the mining destination during contract execution
     /// @param _encrValidatorURL New encrypted validator URL
     /// @param _encrDestURL New encrypted destination URL
     function setDestination(string calldata _encrValidatorURL, string calldata _encrDestURL) external {
-        ResellTerms storage latestResell = getLatestResell();
-        require(_msgSender() == latestResell._account, "not authorized");
+        ResellTerms storage latestResell = _getLatestResell();
+        require(_msgSender() == latestResell._buyer, "not authorized");
         require(contractState() == ContractState.Running, "not running");
         latestResell._encrValidatorURL = _encrValidatorURL;
         latestResell._encrDestURL = _encrDestURL;
@@ -249,27 +253,27 @@ contract Implementation is Versionable, ContextUpgradeable {
         for (uint256 i = resellChain.length; i > 1; i--) {
             ResellTerms storage resell = resellChain[i - 1];
 
-            console.log("\n\n");
-            console.log("now", block.timestamp);
-            console.log("i", i);
-            console.log("resellChain.length", resellChain.length);
-            console.log("resell._account", resell._account);
-            console.log("resell._seller", resell._seller);
-            console.log("resell._validator", resell._validator);
-            console.log("resell._price", resell._price);
-            console.log("resell._fee", resell._fee);
-            console.log("resell._startTime", resell._startTime);
-            console.log("resell._lastSettlementTime", resell._lastSettlementTime);
-            console.log("resell._isResellable", resell._isResellable);
-            console.log("resell._isResellToDefaultBuyer", resell._isResellToDefaultBuyer);
-            console.log("resell._resellProfitTarget");
-            console.logInt(resell._resellProfitTarget);
-            console.log("endTime", getEndTime());
-            bool isDefaultBuyer = resell._seller != resell._account;
-            console.log("isDefaultBuyer", isDefaultBuyer);
-            console.log();
+            bool isDefaultBuyer = resell._seller != resell._buyer;
+            // console.log("\n\n");
+            // console.log("now", block.timestamp);
+            // console.log("i", i);
+            // console.log("resellChain.length", resellChain.length);
+            // console.log("resell._buyer", resell._buyer);
+            // console.log("resell._seller", resell._seller);
+            // console.log("resell._validator", resell._validator);
+            // console.log("resell._price", resell._price);
+            // console.log("resell._fee", resell._fee);
+            // console.log("resell._startTime", resell._startTime);
+            // console.log("resell._lastSettlementTime", resell._lastSettlementTime);
+            // console.log("resell._isResellable", resell._isResellable);
+            // console.log("resell._isResellToDefaultBuyer", resell._isResellToDefaultBuyer);
+            // console.log("resell._resellProfitTarget");
+            // console.logInt(resell._resellProfitTarget);
+            // console.log("endTime", getEndTime());
+            // console.log("isDefaultBuyer", isDefaultBuyer);
+            // console.log();
 
-            if (resell._account == address(0)) {
+            if (resell._buyer == address(0)) {
                 break;
             }
             ResellTerms memory _seller = resellChain[i - 2];
@@ -277,13 +281,13 @@ contract Implementation is Versionable, ContextUpgradeable {
             (uint256 a, uint256 b, uint256 c, uint256 d) = getPayments(isDefaultBuyer, resell);
             // if it is a resell to default buyer, then it will be settled fully when the real buyer purchases the contract
             resell._lastSettlementTime = isDefaultBuyer ? endTime : block.timestamp;
-            if (sendPayments(a, b, c, d, _seller._seller, resell._validator, resell._account)) {
+            if (sendPayments(a, b, c, d, _seller._seller, resell._validator, resell._buyer)) {
                 paid = true;
             }
         }
 
         if (endTime > 0 && block.timestamp >= endTime) {
-            console.log("===End of contract,removing history");
+            // console.log("===End of contract,removing history");
             for (; resellChain.length > 1;) {
                 resellChain.pop();
             }
@@ -307,7 +311,10 @@ contract Implementation is Versionable, ContextUpgradeable {
 
     /// @notice Returns the estimated price of the contract in the payment token
     function price() private view returns (uint256) {
-        return priceV2(getLatestResell()._resellProfitTarget);
+        if (_getLatestResell()._resellPrice > 0) {
+            return _getLatestResell()._resellPrice;
+        }
+        return priceV2(_getLatestResell()._resellProfitTarget);
     }
 
     // terms with length of the contract run
@@ -328,7 +335,7 @@ contract Implementation is Versionable, ContextUpgradeable {
     }
 
     function priceUnchecked() private view returns (uint256) {
-        ResellTerms storage latestPurchase = getLatestResell();
+        ResellTerms storage latestPurchase = _getLatestResell();
 
         uint256 hashesForToken = hashrateOracle.getHashesForTokenUnchecked();
         uint256 priceInToken = (terms._length * terms._speed) / hashesForToken;
@@ -352,11 +359,11 @@ contract Implementation is Versionable, ContextUpgradeable {
     /// @notice Allows the buyer or validator to close out the contract early
     /// @param reason The reason for the early closeout
     function closeEarly(CloseReason reason) external {
-        ResellTerms memory latestPurchase = getLatestResell();
-        console.log("latestBuyer", latestPurchase._account);
+        ResellTerms memory latestPurchase = _getLatestResell();
+        // console.log("latestBuyer", latestPurchase._buyer);
 
         require(
-            _msgSender() == latestPurchase._account || _msgSender() == latestPurchase._validator,
+            _msgSender() == latestPurchase._buyer || _msgSender() == latestPurchase._validator,
             "this account is not authorized to trigger an early closeout"
         );
         require(block.timestamp < getEndTime(), "the contract is not in the running state");
@@ -370,12 +377,21 @@ contract Implementation is Versionable, ContextUpgradeable {
 
         resellChain.pop();
 
-        ResellTerms storage _seller = getLatestResell();
-        console.log("updated seller", _seller._account);
-        emit contractClosedEarly(latestPurchase._account, latestPurchase._validator, _seller._account, reason);
-        sendPayments(a, b, c, d, _seller._account, latestPurchase._validator, latestPurchase._account);
-        if (_seller._isResellToDefaultBuyer) {
-            _seller._lastSettlementTime = block.timestamp;
+        ResellTerms storage _latestResell = _getLatestResell();
+        // console.log("updated seller", _latestResell._buyer);
+        emit contractClosedEarly(
+            latestPurchase._buyer,
+            latestPurchase._validator,
+            _latestResell._buyer,
+            reason,
+            ResellFlags({
+                isResellable: _latestResell._isResellable,
+                isResellToDefaultBuyer: _latestResell._isResellToDefaultBuyer
+            })
+        );
+        sendPayments(a, b, c, d, _latestResell._buyer, latestPurchase._validator, latestPurchase._buyer);
+        if (_latestResell._isResellToDefaultBuyer) {
+            _latestResell._lastSettlementTime = block.timestamp;
         }
         claimFunds();
     }
@@ -414,7 +430,11 @@ contract Implementation is Versionable, ContextUpgradeable {
         }
     }
 
-    function getLatestResell() private view returns (ResellTerms storage) {
+    function _getLatestResell() private view returns (ResellTerms storage) {
+        return resellChain[resellChain.length - 1];
+    }
+
+    function getLatestResell() external view returns (ResellTerms memory) {
         return resellChain[resellChain.length - 1];
     }
 
@@ -428,7 +448,7 @@ contract Implementation is Versionable, ContextUpgradeable {
     /// @notice Returns the current state of the contract
     /// @return ContractState Current contract state (Available or Running)
     function contractState() public view returns (ContractState) {
-        ResellTerms memory latestResell = getLatestResell();
+        ResellTerms memory latestResell = _getLatestResell();
 
         if (latestResell._isResellable) {
             return ContractState.Available;
@@ -436,7 +456,7 @@ contract Implementation is Versionable, ContextUpgradeable {
         if (latestResell._isResellToDefaultBuyer) {
             return ContractState.Available;
         }
-        if (latestResell._account == address(0)) {
+        if (latestResell._buyer == address(0)) {
             return ContractState.Available;
         }
         if (resellChain.length == 1) {
@@ -461,22 +481,22 @@ contract Implementation is Versionable, ContextUpgradeable {
 
         if (sellerPayment > 0) {
             isPaid = true;
-            console.log("===Sending seller payment", sellerPayment, _seller);
+            // console.log("===Sending seller payment", sellerPayment, _seller);
             paymentToken.safeTransfer(_seller, sellerPayment);
         }
         if (validatorFee > 0 && _validator != address(0)) {
             isPaid = true;
-            console.log("===Sending validator fee", validatorFee, _validator);
+            // console.log("===Sending validator fee", validatorFee, _validator);
             feeToken.safeTransfer(_validator, validatorFee);
         }
         if (buyerRefundPayment > 0) {
             isPaid = true;
-            console.log("===Sending buyer refund payment", buyerRefundPayment, _buyer);
+            // console.log("===Sending buyer refund payment", buyerRefundPayment, _buyer);
             paymentToken.safeTransfer(_buyer, buyerRefundPayment);
         }
         if (buyerRefundFee > 0) {
             isPaid = true;
-            console.log("===Sending buyer refund fee", buyerRefundFee, _buyer);
+            // console.log("===Sending buyer refund fee", buyerRefundFee, _buyer);
             feeToken.safeTransfer(_buyer, buyerRefundFee);
         }
 
@@ -513,7 +533,7 @@ contract Implementation is Versionable, ContextUpgradeable {
     }
 
     function seller() public view returns (address) {
-        return getLatestResell()._seller;
+        return _getLatestResell()._seller;
     }
 
     /// @notice Returns true if the contract is reselling
@@ -523,19 +543,11 @@ contract Implementation is Versionable, ContextUpgradeable {
     }
 
     function owner() public view returns (address) {
-        return resellChain[0]._account;
+        return resellChain[0]._buyer;
     }
 
     function min(uint256 a, uint256 b) private pure returns (uint256) {
         return a < b ? a : b;
-    }
-
-    function unpackFirstBool(uint8 packed) public pure returns (bool a) {
-        return (packed & 1) != 0;
-    }
-
-    function unpackSecondBool(uint8 packed) public pure returns (bool b) {
-        return (packed & (1 << 1)) != 0;
     }
 
     modifier onlyCloneFactory() {

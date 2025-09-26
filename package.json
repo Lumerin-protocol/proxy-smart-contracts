@@ -11,7 +11,7 @@
     "format:sol": "forge fmt ./contracts/**/*.sol"
   },
   "devDependencies": {
-    "@biomejs/biome": "1.9.4",
+    "@biomejs/biome": "2.2.4",
     "@cyfrin/aderyn": "^0.5.13",
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
     "@nomicfoundation/hardhat-ethers": "^3.0.0",

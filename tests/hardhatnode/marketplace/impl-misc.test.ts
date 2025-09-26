@@ -1,10 +1,10 @@
 import { viem } from "hardhat";
 import { expect } from "chai";
 import { parseEventLogs, zeroAddress } from "viem";
-import { deployLocalFixture } from "./fixtures-2";
+import { deployLocalFixture } from "../fixtures-2";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
-import { catchError } from "../lib";
+import { catchError } from "../../lib";
 
 // Constants to replace magic numbers
 const CONTRACT_STATE = {

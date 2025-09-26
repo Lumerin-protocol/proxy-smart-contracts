@@ -1,15 +1,16 @@
 import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import { deployLocalFixture } from "./fixtures-2";
+import { deployLocalFixture } from "../fixtures-2";
 import { viem } from "hardhat";
-import { getPublicKey } from "../../lib/pubkey";
-import { expectIsError } from "../utils";
+import { getPublicKey } from "../../../lib/pubkey";
+import { expectIsError } from "../../utils";
+import { parseUnits } from "viem";
 
 describe("CloneFactory Seller Registry", function () {
   describe("Seller Registration", function () {
     it("should allow seller registration with sufficient stake", async function () {
-      const { contracts, config } = await loadFixture(deployLocalFixture);
-      const [, , newSeller] = await viem.getWalletClients();
+      const { contracts, config, accounts } = await loadFixture(deployLocalFixture);
+      const newSeller = accounts.unregistered;
 
       const stakeAmount = config.cloneFactory.minSellerStake;
 
@@ -33,27 +34,16 @@ describe("CloneFactory Seller Registry", function () {
       const pubKey = await getPublicKey(newSeller);
 
       await contracts.cloneFactory.write.setCreateNewRentalContractV2(
-        [0n, 0n, speed, length, profitTarget, newSeller.account.address, pubKey],
+        [speed, length, profitTarget, pubKey],
         { account: newSeller.account }
       );
     });
 
     it("should fail registration with insufficient stake", async function () {
-      const { contracts, config } = await loadFixture(deployLocalFixture);
-      const [, , , , , newSeller] = await viem.getWalletClients();
+      const { contracts, config, accounts } = await loadFixture(deployLocalFixture);
+      const newSeller = accounts.unregistered;
 
       const insufficientStake = config.cloneFactory.minSellerStake - 1n;
-
-      // Transfer insufficient tokens to new seller
-      await contracts.lumerinToken.write.transfer([newSeller.account.address, insufficientStake]);
-
-      // Approve tokens for CloneFactory
-      await contracts.lumerinToken.write.approve(
-        [contracts.cloneFactory.address, insufficientStake],
-        {
-          account: newSeller.account,
-        }
-      );
 
       // Attempt to register seller with insufficient stake
       try {
@@ -69,7 +59,7 @@ describe("CloneFactory Seller Registry", function () {
 
     it("should allow multiple registrations by same seller to increase stake", async function () {
       const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
-      const [, , , , , newSeller] = await viem.getWalletClients();
+      const newSeller = accounts.unregistered;
 
       const firstStake = config.cloneFactory.minSellerStake / 2n;
       const secondStake = config.cloneFactory.minSellerStake;
@@ -108,7 +98,7 @@ describe("CloneFactory Seller Registry", function () {
       const pubKey = await getPublicKey(newSeller);
 
       await contracts.cloneFactory.write.setCreateNewRentalContractV2(
-        [0n, 0n, speed, length, profitTarget, newSeller.account.address, pubKey],
+        [speed, length, profitTarget, pubKey],
         { account: newSeller.account }
       );
 
@@ -117,7 +107,7 @@ describe("CloneFactory Seller Registry", function () {
 
     it("should transfer stake tokens to CloneFactory on registration", async function () {
       const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
-      const [, , , , , newSeller] = await viem.getWalletClients();
+      const newSeller = accounts.unregistered;
 
       const stakeAmount = config.cloneFactory.minSellerStake;
 
@@ -157,7 +147,7 @@ describe("CloneFactory Seller Registry", function () {
   describe("Seller Deregistration", function () {
     it("should allow deregistration when seller has no active contracts", async function () {
       const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
-      const [, , , , , newSeller] = await viem.getWalletClients();
+      const newSeller = accounts.unregistered;
 
       const stakeAmount = config.cloneFactory.minSellerStake;
 
@@ -192,7 +182,7 @@ describe("CloneFactory Seller Registry", function () {
 
       try {
         await contracts.cloneFactory.write.setCreateNewRentalContractV2(
-          [0n, 0n, speed, length, profitTarget, newSeller.account.address, pubKey],
+          [speed, length, profitTarget, pubKey],
           { account: newSeller.account }
         );
         expect.fail("Should not allow contract creation after deregistration");
@@ -219,8 +209,8 @@ describe("CloneFactory Seller Registry", function () {
     });
 
     it("should fail deregistration for unregistered seller", async function () {
-      const { contracts } = await loadFixture(deployLocalFixture);
-      const [, , , , , unregisteredSeller] = await viem.getWalletClients();
+      const { contracts, accounts } = await loadFixture(deployLocalFixture);
+      const unregisteredSeller = accounts.unregistered;
 
       try {
         await contracts.cloneFactory.write.sellerDeregister({
@@ -236,8 +226,8 @@ describe("CloneFactory Seller Registry", function () {
 
   describe("Seller Access Control", function () {
     it("should prevent unregistered sellers from creating contracts", async function () {
-      const { contracts } = await loadFixture(deployLocalFixture);
-      const [, , , , , unregisteredSeller] = await viem.getWalletClients();
+      const { contracts, accounts } = await loadFixture(deployLocalFixture);
+      const unregisteredSeller = accounts.unregistered;
 
       const speed = 1000000000000000000000n;
       const length = 3600n;
@@ -246,7 +236,7 @@ describe("CloneFactory Seller Registry", function () {
 
       try {
         await contracts.cloneFactory.write.setCreateNewRentalContractV2(
-          [0n, 0n, speed, length, profitTarget, unregisteredSeller.account.address, pubKey],
+          [speed, length, profitTarget, pubKey],
           { account: unregisteredSeller.account }
         );
         expect.fail("Should not allow contract creation by unregistered seller");
@@ -287,7 +277,7 @@ describe("CloneFactory Seller Registry", function () {
 
       try {
         await contracts.cloneFactory.write.setCreateNewRentalContractV2(
-          [0n, 0n, speed, length, profitTarget, seller.account.address, pubKey],
+          [speed, length, profitTarget, pubKey],
           { account: seller.account }
         );
         expect.fail("Should not allow contract creation by seller with insufficient stake");
@@ -322,7 +312,16 @@ describe("CloneFactory Seller Registry", function () {
 
       try {
         await contracts.cloneFactory.write.setPurchaseRentalContractV2(
-          [config.cloneFactory.contractAddresses[0], validator.account.address, "", "", 0],
+          [
+            config.cloneFactory.contractAddresses[0],
+            validator.account.address,
+            "",
+            "",
+            0,
+            true,
+            false,
+            0n,
+          ],
           { account: buyer.account }
         );
         expect.fail("Should not allow contract purchase by seller with insufficient stake");
@@ -396,7 +395,16 @@ describe("CloneFactory Seller Registry", function () {
 
       // Purchase should succeed for restored contract
       await contracts.cloneFactory.write.setPurchaseRentalContractV2(
-        [contractList[0], accounts.validator.account.address, "validatorURL", "destURL", 0],
+        [
+          contractList[0],
+          accounts.validator.account.address,
+          "validatorURL",
+          "destURL",
+          0,
+          true,
+          false,
+          0n,
+        ],
         { account: buyer.account }
       );
 
@@ -406,8 +414,8 @@ describe("CloneFactory Seller Registry", function () {
 
   describe("Edge Cases", function () {
     it("should handle zero stake registration attempt", async function () {
-      const { contracts } = await loadFixture(deployLocalFixture);
-      const [, , , , , newSeller] = await viem.getWalletClients();
+      const { contracts, accounts } = await loadFixture(deployLocalFixture);
+      const newSeller = accounts.unregistered;
 
       try {
         await contracts.cloneFactory.write.sellerRegister([0n], {
@@ -421,8 +429,8 @@ describe("CloneFactory Seller Registry", function () {
     });
 
     it("should handle registration with exact minimum stake", async function () {
-      const { contracts, config } = await loadFixture(deployLocalFixture);
-      const [, , , , , newSeller] = await viem.getWalletClients();
+      const { contracts, config, accounts } = await loadFixture(deployLocalFixture);
+      const newSeller = accounts.unregistered;
 
       const exactMinStake = config.cloneFactory.minSellerStake;
 
@@ -442,7 +450,7 @@ describe("CloneFactory Seller Registry", function () {
       const pubKey = await getPublicKey(newSeller);
 
       await contracts.cloneFactory.write.setCreateNewRentalContractV2(
-        [0n, 0n, speed, length, profitTarget, newSeller.account.address, pubKey],
+        [speed, length, profitTarget, pubKey],
         { account: newSeller.account }
       );
 
@@ -450,8 +458,8 @@ describe("CloneFactory Seller Registry", function () {
     });
 
     it("should handle multiple deregistration attempts", async function () {
-      const { contracts, config } = await loadFixture(deployLocalFixture);
-      const [, , , , , newSeller] = await viem.getWalletClients();
+      const { contracts, config, accounts } = await loadFixture(deployLocalFixture);
+      const newSeller = accounts.unregistered;
 
       // Register seller
       const stakeAmount = config.cloneFactory.minSellerStake;
@@ -479,5 +487,133 @@ describe("CloneFactory Seller Registry", function () {
         expect(err.message).to.include("seller is not registered");
       }
     });
+  });
+});
+
+describe("Seller Registry", function () {
+  it("should return sellers list", async function () {
+    const { contracts, accounts } = await loadFixture(deployLocalFixture);
+    const { cloneFactory } = contracts;
+    const { seller } = accounts;
+
+    // Get sellers with pagination - using correct types
+    const sellers = await cloneFactory.read.getSellers([0n, 10]);
+
+    expect(sellers).to.be.an("array");
+    expect(sellers.length).to.be.greaterThan(0);
+    expect(sellers[0].toLowerCase()).to.equal(seller.account.address.toLowerCase());
+  });
+
+  it("should handle pagination for getSellers", async function () {
+    const { contracts, accounts } = await loadFixture(deployLocalFixture);
+    const { cloneFactory } = contracts;
+
+    // Test pagination with offset - using correct types
+    const sellersPage1 = await cloneFactory.read.getSellers([0n, 1]);
+    const sellersPage2 = await cloneFactory.read.getSellers([1n, 1]);
+
+    expect(sellersPage1).to.be.an("array");
+    expect(sellersPage1.length).to.be.lessThanOrEqual(1);
+  });
+
+  it("should register additional seller", async function () {
+    const { contracts, accounts } = await loadFixture(deployLocalFixture);
+    const { cloneFactory, lumerinToken } = contracts;
+
+    const wallet = (await viem.getWalletClients())[10];
+
+    // Transfer tokens and register new seller
+    const minStake = await cloneFactory.read.minSellerStake();
+    await lumerinToken.write.transfer([wallet.account.address, minStake]);
+    await lumerinToken.write.approve([cloneFactory.address, minStake], {
+      account: wallet.account,
+    });
+
+    await cloneFactory.write.sellerRegister([minStake], {
+      account: wallet.account,
+    });
+
+    // Check seller is registered
+    const [sellerInfo, isActive, isRegistered] = await cloneFactory.read.sellerByAddress([
+      wallet.account.address,
+    ]);
+    expect(isRegistered).to.be.true;
+    expect(isActive).to.be.true;
+    expect(sellerInfo.stake).to.equal(minStake);
+  });
+
+  it("should handle seller deregistration with contracts", async function () {
+    const { contracts, accounts } = await loadFixture(deployLocalFixture);
+    const { cloneFactory } = contracts;
+    const { seller } = accounts;
+
+    // Seller should not be able to deregister if they have contracts
+    await expect(
+      cloneFactory.write.sellerDeregister({
+        account: seller.account,
+      })
+    ).to.be.rejectedWith("seller has contracts");
+  });
+
+  it("should handle insufficient stake registration", async function () {
+    const { contracts, accounts } = await loadFixture(deployLocalFixture);
+    const { cloneFactory, lumerinToken } = contracts;
+    const { validator } = accounts;
+
+    const minStake = await cloneFactory.read.minSellerStake();
+    const insufficientStake = minStake / 2n;
+
+    await lumerinToken.write.transfer([validator.account.address, insufficientStake]);
+    await lumerinToken.write.approve([cloneFactory.address, insufficientStake], {
+      account: validator.account,
+    });
+
+    await expect(
+      cloneFactory.write.sellerRegister([insufficientStake], {
+        account: validator.account,
+      })
+    ).to.be.rejectedWith("stake is less than required minimum");
+  });
+
+  it("should handle non-registered seller deregistration", async function () {
+    const { contracts, accounts } = await loadFixture(deployLocalFixture);
+    const { cloneFactory } = contracts;
+    const { validator } = accounts;
+
+    await expect(
+      cloneFactory.write.sellerDeregister({
+        account: validator.account,
+      })
+    ).to.be.rejectedWith("seller is not registered");
+  });
+});
+describe("Seller Stake Management", function () {
+  it("should update minimum seller stake", async function () {
+    const { contracts, accounts } = await loadFixture(deployLocalFixture);
+    const { cloneFactory } = contracts;
+    const { owner } = accounts;
+
+    const newMinStake = parseUnits("20000", 8);
+
+    await cloneFactory.write.setMinSellerStake([newMinStake], {
+      account: owner.account,
+    });
+
+    const updatedMinStake = await cloneFactory.read.minSellerStake();
+    expect(updatedMinStake).to.equal(newMinStake);
+  });
+
+  it("should revert when non-owner tries to set minimum seller stake", async function () {
+    const { contracts, accounts } = await loadFixture(deployLocalFixture);
+    const { cloneFactory } = contracts;
+    const { seller } = accounts;
+
+    const newMinStake = parseUnits("20000", 8);
+
+    await expect(
+      cloneFactory.write.setMinSellerStake([newMinStake], {
+        account: seller.account,
+      })
+    ).to.be.rejectedWith("you are not authorized");
   });
 });

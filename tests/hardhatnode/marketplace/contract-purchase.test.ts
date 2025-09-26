@@ -3,9 +3,9 @@ import { viem } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { encrypt } from "ecies-geth";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
-import { deployLocalFixture } from "./fixtures-2";
-import { remove0xPrefix } from "../../lib/utils";
-import { getPublicKey } from "../../lib/pubkey";
+import { deployLocalFixture } from "../fixtures-2";
+import { remove0xPrefix } from "../../../lib/utils";
+import { getPublicKey } from "../../../lib/pubkey";
 
 describe("Contract purchase", function () {
   it("should purchase with cloud validator", async function () {
@@ -31,21 +31,6 @@ describe("Contract purchase", function () {
     // Get contract instance
     const impl = await viem.getContractAt("Implementation", contractAddr);
 
-    // Get contract terms
-    const [, terms] = await impl.read.getPublicVariablesV2();
-
-    // Check history before purchase
-    const history_before = await impl.read.getHistory([0n, 100]);
-    expect(history_before.length).equal(0);
-
-    // Approve tokens for purchase
-    await usdcMock.write.approve([cloneFactory.address, terms._price], {
-      account: buyer.account,
-    });
-    await lumerinToken.write.approve([cloneFactory.address, terms._fee], {
-      account: buyer.account,
-    });
-
     // Purchase the contract
     await cloneFactory.write.setPurchaseRentalContractV2(
       [
@@ -53,22 +38,24 @@ describe("Contract purchase", function () {
         validator.account.address,
         encValidatorURL.toString("hex"),
         encDestURL.toString("hex"),
-        terms._version,
+        0,
+        true,
+        false,
+        0n,
       ],
       { account: buyer.account }
     );
 
     // Verify the purchase
-    const actValidatorURL = await impl.read.encrValidatorURL();
-    const actDestURL = await impl.read.encrDestURL();
-    const actValidatorAddr = await impl.read.validator();
-    const history_after = await impl.read.getHistory([0n, 100]);
+    const entry = await impl.read.getLatestResell();
+
+    const actValidatorURL = entry._encrValidatorURL;
+    const actDestURL = entry._encrDestURL;
+    const actValidatorAddr = entry._validator;
 
     expect(actValidatorURL).equal(encValidatorURL.toString("hex"));
     expect(actDestURL).equal(encDestURL.toString("hex"));
     expect(actValidatorAddr.toLowerCase()).equal(validator.account.address.toLowerCase());
-    expect(history_after.length).equal(1);
-    expect(history_after[0]._buyer.toLowerCase()).equal(buyer.account.address.toLowerCase());
 
     // Close the contract
     await impl.write.closeEarly([0], { account: buyer.account });
@@ -91,15 +78,6 @@ describe("Contract purchase", function () {
 
     // Get contract instance and terms
     const impl = await viem.getContractAt("Implementation", contractAddr);
-    const [, terms] = await impl.read.getPublicVariablesV2();
-
-    // Approve tokens for purchase
-    await usdcMock.write.approve([cloneFactory.address, terms._price], {
-      account: buyer.account,
-    });
-    await lumerinToken.write.approve([cloneFactory.address, terms._fee], {
-      account: buyer.account,
-    });
 
     // Try to purchase the contract - should fail due to stale oracle data
     try {
@@ -109,7 +87,10 @@ describe("Contract purchase", function () {
           validator.account.address,
           "encryptedValidatorURL",
           "encryptedDestURL",
-          terms._version,
+          0,
+          true,
+          false,
+          0n,
         ],
         { account: buyer.account }
       );
@@ -117,5 +98,22 @@ describe("Contract purchase", function () {
     } catch (err: any) {
       expect(err.message).to.include("StaleData");
     }
+  });
+
+  it("should reject purchase of non-existent contract", async function () {
+    const { contracts, accounts } = await loadFixture(deployLocalFixture);
+    const { cloneFactory } = contracts;
+    const { buyer, validator } = accounts;
+
+    const fakeAddress = "0x1234567890123456789012345678901234567890";
+
+    await expect(
+      cloneFactory.write.setPurchaseRentalContractV2(
+        [fakeAddress, validator.account.address, "validator-url", "dest-url", 0],
+        {
+          account: buyer.account,
+        }
+      )
+    ).to.be.rejectedWith("unknown contract address");
   });
 });

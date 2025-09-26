@@ -1,8 +1,8 @@
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import { deployLocalFixture } from "./fixtures-2";
+import { deployLocalFixture } from "../fixtures-2";
 import { zeroAddress } from "viem";
 import { expect } from "chai";
-import { getTxDeltaBalance } from "../lib";
+import { getTxDeltaBalance } from "../../lib";
 
 it("should purchase and resell to default buyer for the whole duration", async () => {
   const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
