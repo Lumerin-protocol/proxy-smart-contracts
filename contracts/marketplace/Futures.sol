@@ -32,6 +32,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     EnumerableSet.UintSet private deliveryDates; // delivery dates for the futures
     uint256 public speedHps; // speed of the one unit of futures in hashes/second, constant for all positions
     uint32 public deliveryDurationSeconds; // 30 days, constant for all orders
+    uint256 public priceLadderStep; 
 
     uint256 private nonce = 0;
     uint8 private _decimals;
@@ -73,7 +74,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     );
     event PositionClosed(bytes32 indexed positionId, address indexed closedBy);
 
-    error PriceCannotBeZero();
+    error InvalidPrice();
     error DeliveryDateShouldBeInTheFuture();
     error DeliveryDateNotAvailable();
     error OrderNotBelongToSender();
@@ -99,7 +100,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         uint8 _sellerLiquidationMarginPercent,
         uint8 _buyerLiquidationMarginPercent,
         uint256 _speedHps,
-        uint32 _deliveryDurationSeconds
+        uint32 _deliveryDurationSeconds,
+        uint256 _priceLadderStep
     ) public initializer {
         __Ownable_init(_msgSender());
         __UUPSUpgradeable_init();
@@ -113,6 +115,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         speedHps = _speedHps;
         deliveryDurationSeconds = _deliveryDurationSeconds; // 30 days
         breachPenaltyRatePerDay = 1 * 10 ** (BREACH_PENALTY_DECIMALS - 2); // 1%
+        priceLadderStep = _priceLadderStep;
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
@@ -140,18 +143,10 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     }
 
     function _createOrMatchOrder(uint256 _price, uint256 _deliveryDate, bool _isBuy, address _participant) private {
-        if (_price == 0) {
-            revert PriceCannotBeZero();
-        }
-        if (_deliveryDate <= block.timestamp) {
-            revert DeliveryDateShouldBeInTheFuture();
-        }
+        validatePrice(_price);
+        validateDeliveryDate(_deliveryDate);
 
-        if (!deliveryDates.contains(_deliveryDate)) {
-            revert DeliveryDateNotAvailable();
-        }
-
-        uint256 minMargin = calculateRequiredMarginV2(speedHps, _isBuy);
+        uint256 minMargin = calculateRequiredMargin(1, _isBuy);
         if (minMargin > balanceOf(_participant)) {
             revert InsufficientMarginBalance();
         }
@@ -280,9 +275,15 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         token.safeTransfer(_msgSender(), _amount);
     }
 
-    function getMinMargin(address _participant) public view returns (uint256) {
-        uint256 sellHps = 0;
-        uint256 buyHps = 0;
+    /**
+     * @notice Gets the minimum margin required to keep the participant's positions and orders open
+     * @param _participant The participant to get the minimum margin for
+     * @return The minimum margin required to keep the participant's positions and orders open
+     */
+    function getMarginShortfall(address _participant) public view returns (int256) {
+        uint256 sellQ = 0;
+        uint256 buyQ = 0;
+        int256 marginShortfall = 0;
 
         // calculate orders
         EnumerableSet.Bytes32Set storage _orders = participantOrderIdsIndex[_participant];
@@ -290,42 +291,85 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             bytes32 orderId = _orders.at(i);
             Order memory order = orders[orderId];
             if (order.isBuy) {
-                buyHps += speedHps;
+                buyQ++;
             } else {
-                sellHps += speedHps;
+                sellQ++;
             }
         }
 
+        //TODO: check if ok to use market price for orders, or should we use price of the order
+        marginShortfall += int256(calculateRequiredMargin(sellQ, false));
+        marginShortfall += int256(calculateRequiredMargin(buyQ, true));
+
         // calculate positions
+        int256 positionMarginBalance = 0;
+        buyQ = 0;
+        sellQ = 0;
         EnumerableSet.Bytes32Set storage _positions = participantPositionIdsIndex[_participant];
         for (uint256 i = 0; i < _positions.length(); i++) {
             bytes32 positionId = _positions.at(i);
             Position memory position = positions[positionId];
-            if (position.seller == _participant) {
-                sellHps += speedHps;
+            bool isBuy = position.buyer == _participant;
+            positionMarginBalance += getMarginBalance(position, isBuy);
+            if (isBuy) {
+                buyQ++;
             } else {
-                buyHps += speedHps;
+                sellQ++;
             }
         }
 
-        // calculate required margin
-        uint256 requiredMargin = calculateRequiredMargin(sellHps, buyHps);
+        uint256 maintenanceMargin = getMaintenanceMargin(sellQ, false) + getMaintenanceMargin(buyQ, true);
+        int256 positionsMarginShortfall = int256(maintenanceMargin) - positionMarginBalance;
+     
+        console.log("marginShortfall");
+        console.logInt(marginShortfall + positionsMarginShortfall);
 
-        return requiredMargin;
+        return marginShortfall + positionsMarginShortfall;
     }
 
-    function calculateRequiredMargin(uint256 _sellHps, uint256 _buyHps) public view returns (uint256) {
-        // getHashesforToken is never returning 0;
-        uint256 hashesForToken = hashrateOracle.getHashesforToken();
-        uint256 requiredMargin = (_sellHps * getMarginPercent(false) + _buyHps * getMarginPercent(true))
-            * deliveryDurationSeconds / hashesForToken / 100;
-        return requiredMargin;
+    function getMarginShortfallForPosition(Position memory position, bool _isBuy) public view returns (int256) {
+        int256 marginBalance = getMarginBalance(position, _isBuy);
+        return int256(getMaintenanceMargin(1, _isBuy)) - marginBalance;
     }
 
-    function calculateRequiredMarginV2(uint256 _hps, bool _isBuy) public view returns (uint256) {
-        return _hps * getMarginPercent(_isBuy) * deliveryDurationSeconds / 100 / hashrateOracle.getHashesforToken();
+    // function calculateRequiredMargin(uint256 _sellHps, uint256 _buyHps) public view returns (uint256) {
+    //     // getHashesforToken is never returning 0;
+    //     uint256 hashesForToken = hashrateOracle.getHashesforToken();
+    //     uint256 requiredMargin = (_sellHps * getMarginPercent(false) + _buyHps * getMarginPercent(true))
+    //         * deliveryDurationSeconds / hashesForToken / 100;
+    //     return requiredMargin;
+    // }
+
+    // function calculateRequiredMarginV2(uint256 _hps, bool _isBuy) public view returns (uint256) {
+    //     return _hps * getMarginPercent(_isBuy) * deliveryDurationSeconds / 100 / hashrateOracle.getHashesforToken();
+    // }
+
+    function calculateRequiredMargin(uint256 _quantity, bool _isBuy) public view returns (uint256) {
+        return _quantity *speedHps * deliveryDurationSeconds  * getMarginPercent(_isBuy) / 100 / hashrateOracle.getHashesforToken();
     }
 
+
+    /**
+     * @notice Gets the virtual margin balance (initial margin + unrealized PnL) of a position
+     * @param position The position to get the margin balance of
+     * @param _isBuy Whether the position is a buy position
+     */
+    function getMarginBalance(Position memory position, bool _isBuy) private view returns (int256) {
+        uint256 initialMargin = calculateRequiredMargin(1, _isBuy);
+        int256 unrealizedPnL = int256(position.price) - int256(_getMarketPrice(hashrateOracle.getHashesforToken()));
+        return int256(initialMargin) + unrealizedPnL;
+    }
+
+    /**
+     * @notice Gets the maintenance margin - minimal margin balance required to keep the position open
+     * @param _quantity The quantity of the position
+     * @param _isBuy Whether the position is a buy position
+     */
+    function getMaintenanceMargin(uint256 _quantity, bool _isBuy) private view returns (uint256) {
+        return _quantity * _getMarketPrice(hashrateOracle.getHashesforToken()) * getMarginPercent(_isBuy) / 100;
+    }
+
+    // TODO: calculate related to remaining delivery time
     function getMarginPercent(bool _isBuy) public view returns (uint8) {
         uint8 breachPenaltyMarginPercent =
             uint8(breachPenaltyRatePerDay * deliveryDurationSeconds / 10 ** (BREACH_PENALTY_DECIMALS - 2));
@@ -337,14 +381,13 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     }
 
     function marginCall(address _participant) external onlyValidator {
-        uint256 requiredMargin = getMinMargin(_participant);
-        uint256 currentMargin = balanceOf(_participant);
-        if (currentMargin >= requiredMargin) {
+        int256 marginShortfall = getMarginShortfall(_participant);
+        uint256 userCollateral = balanceOf(_participant);
+        if (int256(userCollateral) > marginShortfall) {
             return;
         }
-        uint256 marginDeficit = requiredMargin - currentMargin;
 
-        uint256 reclaimedMargin; // amount of margin that will be reclaimed by closing positions/orders
+        int256 reclaimedMargin; // amount of margin that will be reclaimed by closing positions/orders
 
         // closing orders
         EnumerableSet.Bytes32Set storage _orders = participantOrderIdsIndex[_participant];
@@ -352,15 +395,12 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             bytes32 orderId = _orders.at(0);
             Order memory order = orders[orderId];
             _closeOrder(orderId, order);
-            uint256 sellHps = 0;
-            uint256 buyHps = 0;
             if (order.isBuy) {
-                buyHps = speedHps;
+                reclaimedMargin += int256(getMaintenanceMargin(1, true));
             } else {
-                sellHps = speedHps;
+                reclaimedMargin += int256(getMaintenanceMargin(1, false));
             }
-            reclaimedMargin += calculateRequiredMargin(sellHps, buyHps);
-            if (reclaimedMargin >= marginDeficit) {
+            if (reclaimedMargin >= marginShortfall) {
                 return;
             }
         }
@@ -370,20 +410,16 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         for (; _positions.length() > 0;) {
             bytes32 positionId = _positions.at(0);
             Position storage position = positions[positionId];
+
+            int256 marginBalance = getMarginBalance(position, position.seller == _participant);
             _closeSettlePositionAndPenalize(positionId, position, position.seller == _participant);
-            uint256 sellHps = 0;
-            uint256 buyHps = 0;
-            if (position.seller == _participant) {
-                sellHps = speedHps;
-            } else {
-                buyHps = speedHps;
-            }
+            reclaimedMargin += marginBalance;
             // TODO: update margin deficit since order closed and settled
-            reclaimedMargin += calculateRequiredMargin(sellHps, buyHps);
-            if (reclaimedMargin >= marginDeficit) {
+            if (reclaimedMargin >= marginShortfall) {
                 return;
             }
         }
+
     }
 
     function _calculateBreachPenalty(uint256 _price, uint256 remainingTime) private view returns (uint256) {
@@ -489,13 +525,18 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         uint256 hashesForToken = hashrateOracle.getHashesforToken();
 
         // if the position is not started yet, then use the current price
-        uint256 currentPrice = getMarketPrice(hashesForToken);
+        uint256 currentPrice = _getMarketPrice(hashesForToken);
 
         uint256 deliveredPayment = position.price * positionElapsedTime / deliveryDurationSeconds;
-        uint256 undeliveredPayment = currentPrice * positionRemainingTime / deliveryDurationSeconds;
-
         _transfer(position.buyer, position.seller, deliveredPayment);
-        _transfer(position.seller, position.buyer, undeliveredPayment);
+
+        int256 priceDifference = int256(currentPrice) - int256(position.price);
+        uint256 pnl = abs(priceDifference) * positionRemainingTime / deliveryDurationSeconds;
+        if (priceDifference > 0) {
+            _transfer(position.seller, position.buyer, pnl);
+        } else {
+            _transfer(position.buyer, position.seller, pnl);
+        }
 
         // remove position
         delete positions[_positionId];
@@ -506,8 +547,12 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         positionIds.remove(_positionId);
     }
 
-    function getMarketPrice(uint256 _hashesForToken) private view returns (uint256) {
+    function _getMarketPrice(uint256 _hashesForToken) private view returns (uint256) {
         return deliveryDurationSeconds * speedHps / _hashesForToken;
+    }
+
+    function getMarketPrice() public view returns (uint256) {
+        return _getMarketPrice(hashrateOracle.getHashesforToken());
     }
 
     function getOrderById(bytes32 _orderId) public view returns (Order memory) {
@@ -524,6 +569,51 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         }
         breachPenaltyRatePerDay = _breachPenaltyRatePerDay;
     }
+
+    // TODO: fix it for the unlikely negative value
+    function getMinMargin(address _participant) public view returns (uint256) {
+        return clamp(getMarginShortfall(_participant));
+    }
+
+    function getCollateralDeficit(address _participant) public view returns (int256) {
+        return int256(balanceOf(_participant)) - getMarginShortfall(_participant);
+    }
+
+    function clamp(int256 _value) public pure returns (uint256) {
+        if (_value > 0) {
+            return uint256(_value);
+        } else {
+            return 0;
+        }
+    }
+
+    function abs(int256 _value) public pure returns (uint256) {
+        if (_value > 0) {
+            return uint256(_value);
+        } else {
+            return uint256(-_value);
+        }
+    }
+
+    function validatePrice(uint256 _price) private view  {
+        if (_price == 0) {
+            revert InvalidPrice();
+        }
+        if (_price % priceLadderStep != 0) {
+            revert InvalidPrice();
+        }
+    }
+
+    function validateDeliveryDate(uint256 _deliveryDate) private view {
+        if (_deliveryDate <= block.timestamp) {
+            revert DeliveryDateShouldBeInTheFuture();
+        }
+
+        if (!deliveryDates.contains(_deliveryDate)) {
+            revert DeliveryDateNotAvailable();
+        }
+    }
+
 
     // ERC20
 
@@ -554,7 +644,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         if (balance < _amount) {
             revert ERC20InsufficientBalance(_from, balance, _amount);
         }
-        if (balance - _amount < getMinMargin(_from)) {
+
+        if (int256(_amount) > int256(balance)-getMarginShortfall(_from)) {
             revert InsufficientMarginBalance();
         }
         _;

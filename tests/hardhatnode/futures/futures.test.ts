@@ -193,7 +193,23 @@ describe("Futures Contract", function () {
       const deliveryDate = config.deliveryDates.date1;
       const isBuy = true;
 
-      await catchError(futures.abi, "PriceCannotBeZero", async () => {
+      await catchError(futures.abi, "InvalidPrice", async () => {
+        await futures.write.createOrder([price, deliveryDate, isBuy], {
+          account: seller.account,
+        });
+      });
+    });
+
+    it("should reject order creation with price not divisible by price ladder step", async function () {
+      const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+      const { futures } = contracts;
+      const { seller } = accounts;
+
+      const price = parseUnits("100.01", 6);
+      const deliveryDate = config.deliveryDates.date1;
+      const isBuy = true;
+
+      await catchError(futures.abi, "InvalidPrice", async () => {
         await futures.write.createOrder([price, deliveryDate, isBuy], {
           account: seller.account,
         });
@@ -622,12 +638,13 @@ describe("Futures Contract", function () {
       const { futures } = contracts;
       const { seller } = accounts;
 
-      const marginAmount = parseUnits("1000", 6);
       const price = parseUnits("100", 6);
+      const minMargin = await futures.read.calculateRequiredMargin([1n, false]);
+      console.log("minMargin", minMargin);
       const deliveryDate = config.deliveryDates.date1;
 
       // Add margin
-      await futures.write.addMargin([marginAmount], {
+      await futures.write.addMargin([minMargin], {
         account: seller.account,
       });
 
@@ -637,7 +654,7 @@ describe("Futures Contract", function () {
       });
 
       // Try to remove too much margin
-      const removeAmount = parseUnits("900", 6);
+      const removeAmount = 1n;
       await catchError(futures.abi, "InsufficientMarginBalance", async () => {
         await futures.write.removeMargin([removeAmount], {
           account: seller.account,
@@ -995,11 +1012,11 @@ describe("Futures Contract", function () {
       const { seller, validator, pc } = accounts;
 
       const price = parseUnits("100", 6);
-      const margin = parseUnits("120", 6);
+      const minMargin = await futures.read.calculateRequiredMargin([1n, true]);
       const deliveryDate = config.deliveryDates.date1;
 
       // Add small margin
-      await futures.write.addMargin([margin], {
+      await futures.write.addMargin([minMargin], {
         account: seller.account,
       });
 
@@ -1083,16 +1100,18 @@ describe("Futures Contract", function () {
 
       // Create maximum number of positions (50)
       for (let i = 0; i < numOrders; i++) {
-        await futures.write.createOrder([price + BigInt(i), deliveryDate, true], {
-          account: seller.account,
-        });
+        await futures.write.createOrder(
+          [price + BigInt(i) * config.priceLadderStep, deliveryDate, true],
+          { account: seller.account }
+        );
       }
 
       // Try to create one more position
       await catchError(futures.abi, "MaxOrdersPerParticipantReached", async () => {
-        await futures.write.createOrder([price + 50n, deliveryDate, true], {
-          account: seller.account,
-        });
+        await futures.write.createOrder(
+          [price + 50n * config.priceLadderStep, deliveryDate, true],
+          { account: seller.account }
+        );
       });
     });
 
