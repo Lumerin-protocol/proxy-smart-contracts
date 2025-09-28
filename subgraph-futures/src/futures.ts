@@ -7,9 +7,10 @@ import {
   OrderClosed,
   DeliveryDateAdded,
   Transfer,
+  Futures as FuturesContract,
 } from "../generated/Futures/Futures";
 import { Futures, Participant, Position, Order, DeliveryDate } from "../generated/schema";
-import { log, Bytes, Address } from "@graphprotocol/graph-ts";
+import { log, Bytes, Address, dataSource } from "@graphprotocol/graph-ts";
 
 // Helper function to get or create a participant with balance tracking
 function getOrCreateParticipant(address: Address): Participant {
@@ -60,6 +61,20 @@ export function handleInitialized(event: Initialized): void {
   futures.contractActiveCount = 0;
   futures.purchaseCount = 0;
   futures.closeoutCount = 0;
+
+  const address = dataSource.address();
+  log.info("Futures Address {}", [address.toHexString()]);
+  const futuresContract = FuturesContract.bind(address);
+
+  futures.priceLadderStep = futuresContract.priceLadderStep();
+  futures.sellerLiquidationMarginPercent = futuresContract.sellerLiquidationMarginPercent();
+  futures.buyerLiquidationMarginPercent = futuresContract.buyerLiquidationMarginPercent();
+  futures.speedHps = futuresContract.speedHps();
+  futures.deliveryDurationSeconds = futuresContract.deliveryDurationSeconds();
+  futures.breachPenaltyRatePerDay = futuresContract.breachPenaltyRatePerDay();
+  futures.validatorAddress = futuresContract.validatorAddress();
+  futures.hashrateOracleAddress = futuresContract.hashrateOracle();
+  futures.tokenAddress = futuresContract.token();
   futures.save();
 }
 

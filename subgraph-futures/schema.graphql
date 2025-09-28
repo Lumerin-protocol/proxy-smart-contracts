@@ -4,7 +4,18 @@ type Futures @entity(immutable: false) {
   id: Int8!
   initializedBlockNumber: BigInt!
   initializeTimestamp: BigInt!
+
+  "Contract configuration parameters"
   minSellerStake: BigInt!
+  priceLadderStep: BigInt!
+  sellerLiquidationMarginPercent: Int!
+  buyerLiquidationMarginPercent: Int!
+  speedHps: BigInt!
+  deliveryDurationSeconds: BigInt!
+  breachPenaltyRatePerDay: BigInt!
+  validatorAddress: Bytes!
+  hashrateOracleAddress: Bytes!
+  tokenAddress: Bytes!
 
   "Number of contracts including archived"
   contractCount: Int!
