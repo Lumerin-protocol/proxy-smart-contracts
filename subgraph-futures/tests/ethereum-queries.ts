@@ -117,6 +117,21 @@ export const closeOrder = async (
   return txhash;
 };
 
+export const offsetPosition = async (
+  ethClient: viem.Client,
+  participant: `0x${string}`,
+  positionId: `0x${string}`,
+  price: bigint
+) => {
+  const futuresContract = getFuturesContract(ethClient);
+  const sm = await futuresContract.simulate.offsetPosition([positionId, price], {
+    account: participant,
+  });
+  const txhash = await writeContract(ethClient, sm.request);
+  await waitForTransactionReceipt(ethClient, { hash: txhash });
+  return txhash;
+};
+
 export const closePositionAsSeller = async (
   ethClient: viem.Client,
   participant: `0x${string}`,

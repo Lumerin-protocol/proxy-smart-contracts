@@ -40,6 +40,7 @@ export const ParticipantQuery = gql`
         id
         closedBy
         closedAt
+        offsetPositionId
         buyer {
           address
         }
@@ -120,6 +121,3 @@ const ContractSpecsQuery = gql`
     }
   }
 `;
-
-// TODO: margin query
-// TODO: write transactions
