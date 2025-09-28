@@ -35,7 +35,7 @@ dataSources:
           handler: handlePositionCreated
         - event: PositionClosed(indexed bytes32,indexed address)
           handler: handlePositionClosed
-        - event: OrderCreated(indexed bytes32,indexed address,uint256,uint256,bool)
+        - event: OrderCreated(indexed bytes32,indexed address,uint256,uint256,bytes32,bool)
           handler: handleOrderCreated
         - event: OrderClosed(indexed bytes32,indexed address)
           handler: handleOrderClosed

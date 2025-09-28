@@ -149,6 +149,11 @@ export const FuturesABI = [
   },
   {
     inputs: [],
+    name: "InvalidPrice",
+    type: "error",
+  },
+  {
+    inputs: [],
     name: "MaxOrdersPerParticipantReached",
     type: "error",
   },
@@ -165,6 +170,11 @@ export const FuturesABI = [
   {
     inputs: [],
     name: "OnlyPositionSeller",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "OnlyPositionSellerOrBuyer",
     type: "error",
   },
   {
@@ -207,11 +217,6 @@ export const FuturesABI = [
   {
     inputs: [],
     name: "PositionNotExists",
-    type: "error",
-  },
-  {
-    inputs: [],
-    name: "PriceCannotBeZero",
     type: "error",
   },
   {
@@ -358,6 +363,12 @@ export const FuturesABI = [
         internalType: "uint256",
         name: "deliveryDate",
         type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "bytes32",
+        name: "offsetPositionId",
+        type: "bytes32",
       },
       {
         indexed: false,
@@ -762,6 +773,24 @@ export const FuturesABI = [
   {
     inputs: [
       {
+        internalType: "bytes32",
+        name: "_offsetPositionId",
+        type: "bytes32",
+      },
+      {
+        internalType: "uint256",
+        name: "_price",
+        type: "uint256",
+      },
+    ],
+    name: "createOffsetOrder",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
         internalType: "uint256",
         name: "_price",
         type: "uint256",
@@ -1017,6 +1046,11 @@ export const FuturesABI = [
             name: "timestamp",
             type: "uint256",
           },
+          {
+            internalType: "bytes32",
+            name: "offsetPositionId",
+            type: "bytes32",
+          },
         ],
         internalType: "struct Futures.Order",
         name: "",
@@ -1122,6 +1156,11 @@ export const FuturesABI = [
         name: "_deliveryDurationSeconds",
         type: "uint32",
       },
+      {
+        internalType: "uint256",
+        name: "_priceLadderStep",
+        type: "uint256",
+      },
     ],
     name: "initialize",
     outputs: [],
@@ -1162,6 +1201,19 @@ export const FuturesABI = [
         internalType: "address",
         name: "",
         type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "priceLadderStep",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
       },
     ],
     stateMutability: "view",

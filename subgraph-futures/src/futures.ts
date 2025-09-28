@@ -109,6 +109,7 @@ export function handleOrderCreated(event: OrderCreated): void {
   order.participant = participant.id;
   order.price = event.params.price;
   order.deliveryDate = event.params.deliveryDate;
+  order.offsetPositionId = event.params.offsetPositionId;
   order.isBuy = event.params.isBuy;
   order.timestamp = event.block.timestamp;
   order.blockNumber = event.block.number;

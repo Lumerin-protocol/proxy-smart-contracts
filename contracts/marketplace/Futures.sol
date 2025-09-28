@@ -43,6 +43,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         uint256 deliveryDate; // date of delivery, when contract delivery is started
         bool isBuy; // true if long/buy position, false if short/sell position
         uint256 timestamp; // when position is opened
+        bytes32 offsetPositionId; // id of the position you want to offset, zero if no offset
     }
 
     struct Position {
@@ -66,7 +67,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
 
     event DeliveryDateAdded(uint256 deliveryDate);
     event OrderCreated(
-        bytes32 indexed orderId, address indexed participant, uint256 price, uint256 deliveryDate, bool isBuy
+        bytes32 indexed orderId, address indexed participant, uint256 price, uint256 deliveryDate,  bytes32 offsetPositionId, bool isBuy
     );
     event OrderClosed(bytes32 indexed orderId, address indexed participant);
     event PositionCreated(
@@ -83,6 +84,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     error OnlyValidator(); // when the function is called by a non-validator address
     error OnlyPositionSeller();
     error OnlyPositionBuyer();
+    error OnlyPositionSellerOrBuyer();
     error PositionNotExists();
     error ValidatorCannotClosePositionBeforeStartTime();
     error PositionExpired();
@@ -139,10 +141,22 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     }
 
     function createOrder(uint256 _price, uint256 _deliveryDate, bool _isBuy) public {
-        _createOrMatchOrder(_price, _deliveryDate, _isBuy, _msgSender());
+        _createOrMatchOrder(_price, _deliveryDate, _isBuy, _msgSender(), bytes32(0));
     }
 
-    function _createOrMatchOrder(uint256 _price, uint256 _deliveryDate, bool _isBuy, address _participant) private {
+    function createOffsetOrder(bytes32 _offsetPositionId, uint256 _price) public {
+        Position memory position = positions[_offsetPositionId];
+        if (position.startTime == 0) {
+            revert PositionNotExists();
+        }
+        if (position.seller != _msgSender() && position.buyer != _msgSender()) {
+            revert OnlyPositionSellerOrBuyer();
+        }
+        bool isBuy = position.seller == _msgSender();
+        _createOrMatchOrder(_price, position.startTime, isBuy, position.seller, _offsetPositionId);
+    }
+
+    function _createOrMatchOrder(uint256 _price, uint256 _deliveryDate, bool _isBuy, address _participant, bytes32 _offsetPositionId) private {
         validatePrice(_price);
         validateDeliveryDate(_deliveryDate);
 
@@ -167,7 +181,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             if (participantOrders.length() >= MAX_ORDERS_PER_PARTICIPANT) {
                 revert MaxOrdersPerParticipantReached();
             }
-            bytes32 _orderId = _createOrder(_participant, _price, _deliveryDate, _isBuy);
+            bytes32 _orderId = _createOrder(_participant, _price, _deliveryDate, _isBuy, _offsetPositionId);
             orderIndexId.add(_orderId);
             participantOrders.add(_orderId);
             return;
@@ -178,6 +192,37 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         bytes32 orderId = oppositeOrderIndexId.at(0);
         Order memory order = orders[orderId];
 
+        address positionSeller;
+        address positionBuyer;
+
+        if (order.isBuy){
+            if (_offsetPositionId == bytes32(0)) {
+                positionSeller = _participant;
+            } else {
+                positionSeller = positions[_offsetPositionId].seller;
+            }
+            if (order.offsetPositionId == bytes32(0)) {
+                positionBuyer = order.participant;
+            } else {
+                positionBuyer = positions[_offsetPositionId].buyer;
+            }
+        } else {
+            if (_offsetPositionId == bytes32(0)) {
+                positionBuyer = _participant;
+            } else {
+                Position memory offsetPosition = positions[_offsetPositionId];
+                positionBuyer = offsetPosition.buyer;
+                _removePosition(_offsetPositionId, offsetPosition.seller, offsetPosition.buyer);
+            }
+            if (order.offsetPositionId == bytes32(0)) {
+                positionSeller = order.participant;
+            } else {
+                Position memory offsetPosition = positions[_offsetPositionId];
+                positionSeller = offsetPosition.seller;
+                _removePosition(_offsetPositionId, offsetPosition.seller, offsetPosition.buyer);
+            }
+        }
+
         // delete order
         oppositeOrderIndexId.remove(orderId);
         participantOrderIdsIndex[order.participant].remove(orderId);
@@ -187,7 +232,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         _createPosition(order, _participant);
     }
 
-    function _createOrder(address _participant, uint256 _price, uint256 _deliveryDate, bool _isBuy)
+    function _createOrder(address _participant, uint256 _price, uint256 _deliveryDate, bool _isBuy, bytes32 _offsetPositionId)
         private
         returns (bytes32)
     {
@@ -198,17 +243,18 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             price: _price,
             deliveryDate: _deliveryDate,
             isBuy: _isBuy,
-            timestamp: block.timestamp
+            timestamp: block.timestamp,
+            offsetPositionId: _offsetPositionId
         });
         orderIds.add(orderId);
 
-        emit OrderCreated(orderId, _participant, _price, _deliveryDate, _isBuy);
+        emit OrderCreated(orderId, _participant, _price, _deliveryDate, _offsetPositionId, _isBuy);
         return orderId;
     }
 
     function _createPosition(Order memory order, address _otherParticipant) private {
         if (order.participant == _otherParticipant) {
-            // TODO: check if this correct for reselling order
+            // TODO: check if this correct for buying your own order
             // if the order is already created by the participant, then do not create a position
             // but this will happen only if the participant order is the oldest
             // otherwise it will create an position with the one who has the oldest order
@@ -473,7 +519,6 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         uint256 remainingTime;
         if (block.timestamp < position.startTime) {
             remainingTime = deliveryDurationSeconds;
-            _createOrMatchOrder(position.price, position.startTime, false, position.buyer);
         } else {
             remainingTime = position.startTime + deliveryDurationSeconds - block.timestamp;
         }
@@ -501,7 +546,6 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         uint256 remainingTime;
         if (block.timestamp < position.startTime) {
             remainingTime = deliveryDurationSeconds;
-            _createOrMatchOrder(position.price, position.startTime, false, position.buyer);
         } else {
             remainingTime = position.startTime + deliveryDurationSeconds - block.timestamp;
         }
@@ -539,11 +583,13 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         }
 
         // remove position
-        delete positions[_positionId];
+        _removePosition(_positionId, position.seller, position.buyer);
+    }
 
-        // remove position from indexes
-        participantPositionIdsIndex[position.seller].remove(_positionId);
-        participantPositionIdsIndex[position.buyer].remove(_positionId);
+    function _removePosition(bytes32 _positionId, address _seller, address _buyer) private {
+        delete positions[_positionId];
+        participantPositionIdsIndex[_seller].remove(_positionId);
+        participantPositionIdsIndex[_buyer].remove(_positionId);
         positionIds.remove(_positionId);
     }
 

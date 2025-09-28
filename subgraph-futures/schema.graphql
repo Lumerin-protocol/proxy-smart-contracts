@@ -58,6 +58,7 @@ type Order @entity(immutable: false) {
   deliveryDate: BigInt!
   isBuy: Boolean!
   timestamp: BigInt!
+  offsetPositionId: Bytes!
   blockNumber: BigInt!
   transactionHash: Bytes!
 
