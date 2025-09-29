@@ -92,7 +92,7 @@ type HashrateOracle @entity(immutable: false) {
 
 # HashrateOracle Timeseries Entities
 type HashrateIndex @entity(immutable: true) @timeseries {
-  id: Int8!
+  id: Bytes!
   hashesForBTC: BigInt!
   hashesForToken: BigInt!
   updatedAt: BigInt!

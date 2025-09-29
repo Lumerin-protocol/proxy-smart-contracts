@@ -13,7 +13,7 @@ dataSources:
       address: "{{futuresAddress}}"
       # avoid messing mustache syntax with autoformatting
       # prettier-ignore
-      startBlock: {{startBlock}}
+      startBlock: {{startBlockFutures}}
       abi: Futures
     mapping:
       kind: ethereum/events
@@ -53,7 +53,7 @@ dataSources:
       address: "{{ hashrateOracleAddress }}"
       # avoid messing mustache syntax with autoformatting
       # prettier-ignore
-      startBlock: {{ startBlock }}
+      startBlock: {{ startBlockHashrateOracle }}
       abi: HashrateOracle
     mapping:
       kind: ethereum/events
@@ -71,5 +71,6 @@ dataSources:
         - handler: handleBlock
           filter:
             kind: polling
-            every: 1
+            # prettier-ignore
+            every: {{ hashrateOraclePollingBlockInterval }}
       file: ./src/hashrate-oracle.ts

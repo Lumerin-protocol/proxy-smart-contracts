@@ -23,5 +23,8 @@ export function concatU64s(a: u64, b: u64): Bytes {
 }
 
 export function bigIntToBytes(a: BigInt): Bytes {
-  return changetype<Bytes>(ByteArray.fromBigInt(a).reverse());
+  const byteArray = ByteArray.fromBigInt(a);
+  // slice is needed to avoid overwriting the original byte array
+  // have no idea why that happens, but it does
+  return changetype<Bytes>(byteArray.slice().reverse());
 }
