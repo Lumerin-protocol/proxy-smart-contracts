@@ -9,7 +9,7 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { HashrateOracle } from "./HashrateOracle.sol";
-import { console } from "hardhat/console.sol";
+// import { console } from "hardhat/console.sol";
 
 contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     using SafeERC20 for IERC20;
@@ -32,7 +32,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     EnumerableSet.UintSet private deliveryDates; // delivery dates for the futures
     uint256 public speedHps; // speed of the one unit of futures in hashes/second, constant for all positions
     uint32 public deliveryDurationSeconds; // 30 days, constant for all orders
-    uint256 public priceLadderStep; 
+    uint256 public priceLadderStep;
 
     uint256 private nonce = 0;
     uint8 private _decimals;
@@ -67,27 +67,31 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
 
     event DeliveryDateAdded(uint256 deliveryDate);
     event OrderCreated(
-        bytes32 indexed orderId, address indexed participant, uint256 price, uint256 deliveryDate,  bytes32 offsetPositionId, bool isBuy
+        bytes32 indexed orderId,
+        address indexed participant,
+        uint256 price,
+        uint256 deliveryDate,
+        bytes32 offsetPositionId,
+        bool isBuy
     );
     event OrderClosed(bytes32 indexed orderId, address indexed participant);
     event PositionCreated(
         bytes32 indexed positionId, address indexed seller, address indexed buyer, uint256 price, uint256 startTime
     );
-    event PositionClosed(bytes32 indexed positionId, address indexed closedBy);
+    event PositionClosed(bytes32 indexed positionId);
+    event PositionDeliveryClosed(bytes32 indexed positionId, address indexed closedBy);
 
     error InvalidPrice();
     error DeliveryDateShouldBeInTheFuture();
     error DeliveryDateNotAvailable();
     error OrderNotBelongToSender();
     error InsufficientMarginBalance();
-    error CannotStartDeliveryBeforeStartTime(); // when delivery start is triggered before the start time
     error OnlyValidator(); // when the function is called by a non-validator address
-    error OnlyPositionSeller();
-    error OnlyPositionBuyer();
     error OnlyPositionSellerOrBuyer();
+    error OnlyValidatorOrPositionParticipant();
     error PositionNotExists();
-    error ValidatorCannotClosePositionBeforeStartTime();
-    error PositionExpired();
+    error PositionDeliveryNotStartedYet();
+    error PositionDeliveryExpired();
     error MaxOrdersPerParticipantReached();
     error ValueOutOfRange(int256 min, int256 max);
 
@@ -156,7 +160,13 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         _createOrMatchOrder(_price, position.startTime, isBuy, position.seller, _offsetPositionId);
     }
 
-    function _createOrMatchOrder(uint256 _price, uint256 _deliveryDate, bool _isBuy, address _participant, bytes32 _offsetPositionId) private {
+    function _createOrMatchOrder(
+        uint256 _price,
+        uint256 _deliveryDate,
+        bool _isBuy,
+        address _participant,
+        bytes32 _offsetPositionId
+    ) private {
         validatePrice(_price);
         validateDeliveryDate(_deliveryDate);
 
@@ -195,7 +205,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         address positionSeller;
         address positionBuyer;
 
-        if (order.isBuy){
+        if (order.isBuy) {
             if (_offsetPositionId == bytes32(0)) {
                 positionSeller = _participant;
             } else {
@@ -213,6 +223,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
                 Position memory offsetPosition = positions[_offsetPositionId];
                 positionBuyer = offsetPosition.buyer;
                 _removePosition(_offsetPositionId, offsetPosition.seller, offsetPosition.buyer);
+                emit PositionClosed(_offsetPositionId);
             }
             if (order.offsetPositionId == bytes32(0)) {
                 positionSeller = order.participant;
@@ -220,6 +231,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
                 Position memory offsetPosition = positions[_offsetPositionId];
                 positionSeller = offsetPosition.seller;
                 _removePosition(_offsetPositionId, offsetPosition.seller, offsetPosition.buyer);
+                emit PositionClosed(_offsetPositionId);
             }
         }
 
@@ -232,12 +244,14 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         _createPosition(order, _participant);
     }
 
-    function _createOrder(address _participant, uint256 _price, uint256 _deliveryDate, bool _isBuy, bytes32 _offsetPositionId)
-        private
-        returns (bytes32)
-    {
-        bytes32 orderId =
-            keccak256(abi.encode(_participant, _price, _deliveryDate, _isBuy, block.timestamp, nonce++));
+    function _createOrder(
+        address _participant,
+        uint256 _price,
+        uint256 _deliveryDate,
+        bool _isBuy,
+        bytes32 _offsetPositionId
+    ) private returns (bytes32) {
+        bytes32 orderId = keccak256(abi.encode(_participant, _price, _deliveryDate, _isBuy, block.timestamp, nonce++));
         orders[orderId] = Order({
             participant: _participant,
             price: _price,
@@ -366,9 +380,6 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
 
         uint256 maintenanceMargin = getMaintenanceMargin(sellQ, false) + getMaintenanceMargin(buyQ, true);
         int256 positionsMarginShortfall = int256(maintenanceMargin) - positionMarginBalance;
-     
-        console.log("marginShortfall");
-        console.logInt(marginShortfall + positionsMarginShortfall);
 
         return marginShortfall + positionsMarginShortfall;
     }
@@ -391,9 +402,9 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     // }
 
     function calculateRequiredMargin(uint256 _quantity, bool _isBuy) public view returns (uint256) {
-        return _quantity *speedHps * deliveryDurationSeconds  * getMarginPercent(_isBuy) / 100 / hashrateOracle.getHashesforToken();
+        return _quantity * speedHps * deliveryDurationSeconds * getMarginPercent(_isBuy) / 100
+            / hashrateOracle.getHashesforToken();
     }
-
 
     /**
      * @notice Gets the virtual margin balance (initial margin + unrealized PnL) of a position
@@ -458,39 +469,56 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             Position storage position = positions[positionId];
 
             int256 marginBalance = getMarginBalance(position, position.seller == _participant);
-            _closeSettlePositionAndPenalize(positionId, position, position.seller == _participant);
+            _closeAndCashSettleDeliveryAndPenalize(positionId, position, position.seller == _participant);
             reclaimedMargin += marginBalance;
             // TODO: update margin deficit since order closed and settled
             if (reclaimedMargin >= marginShortfall) {
                 return;
             }
         }
-
     }
 
-    function _calculateBreachPenalty(uint256 _price, uint256 remainingTime) private view returns (uint256) {
-        return _price * breachPenaltyRatePerDay * remainingTime / SECONDS_PER_DAY / 10 ** BREACH_PENALTY_DECIMALS;
-    }
-
-    // TODO: rename to closePositionAsValidator
-    function closePositionAsValidator(bytes32 _positionId, bool _blameSeller) public onlyValidator {
+    /**
+     * @notice Cash settles the remaining delivery and pays the breach penalty
+     * @dev Buyer, seller or validator can call this function
+     * @dev Validator chooses the blame party
+     * @param _positionId The id of the position to close the delivery of
+     * @param _blameSeller Whether the seller is blamed, ignored if called by buyer or seller
+     */
+    function closeDelivery(bytes32 _positionId, bool _blameSeller) public {
         // if validator closes the position then it is not delivered
         Position storage position = positions[_positionId];
         if (position.seller == address(0)) {
             revert PositionNotExists();
         }
 
+        if (_msgSender() == position.seller) {
+            _blameSeller = true;
+        } else if (_msgSender() == position.buyer) {
+            _blameSeller = false;
+        } else if (_msgSender() != validatorAddress) {
+            revert OnlyValidatorOrPositionParticipant();
+        }
+
         if (block.timestamp < position.startTime) {
-            revert ValidatorCannotClosePositionBeforeStartTime();
+            revert PositionDeliveryNotStartedYet();
         }
         if (block.timestamp > position.startTime + deliveryDurationSeconds) {
-            revert PositionExpired();
+            revert PositionDeliveryExpired();
         }
 
-        _closeSettlePositionAndPenalize(_positionId, position, _blameSeller);
+        _closeAndCashSettleDeliveryAndPenalize(_positionId, position, _blameSeller);
     }
 
-    function _closeSettlePositionAndPenalize(bytes32 _positionId, Position storage position, bool _blameSeller) private {
+    /**
+     * @notice Cash settles the remaining delivery and pays the breach penalty
+     * @param _positionId The id of the position to close the delivery of
+     * @param position The position to close the delivery of
+     * @param _blameSeller Whether the seller is blamed, ignored if called by buyer or seller
+     */
+    function _closeAndCashSettleDeliveryAndPenalize(bytes32 _positionId, Position storage position, bool _blameSeller)
+        private
+    {
         // calculate and pay breach penalty
         uint256 breachPenalty =
             _calculateBreachPenalty(position.price, position.startTime + deliveryDurationSeconds - block.timestamp);
@@ -499,66 +527,16 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         } else {
             _transfer(position.buyer, position.seller, breachPenalty);
         }
-        _closeAndSettlePosition(_positionId, position);
-        emit PositionClosed(_positionId, _msgSender());
+        _closeAndCashSettleDelivery(_positionId, position);
+        emit PositionDeliveryClosed(_positionId, _msgSender());
     }
 
-    // TODO: rename to closePositionAsBuyer
-    function closePositionAsBuyer(bytes32 _positionId) external {
-        Position storage position = positions[_positionId];
-        if (position.buyer == address(0)) {
-            revert PositionNotExists();
-        }
-        if (position.buyer != _msgSender()) {
-            revert OnlyPositionBuyer();
-        }
-        if (block.timestamp > position.startTime + deliveryDurationSeconds) {
-            revert PositionExpired();
-        }
-
-        uint256 remainingTime;
-        if (block.timestamp < position.startTime) {
-            remainingTime = deliveryDurationSeconds;
-        } else {
-            remainingTime = position.startTime + deliveryDurationSeconds - block.timestamp;
-        }
-        // calculate and pay breach penalty
-        uint256 breachPenalty = _calculateBreachPenalty(position.price, remainingTime);
-        _transfer(position.buyer, position.seller, breachPenalty);
-
-        _closeAndSettlePosition(_positionId, position);
-
-        emit PositionClosed(_positionId, _msgSender());
-    }
-
-    // TODO: rename to closePositionAsSeller
-    function closePositionAsSeller(bytes32 _positionId) external {
-        Position storage position = positions[_positionId];
-        if (position.seller == address(0)) {
-            revert PositionNotExists();
-        }
-        if (position.seller != _msgSender()) {
-            revert OnlyPositionSeller();
-        }
-        if (block.timestamp > position.startTime + deliveryDurationSeconds) {
-            revert PositionExpired();
-        }
-        uint256 remainingTime;
-        if (block.timestamp < position.startTime) {
-            remainingTime = deliveryDurationSeconds;
-        } else {
-            remainingTime = position.startTime + deliveryDurationSeconds - block.timestamp;
-        }
-        // calculate and pay breach penalty
-        uint256 breachPenalty = _calculateBreachPenalty(position.price, remainingTime);
-        _transfer(position.seller, position.buyer, breachPenalty);
-
-        _closeAndSettlePosition(_positionId, position);
-
-        emit PositionClosed(_positionId, _msgSender());
-    }
-
-    function _closeAndSettlePosition(bytes32 _positionId, Position storage position) private {
+    /**
+     * @notice Settles position or remaining delivery in cash
+     * @param _positionId The id of the position to close and settle
+     * @param position The position to close and settle
+     */
+    function _closeAndCashSettleDelivery(bytes32 _positionId, Position storage position) private {
         uint256 positionElapsedTime = 0;
         uint256 positionRemainingTime = 0;
         if (block.timestamp > position.startTime) {
@@ -584,6 +562,10 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
 
         // remove position
         _removePosition(_positionId, position.seller, position.buyer);
+    }
+
+    function _calculateBreachPenalty(uint256 _price, uint256 remainingTime) private view returns (uint256) {
+        return _price * breachPenaltyRatePerDay * remainingTime / SECONDS_PER_DAY / 10 ** BREACH_PENALTY_DECIMALS;
     }
 
     function _removePosition(bytes32 _positionId, address _seller, address _buyer) private {
@@ -616,7 +598,6 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         breachPenaltyRatePerDay = _breachPenaltyRatePerDay;
     }
 
-    // TODO: fix it for the unlikely negative value
     function getMinMargin(address _participant) public view returns (uint256) {
         return clamp(getMarginShortfall(_participant));
     }
@@ -641,7 +622,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         }
     }
 
-    function validatePrice(uint256 _price) private view  {
+    function validatePrice(uint256 _price) private view {
         if (_price == 0) {
             revert InvalidPrice();
         }
@@ -659,7 +640,6 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             revert DeliveryDateNotAvailable();
         }
     }
-
 
     // ERC20
 
@@ -691,7 +671,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             revert ERC20InsufficientBalance(_from, balance, _amount);
         }
 
-        if (int256(_amount) > int256(balance)-getMarginShortfall(_from)) {
+        if (int256(_amount) > int256(balance) - getMarginShortfall(_from)) {
             revert InsufficientMarginBalance();
         }
         _;

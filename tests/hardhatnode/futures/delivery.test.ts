@@ -2,6 +2,7 @@ import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { deployFuturesFixture } from "./fixtures";
 import { Account, Client, parseEventLogs, parseUnits } from "viem";
 import { expect } from "chai";
+import { quantizePrice } from "./utils";
 
 describe("Futures Delivery", () => {
   async function positionFixture() {
@@ -15,7 +16,7 @@ describe("Futures Delivery", () => {
       console.log(`${name} balance`, balance);
     }
 
-    const price = await futures.read.getMarketPrice();
+    const price = quantizePrice(await futures.read.getMarketPrice(), config.priceLadderStep);
     const marginAmount = parseUnits("1000", 6);
     const deliveryDate = config.deliveryDates.date1;
 
@@ -61,7 +62,7 @@ describe("Futures Delivery", () => {
     await tc.setNextBlockTimestamp({
       timestamp: position.deliveryDate + BigInt(config.deliveryDurationSeconds) / 2n,
     });
-    await futures.write.closePositionAsValidator([position.positionId, true], {
+    await futures.write.closeDelivery([position.positionId, true], {
       account: validator.account,
     });
     await logBalance(seller, "seller after close");

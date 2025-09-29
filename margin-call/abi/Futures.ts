@@ -17,11 +17,6 @@ export const FuturesABI = [
   },
   {
     inputs: [],
-    name: "CannotStartDeliveryBeforeStartTime",
-    type: "error",
-  },
-  {
-    inputs: [],
     name: "DeliveryDateNotAvailable",
     type: "error",
   },
@@ -164,22 +159,17 @@ export const FuturesABI = [
   },
   {
     inputs: [],
-    name: "OnlyPositionBuyer",
-    type: "error",
-  },
-  {
-    inputs: [],
-    name: "OnlyPositionSeller",
-    type: "error",
-  },
-  {
-    inputs: [],
     name: "OnlyPositionSellerOrBuyer",
     type: "error",
   },
   {
     inputs: [],
     name: "OnlyValidator",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "OnlyValidatorOrPositionParticipant",
     type: "error",
   },
   {
@@ -211,7 +201,12 @@ export const FuturesABI = [
   },
   {
     inputs: [],
-    name: "PositionExpired",
+    name: "PositionDeliveryExpired",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "PositionDeliveryNotStartedYet",
     type: "error",
   },
   {
@@ -244,11 +239,6 @@ export const FuturesABI = [
       },
     ],
     name: "UUPSUnsupportedProxiableUUID",
-    type: "error",
-  },
-  {
-    inputs: [],
-    name: "ValidatorCannotClosePositionBeforeStartTime",
     type: "error",
   },
   {
@@ -408,12 +398,6 @@ export const FuturesABI = [
         name: "positionId",
         type: "bytes32",
       },
-      {
-        indexed: true,
-        internalType: "address",
-        name: "closedBy",
-        type: "address",
-      },
     ],
     name: "PositionClosed",
     type: "event",
@@ -453,6 +437,25 @@ export const FuturesABI = [
       },
     ],
     name: "PositionCreated",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "bytes32",
+        name: "positionId",
+        type: "bytes32",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "closedBy",
+        type: "address",
+      },
+    ],
+    name: "PositionDeliveryClosed",
     type: "event",
   },
   {
@@ -717,45 +720,6 @@ export const FuturesABI = [
     inputs: [
       {
         internalType: "bytes32",
-        name: "_orderId",
-        type: "bytes32",
-      },
-    ],
-    name: "closeOrder",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "bytes32",
-        name: "_positionId",
-        type: "bytes32",
-      },
-    ],
-    name: "closePositionAsBuyer",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "bytes32",
-        name: "_positionId",
-        type: "bytes32",
-      },
-    ],
-    name: "closePositionAsSeller",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "bytes32",
         name: "_positionId",
         type: "bytes32",
       },
@@ -765,7 +729,20 @@ export const FuturesABI = [
         type: "bool",
       },
     ],
-    name: "closePositionAsValidator",
+    name: "closeDelivery",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "bytes32",
+        name: "_orderId",
+        type: "bytes32",
+      },
+    ],
+    name: "closeOrder",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",

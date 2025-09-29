@@ -729,8 +729,7 @@ describe("Futures Contract", function () {
   });
 
   describe("Position Management", function () {
-    // TODO: check if this is correct
-    it("should allow buyer to close order before start time", async function () {
+    it("should not allow buyer to close position before start time", async function () {
       const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
       const { futures } = contracts;
       const { seller, buyer, pc } = accounts;
@@ -764,23 +763,14 @@ describe("Futures Contract", function () {
 
       const { positionId } = positionEvent.args;
 
-      // Close position as buyer
-      const closeTxHash = await futures.write.closePositionAsBuyer([positionId], {
-        account: buyer.account,
+      await catchError(futures.abi, "PositionDeliveryNotStartedYet", async () => {
+        await futures.write.closeDelivery([positionId, false], {
+          account: buyer.account,
+        });
       });
-
-      const closeReceipt = await pc.waitForTransactionReceipt({ hash: closeTxHash });
-      const [closeEvent] = parseEventLogs({
-        logs: closeReceipt.logs,
-        abi: futures.abi,
-        eventName: "PositionClosed",
-      });
-
-      expect(closeEvent.args.positionId).to.equal(positionId);
-      expect(getAddress(closeEvent.args.closedBy)).to.equal(getAddress(buyer.account.address));
     });
 
-    it("should allow seller to close position before start time", async function () {
+    it("should not allow seller to close position before start time", async function () {
       const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
       const { futures } = contracts;
       const { seller, buyer, pc } = accounts;
@@ -815,19 +805,11 @@ describe("Futures Contract", function () {
       const { positionId } = createdEvent.args;
 
       // Close position as seller
-      const closeTxHash = await futures.write.closePositionAsSeller([positionId], {
-        account: seller.account,
+      await catchError(futures.abi, "PositionDeliveryNotStartedYet", async () => {
+        await futures.write.closeDelivery([positionId, false], {
+          account: seller.account,
+        });
       });
-
-      const closeReceipt = await pc.waitForTransactionReceipt({ hash: closeTxHash });
-      const [closeEvent] = parseEventLogs({
-        logs: closeReceipt.logs,
-        abi: futures.abi,
-        eventName: "PositionClosed",
-      });
-
-      expect(closeEvent.args.positionId).to.equal(positionId);
-      expect(getAddress(closeEvent.args.closedBy)).to.equal(getAddress(seller.account.address));
     });
 
     it("should reject closing position by non-participant", async function () {
@@ -863,8 +845,8 @@ describe("Futures Contract", function () {
       const { positionId } = createdEvent.args;
 
       // Try to close order with different account
-      await catchError(futures.abi, "OnlyPositionBuyer", async () => {
-        await futures.write.closePositionAsBuyer([positionId], {
+      await catchError(futures.abi, "OnlyValidatorOrPositionParticipant", async () => {
+        await futures.write.closeDelivery([positionId, false], {
           account: buyer2.account,
         });
       });
@@ -909,7 +891,7 @@ describe("Futures Contract", function () {
       await tc.setNextBlockTimestamp({ timestamp: deliveryDate + 1n }); // 1 day + 1 second
 
       // Close order as validator
-      const closeTxHash = await futures.write.closePositionAsValidator([positionId, true], {
+      const closeTxHash = await futures.write.closeDelivery([positionId, true], {
         account: validator.account,
       });
 
@@ -917,7 +899,7 @@ describe("Futures Contract", function () {
       const [closeEvent] = parseEventLogs({
         logs: closeReceipt.logs,
         abi: futures.abi,
-        eventName: "PositionClosed",
+        eventName: "PositionDeliveryClosed",
       });
 
       expect(closeEvent.args.positionId).to.equal(positionId);
@@ -957,8 +939,8 @@ describe("Futures Contract", function () {
       const { positionId } = createdEvent.args;
 
       // Try to close order as validator before start time
-      await catchError(futures.abi, "ValidatorCannotClosePositionBeforeStartTime", async () => {
-        await futures.write.closePositionAsValidator([positionId, true], {
+      await catchError(futures.abi, "PositionDeliveryNotStartedYet", async () => {
+        await futures.write.closeDelivery([positionId, true], {
           account: validator.account,
         });
       });
@@ -967,7 +949,7 @@ describe("Futures Contract", function () {
     it("should reject non-validator from calling validator functions", async function () {
       const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
       const { futures } = contracts;
-      const { seller, buyer, pc } = accounts;
+      const { seller, buyer, buyer2, pc, tc } = accounts;
 
       const price = parseUnits("100", 6);
       const margin = parseUnits("10000", 6);
@@ -996,10 +978,12 @@ describe("Futures Contract", function () {
 
       const { positionId } = orderEvent.args;
 
+      await tc.setNextBlockTimestamp({ timestamp: deliveryDate + 1n });
+
       // Try to close order as non-validator
-      await catchError(futures.abi, "OnlyValidator", async () => {
-        await futures.write.closePositionAsValidator([positionId, true], {
-          account: seller.account,
+      await catchError(futures.abi, "OnlyValidatorOrPositionParticipant", async () => {
+        await futures.write.closeDelivery([positionId, true], {
+          account: buyer2.account,
         });
       });
     });
@@ -1153,8 +1137,8 @@ describe("Futures Contract", function () {
       });
 
       // Try to close expired order
-      await catchError(futures.abi, "PositionExpired", async () => {
-        await futures.write.closePositionAsBuyer([positionId], {
+      await catchError(futures.abi, "PositionDeliveryExpired", async () => {
+        await futures.write.closeDelivery([positionId, false], {
           account: buyer.account,
         });
       });

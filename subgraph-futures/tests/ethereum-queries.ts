@@ -1,4 +1,4 @@
-import viem, { zeroAddress } from "viem";
+import { createClient, getContract, http, zeroAddress, type Client } from "viem";
 import { hardhat } from "viem/chains";
 import { FuturesABI } from "../../margin-call/abi/Futures";
 import { waitForTransactionReceipt, writeContract } from "viem/actions";
@@ -12,40 +12,36 @@ const config = {
   HASHRATE_ORACLE_ADDRESS: zeroAddress,
 };
 
-const ethClient = viem.createClient({
-  transport: viem.http(config.ETH_NODE_URL),
+const ethClient = createClient({
+  transport: http(config.ETH_NODE_URL),
   chain: {
     ...hardhat,
     multicall3Address: config.MULTICALL_ADDRESS,
   },
 });
 
-export const getFuturesContract = (ethClient: viem.Client) => {
-  return viem.getContract({
+export const getFuturesContract = (ethClient: Client) => {
+  return getContract({
     address: config.FUTURES_ADDRESS,
     abi: FuturesABI,
     client: ethClient,
   });
 };
 
-export const getHashrateOracleContract = (ethClient: viem.Client) => {
-  return viem.getContract({
+export const getHashrateOracleContract = (ethClient: Client) => {
+  return getContract({
     address: config.HASHRATE_ORACLE_ADDRESS,
     abi: HashrateOracleABI,
     client: ethClient,
   });
 };
 
-export const getMinMargin = async (ethClient: viem.Client, participant: `0x${string}`) => {
+export const getMinMargin = async (ethClient: Client, participant: `0x${string}`) => {
   const futuresContract = getFuturesContract(ethClient);
   return await futuresContract.read.getMinMargin([participant]);
 };
 
-export const addMargin = async (
-  ethClient: viem.Client,
-  participant: `0x${string}`,
-  amount: bigint
-) => {
+export const addMargin = async (ethClient: Client, participant: `0x${string}`, amount: bigint) => {
   const futuresContract = getFuturesContract(ethClient);
   const sm = await futuresContract.simulate.addMargin([amount], {
     account: participant,
@@ -57,7 +53,7 @@ export const addMargin = async (
 };
 
 export const removeMargin = async (
-  ethClient: viem.Client,
+  ethClient: Client,
   participant: `0x${string}`,
   amount: bigint
 ) => {
@@ -71,7 +67,7 @@ export const removeMargin = async (
 };
 
 export const placeOrder = async (
-  ethClient: viem.Client,
+  ethClient: Client,
   participant: `0x${string}`,
   price: bigint,
   deliveryDate: bigint,
@@ -104,7 +100,7 @@ export const placeOrder = async (
 };
 
 export const closeOrder = async (
-  ethClient: viem.Client,
+  ethClient: Client,
   participant: `0x${string}`,
   orderId: `0x${string}`
 ) => {
@@ -118,7 +114,7 @@ export const closeOrder = async (
 };
 
 export const offsetPosition = async (
-  ethClient: viem.Client,
+  ethClient: Client,
   participant: `0x${string}`,
   positionId: `0x${string}`,
   price: bigint
@@ -132,27 +128,13 @@ export const offsetPosition = async (
   return txhash;
 };
 
-export const closePositionAsSeller = async (
-  ethClient: viem.Client,
+export const closePosition = async (
+  ethClient: Client,
   participant: `0x${string}`,
   positionId: `0x${string}`
 ) => {
   const futuresContract = getFuturesContract(ethClient);
-  const sm = await futuresContract.simulate.closePositionAsSeller([positionId], {
-    account: participant,
-  });
-  const txhash = await writeContract(ethClient, sm.request);
-  await waitForTransactionReceipt(ethClient, { hash: txhash });
-  return txhash;
-};
-
-export const closePositionAsBuyer = async (
-  ethClient: viem.Client,
-  participant: `0x${string}`,
-  positionId: `0x${string}`
-) => {
-  const futuresContract = getFuturesContract(ethClient);
-  const sm = await futuresContract.simulate.closePositionAsBuyer([positionId], {
+  const sm = await futuresContract.simulate.closePosition([positionId, false], {
     account: participant,
   });
   const txhash = await writeContract(ethClient, sm.request);

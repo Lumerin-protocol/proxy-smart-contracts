@@ -8,6 +8,7 @@ import {
   DeliveryDateAdded,
   Transfer,
   Futures as FuturesContract,
+  PositionDeliveryClosed,
 } from "../generated/Futures/Futures";
 import { Futures, Participant, Position, Order, DeliveryDate } from "../generated/schema";
 import { log, Bytes, Address, dataSource } from "@graphprotocol/graph-ts";
@@ -216,10 +217,43 @@ export function handlePositionCreated(event: PositionCreated): void {
 }
 
 export function handlePositionClosed(event: PositionClosed): void {
-  log.info("Position closed: {} by {}", [
-    event.params.positionId.toHexString(),
-    event.params.closedBy.toHexString(),
-  ]);
+  log.info("Position closed: {} by {}", [event.params.positionId.toHexString()]);
+
+  const position = Position.load(event.params.positionId);
+  if (!position) {
+    log.warning("Order not found: {}", [event.params.positionId.toHexString()]);
+    return;
+  }
+
+  // Update order status
+  position.isActive = false;
+  position.closedAt = event.block.timestamp;
+  position.save();
+
+  // Update participants
+  const seller = Participant.load(position.seller);
+  if (seller) {
+    seller.orderCount--;
+    seller.save();
+  }
+
+  const buyer = Participant.load(position.buyer);
+  if (buyer) {
+    buyer.orderCount--;
+    buyer.save();
+  }
+
+  // Update Futures stats
+  const futures = Futures.load(0);
+  if (futures) {
+    futures.contractActiveCount--;
+    futures.closeoutCount++;
+    futures.save();
+  }
+}
+
+export function handlePositionDeliveryClosed(event: PositionDeliveryClosed): void {
+  log.info("Position delivery closed: {} by {}", [event.params.positionId.toHexString()]);
 
   const position = Position.load(event.params.positionId);
   if (!position) {
