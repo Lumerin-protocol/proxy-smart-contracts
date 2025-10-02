@@ -20,6 +20,7 @@ export async function executeMarginCalls(
 
   const batchSize = 100;
   const batches = Math.ceil(entries.length / batchSize);
+
   for (let i = 0; i < batches; i++) {
     const batch = entries.slice(i * batchSize, (i + 1) * batchSize);
     const calls = batch.map((entry) => ({

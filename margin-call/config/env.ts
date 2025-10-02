@@ -20,6 +20,7 @@ const schema = Type.Object({
     { default: "info" }
   ),
   MARGIN_ALERT_THRESHOLD: Type.Number({ minimum: 0, maximum: 1, default: 0.1 }),
+  NOTIFICATIONS_SERVICE_URL: Type.String({ format: "uri" }),
   MULTICALL_ADDRESS: TypeEthAddress(),
   SUBGRAPH_URL: Type.String({ format: "uri" }),
   SUBGRAPH_API_KEY: Type.String({ minLength: 1 }),

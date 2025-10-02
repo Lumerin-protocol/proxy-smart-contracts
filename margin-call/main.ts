@@ -63,7 +63,7 @@ async function main() {
     }
   }
 
-  await sendDeficitAlerts(addressesForAlert, log);
+  await sendDeficitAlerts(addressesForAlert, config.NOTIFICATIONS_SERVICE_URL, log);
   await executeMarginCalls(addressesForMarginCall, ethClient, log);
 }
 
