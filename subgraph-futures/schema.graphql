@@ -4,7 +4,18 @@ type Futures @entity(immutable: false) {
   id: Int8!
   initializedBlockNumber: BigInt!
   initializeTimestamp: BigInt!
+
+  "Contract configuration parameters"
   minSellerStake: BigInt!
+  priceLadderStep: BigInt!
+  sellerLiquidationMarginPercent: Int!
+  buyerLiquidationMarginPercent: Int!
+  speedHps: BigInt!
+  deliveryDurationSeconds: BigInt!
+  breachPenaltyRatePerDay: BigInt!
+  validatorAddress: Bytes!
+  hashrateOracleAddress: Bytes!
+  tokenAddress: Bytes!
 
   "Number of contracts including archived"
   contractCount: Int!
@@ -40,13 +51,14 @@ type Participant @entity(immutable: false) {
   lastBalanceUpdate: BigInt!
 }
 
-type Position @entity(immutable: false) {
+type Order @entity(immutable: false) {
   id: Bytes!
   participant: Participant!
   price: BigInt!
   deliveryDate: BigInt!
   isBuy: Boolean!
   timestamp: BigInt!
+  offsetPositionId: Bytes!
   blockNumber: BigInt!
   transactionHash: Bytes!
 
@@ -56,7 +68,7 @@ type Position @entity(immutable: false) {
   closedBy: Bytes
 }
 
-type Order @entity(immutable: false) {
+type Position @entity(immutable: false) {
   id: Bytes!
   seller: Participant!
   buyer: Participant!
@@ -80,7 +92,7 @@ type HashrateOracle @entity(immutable: false) {
 
 # HashrateOracle Timeseries Entities
 type HashrateIndex @entity(immutable: true) @timeseries {
-  id: Int8!
+  id: Bytes!
   hashesForBTC: BigInt!
   hashesForToken: BigInt!
   updatedAt: BigInt!

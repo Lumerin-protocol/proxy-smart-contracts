@@ -1,0 +1,21 @@
+{
+  "name": "margin-call",
+  "engines": {
+    "node": "22.20"
+  },
+  "scripts": {
+    "copy-abi": "cp ../abi/Futures.json abi/Futures.json",
+    "start": "node main.ts"
+  },
+  "version": "1.0.0",
+  "main": "main.ts",
+  "license": "MIT",
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.41",
+    "env-schema": "^6.0.1",
+    "graphql": "^16.11.0",
+    "graphql-request": "^7.2.0",
+    "pino": "^9.11.0",
+    "viem": "^2.37.8"
+  }
+}

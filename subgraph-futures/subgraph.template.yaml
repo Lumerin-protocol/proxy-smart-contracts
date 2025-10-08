@@ -13,7 +13,7 @@ dataSources:
       address: "{{futuresAddress}}"
       # avoid messing mustache syntax with autoformatting
       # prettier-ignore
-      startBlock: {{startBlock}}
+      startBlock: {{startBlockFutures}}
       abi: Futures
     mapping:
       kind: ethereum/events
@@ -31,11 +31,13 @@ dataSources:
       eventHandlers:
         - event: Initialized(uint64)
           handler: handleInitialized
-        - event: PositionCreated(indexed bytes32,indexed address,uint256,uint256,bool)
+        - event: PositionCreated(indexed bytes32,indexed address,indexed address,uint256,uint256)
           handler: handlePositionCreated
-        - event: PositionClosed(indexed bytes32,indexed address)
+        - event: PositionClosed(indexed bytes32)
           handler: handlePositionClosed
-        - event: OrderCreated(indexed bytes32,indexed address,indexed address,uint256,uint256)
+        - event: PositionDeliveryClosed(indexed bytes32,indexed address)
+          handler: handlePositionDeliveryClosed
+        - event: OrderCreated(indexed bytes32,indexed address,uint256,uint256,bytes32,bool)
           handler: handleOrderCreated
         - event: OrderClosed(indexed bytes32,indexed address)
           handler: handleOrderClosed
@@ -51,7 +53,7 @@ dataSources:
       address: "{{ hashrateOracleAddress }}"
       # avoid messing mustache syntax with autoformatting
       # prettier-ignore
-      startBlock: {{ startBlock }}
+      startBlock: {{ startBlockHashrateOracle }}
       abi: HashrateOracle
     mapping:
       kind: ethereum/events
@@ -69,5 +71,6 @@ dataSources:
         - handler: handleBlock
           filter:
             kind: polling
-            every: 1
+            # prettier-ignore
+            every: {{ hashrateOraclePollingBlockInterval }}
       file: ./src/hashrate-oracle.ts

@@ -3,5 +3,13 @@
     "Futures": {
       "address": "0xe6e340d132b5f46d1e472debcd681b2abc16e57e"
     }
+  },
+  "arbitrum-sepolia": {
+    "Futures": {
+      "address": "0x34bedcf9a8510a8ffb068afcdd78f85f0af14994"
+    },
+    "HashrateOracle": {
+      "address": "0x6f736186d2c93913721e2570c283dff2a08575e9"
+    }
   }
 }
