@@ -196,7 +196,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: subgraph-build
-          path: subgraph-futures/
+          path: .
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
