@@ -197,6 +197,19 @@ jobs:
           name: subgraph-build
           path: subgraph-futures/
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: subgraph-futures/yarn.lock
+
+      - name: Install dependencies
+        working-directory: ./subgraph-futures
+        run: |
+          echo "📦 Installing dependencies for deployment..."
+          yarn install --frozen-lockfile
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
