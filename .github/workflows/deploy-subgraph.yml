@@ -121,13 +121,17 @@ jobs:
           echo "tag=subgraph-${FULL_VERSION}" >> $GITHUB_OUTPUT
           echo "📦 Version: ${FULL_VERSION}"
 
-      - name: Install dependencies
+      ################################################################################
+      # BUILD PHASE
+      ################################################################################
+
+      - name: 📦 Install dependencies
         working-directory: ./subgraph-futures
         run: |
           echo "📦 Installing dependencies..."
           yarn install --frozen-lockfile
 
-      - name: Build contracts and generate ABIs
+      - name: 🔨 Build contracts and generate ABIs
         run: |
           echo "🔨 Compiling smart contracts..."
           yarn install --frozen-lockfile
@@ -141,7 +145,7 @@ jobs:
           cp artifacts/contracts/marketplace/HashrateOracle.sol/HashrateOracle.json abi/
           echo "✅ ABIs copied to abi/ directory"
 
-      - name: Prepare subgraph configuration
+      - name: ⚙️ Prepare subgraph configuration
         working-directory: ./subgraph-futures
         run: |
           echo "⚙️ Preparing subgraph for ${{ steps.env.outputs.environment }}..."
@@ -161,32 +165,36 @@ jobs:
           
           echo "✅ Subgraph configuration ready"
 
-      - name: Generate code
+      - name: 🔨 Generate code
         working-directory: ./subgraph-futures
         run: |
           echo "🔨 Generating AssemblyScript types..."
           yarn codegen
           echo "✅ Code generation complete"
 
-      - name: Build subgraph
+      - name: 🔨 Build subgraph
         working-directory: ./subgraph-futures
         run: |
           echo "🔨 Building subgraph..."
           yarn build
           echo "✅ Build complete"
 
-      - name: Configure AWS credentials
+      ################################################################################
+      # DEPLOY PHASE
+      ################################################################################
+
+      - name: 🔐 Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ steps.env.outputs.aws_role_arn }}
           aws-region: ${{ steps.env.outputs.aws_region }}
           role-session-name: GitHubActions-Subgraph-${{ github.run_id }}
 
-      - name: Install Graph CLI
+      - name: 📦 Install Graph CLI
         run: |
           npm install -g @graphprotocol/graph-cli
 
-      - name: Create subgraph (if not exists)
+      - name: 📝 Create subgraph (if not exists)
         working-directory: ./subgraph-futures
         continue-on-error: true
         run: |
@@ -194,7 +202,7 @@ jobs:
           graph create --node ${{ steps.env.outputs.graph_node_url }}:8020 \
             ${{ steps.env.outputs.subgraph_name }} || echo "Subgraph already exists"
 
-      - name: Deploy subgraph
+      - name: 🚀 Deploy subgraph
         working-directory: ./subgraph-futures
         run: |
           echo "🚀 Deploying to ${{ steps.env.outputs.environment }} environment"
@@ -210,7 +218,11 @@ jobs:
           
           echo "✅ Subgraph deployed successfully"
 
-      - name: Verify deployment
+      ################################################################################
+      # VERIFY PHASE
+      ################################################################################
+
+      - name: 🔍 Verify deployment
         run: |
           echo "🔍 Verifying subgraph deployment..."
           
@@ -235,7 +247,11 @@ jobs:
           
           echo "✅ Subgraph is healthy and indexing"
 
-      - name: Create Git tag
+      ################################################################################
+      # CLEANUP PHASE
+      ################################################################################
+
+      - name: 🏷️ Create Git tag
         if: steps.env.outputs.environment == 'main'
         run: |
           git config user.name "GitHub Actions"
@@ -243,7 +259,7 @@ jobs:
           git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.version }}"
           git push origin "${{ steps.version.outputs.tag }}"
 
-      - name: Deployment summary
+      - name: 📋 Deployment summary
         run: |
           echo "## 🎉 Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
