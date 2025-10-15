@@ -228,9 +228,9 @@ yarn codegen
 yarn build
 
 # Deploy to Graph Node
-yarn graph create --node https://gphuse1.dev.lumerin.io:8020 marketplace
-yarn graph deploy --node https://gphuse1.dev.lumerin.io:8020 \
-  --ipfs https://gphuse1.dev.lumerin.io/ipfs \
+yarn graph create --node https://graphidx.dev.lumerin.io:8020 marketplace
+yarn graph deploy --node https://graphidx.dev.lumerin.io:8020 \
+  --ipfs https://graphidx.dev.lumerin.io/ipfs \
   --version-label v0.1.0-dev \
   marketplace
 ```
@@ -266,13 +266,13 @@ yarn graph deploy --node https://gphuse1.dev.lumerin.io:8020 \
 
 ```bash
 # Notifications service
-curl https://ntfuse1-int.dev.lumerin.io/healthcheck
+curl https://notifyint.dev.lumerin.io/healthcheck
 
 # Subgraph
 curl -X POST \
   -H "Content-Type: application/json" \
   -d '{"query": "{ _meta { block { number } } }"}' \
-  https://gphuse1.dev.lumerin.io/subgraphs/name/marketplace
+  https://graphidx.dev.lumerin.io/subgraphs/name/marketplace
 
 # Lambda (check last execution)
 aws lambda get-function \
@@ -313,7 +313,7 @@ aws lambda get-function \
 **Solution:**
 1. Verify Graph Node is running: `aws ecs describe-services`
 2. Check ALB health checks are passing
-3. Verify DNS resolution: `nslookup gphuse1.dev.lumerin.io`
+3. Verify DNS resolution: `nslookup graphidx.dev.lumerin.io`
 4. Check security groups allow port 8020 (admin) and 8000 (HTTP)
 
 ## Security Best Practices

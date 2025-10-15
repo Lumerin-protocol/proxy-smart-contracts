@@ -75,15 +75,15 @@ aws lambda update-function-code --function-name margin-call-dev \
 # Subgraph
 cd subgraph-futures
 yarn install && yarn prepare-dev && yarn codegen && yarn build
-yarn graph deploy --node https://gphuse1.dev.lumerin.io:8020 \
-  --ipfs https://gphuse1.dev.lumerin.io/ipfs marketplace
+yarn graph deploy --node https://graphidx.dev.lumerin.io:8020 \
+  --ipfs https://graphidx.dev.lumerin.io/ipfs marketplace
 ```
 
 ## 🔍 Health Checks
 
 ### Notifications Service
 ```bash
-curl https://ntfuse1-int.dev.lumerin.io/healthcheck
+curl https://notifyint.dev.lumerin.io/healthcheck
 ```
 
 ### Margin Call Lambda
@@ -96,7 +96,7 @@ aws lambda invoke --function-name margin-call-dev \
 ```bash
 curl -X POST -H "Content-Type: application/json" \
   -d '{"query": "{ _meta { block { number } hasIndexingErrors } }"}' \
-  https://gphuse1.dev.lumerin.io/subgraphs/name/marketplace
+  https://graphidx.dev.lumerin.io/subgraphs/name/marketplace
 ```
 
 ## 📊 Monitoring
@@ -165,7 +165,7 @@ aws lambda wait function-updated --function-name margin-call-dev
 aws logs tail /ecs/lumerin-graph-node-dev --since 5m
 
 # Check IPFS connectivity
-curl https://gphuse1.dev.lumerin.io/ipfs/api/v0/version
+curl https://graphidx.dev.lumerin.io/ipfs/api/v0/version
 ```
 
 ## 📋 Cheat Sheet

@@ -10,14 +10,14 @@ graph TB
     end
 
     subgraph "Route53 DNS"
-        DNS1[gphuse1.dev.lumerin.io]
-        DNS2[ntfuse1-int.dev.lumerin.io]
+        DNS1[graphidx.dev.lumerin.io]
+        DNS2[notifyint.dev.lumerin.io]
     end
 
     subgraph "Futures Marketplace Infrastructure"
         
         subgraph "Subgraph Indexer - Public"
-            ALB_Subgraph[External ALB<br/>gphuse1-use1<br/>:443 HTTPS]
+            ALB_Subgraph[External ALB<br/>graphidx-ext-use1<br/>:443 HTTPS]
             
             subgraph "ECS Fargate - Graph Node"
                 GraphNode[Graph Node Container<br/>512 CPU / 1024 MB<br/>Ports: 8000, 8001, 8020, 8030]
@@ -33,7 +33,7 @@ graph TB
         end
 
         subgraph "Notifications Service - Internal"
-            ALB_Notif[Internal ALB<br/>ntf-int-use1<br/>:443 HTTPS]
+            ALB_Notif[Internal ALB<br/>notifyint-int-use1<br/>:443 HTTPS]
             
             subgraph "ECS Fargate - Notifications"
                 NotifSvc[Notifications Bot<br/>256 CPU / 512 MB<br/>Port: 3000<br/>Telegram Bot]
@@ -124,7 +124,7 @@ graph TB
 **Purpose:** Index and query blockchain data for the Futures Marketplace
 
 **Components:**
-- **External ALB**: `gphuse1.dev.lumerin.io` - Public HTTPS endpoint
+- **External ALB**: `graphidx.dev.lumerin.io` - Public HTTPS endpoint
 - **Graph Node ECS**: Indexes blockchain events, serves GraphQL queries
 - **IPFS ECS**: Stores subgraph metadata and deployment files
 - **RDS PostgreSQL**: Stores indexed blockchain data (db.t3.small)
@@ -150,7 +150,7 @@ graph TB
 **Purpose:** Telegram bot for margin call alerts and user notifications
 
 **Components:**
-- **Internal ALB**: `ntfuse1-int.dev.lumerin.io` - VPC-only access
+- **Internal ALB**: `notifyint.dev.lumerin.io` - VPC-only access
 - **Notifications ECS**: Node.js Telegram bot service
 - **RDS PostgreSQL**: Stores user subscriptions and notification history (db.t3.micro)
 
@@ -207,13 +207,13 @@ graph TB
 ## Security & Access
 
 ### Public Access
-- ✅ Subgraph GraphQL endpoint (gphuse1.dev.lumerin.io)
+- ✅ Subgraph GraphQL endpoint (graphidx.dev.lumerin.io)
   - Protected by WAF
   - HTTPS only (ACM certificate)
   - Rate limiting via WAF rules
 
 ### Internal Only
-- 🔒 Notifications Service ALB (ntfuse1-int.dev.lumerin.io)
+- 🔒 Notifications Service ALB (notifyint.dev.lumerin.io)
   - VPC-internal only
   - Only accessible by Lambda and ECS services
   - No public internet access
@@ -279,7 +279,7 @@ graph TB
    ↓
 2. Margin Call Lambda triggered
    ↓
-3. Lambda → queries subgraph at gphuse1.dev.lumerin.io
+3. Lambda → queries subgraph at graphidx.dev.lumerin.io
    Query: "Get all open positions"
    ↓
 4. Lambda → reads Oracle contract (via Ethereum RPC)
@@ -289,7 +289,7 @@ graph TB
    ↓
 6. IF margin_ratio < 0.1 (10%)
    ↓
-7. Lambda → POST to ntfuse1-int.dev.lumerin.io/notifications
+7. Lambda → POST to notifyint.dev.lumerin.io/notifications
    Body: { positionId, userId, currentMargin, requiredMargin }
    ↓
 8. Notifications Service → Telegram API
@@ -309,8 +309,8 @@ graph TB
 **Deployment Date:** 2025-10-15
 
 **DNS Records:**
-- `gphuse1.dev.lumerin.io` → External ALB (Subgraph)
-- `ntfuse1-int.dev.lumerin.io` → Internal ALB (Notifications)
+- `graphidx.dev.lumerin.io` → External ALB (Subgraph)
+- `notifyint.dev.lumerin.io` → Internal ALB (Notifications)
 - `ipfs.subgraph.local` → Service Discovery (IPFS)
 
 **Terraform Files:**

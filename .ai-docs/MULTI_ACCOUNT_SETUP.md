@@ -85,18 +85,18 @@ terragrunt output github_actions_role_arn
 ## DNS Endpoints by Environment
 
 ### DEV (dev branch)
-- **Notifications**: `ntfuse1-int.dev.lumerin.io` (internal)
-- **Subgraph**: `gphuse1.dev.lumerin.io` (public)
+- **Notifications**: `notifyint.dev.lumerin.io` (internal)
+- **Subgraph**: `graphidx.dev.lumerin.io` (public)
 - **Margin Call**: Runs in VPC (no public endpoint)
 
 ### STG (test branch)
-- **Notifications**: `ntfuse1-int.stg.lumerin.io` (internal)
-- **Subgraph**: `gphuse1.stg.lumerin.io` (public)
+- **Notifications**: `notifyint.stg.lumerin.io` (internal)
+- **Subgraph**: `graphidx.stg.lumerin.io` (public)
 - **Margin Call**: Runs in VPC (no public endpoint)
 
 ### LMN (main branch)
-- **Notifications**: `ntfuse1-int.lumerin.io` (internal)
-- **Subgraph**: `gphuse1.lumerin.io` (public)
+- **Notifications**: `notifyint.lumerin.io` (internal)
+- **Subgraph**: `graphidx.lumerin.io` (public)
 - **Margin Call**: Runs in VPC (no public endpoint)
 
 ---
