@@ -38,7 +38,6 @@ jobs:
       environment: ${{ steps.env.outputs.environment }}
       lambda_function: ${{ steps.env.outputs.lambda_function }}
       aws_region: ${{ steps.env.outputs.aws_region }}
-      aws_role_arn: ${{ steps.env.outputs.aws_role_arn }}
     
     steps:
       - name: Checkout code
@@ -77,17 +76,14 @@ jobs:
             dev)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
               echo "lambda_function=margin-call-dev" >> $GITHUB_OUTPUT
-              echo "aws_role_arn=${{ secrets.AWS_ROLE_ARN_DEV }}" >> $GITHUB_OUTPUT
               ;;
             test)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
               echo "lambda_function=margin-call-stg" >> $GITHUB_OUTPUT
-              echo "aws_role_arn=${{ secrets.AWS_ROLE_ARN_STG }}" >> $GITHUB_OUTPUT
               ;;
             main)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
               echo "lambda_function=margin-call-lmn" >> $GITHUB_OUTPUT
-              echo "aws_role_arn=${{ secrets.AWS_ROLE_ARN_LMN }}" >> $GITHUB_OUTPUT
               ;;
           esac
 
@@ -181,7 +177,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ needs.build.outputs.aws_role_arn }}
+          role-to-assume: ${{ needs.build.outputs.environment == 'dev' && secrets.AWS_ROLE_ARN_DEV || needs.build.outputs.environment == 'test' && secrets.AWS_ROLE_ARN_STG || secrets.AWS_ROLE_ARN_LMN }}
           aws-region: ${{ needs.build.outputs.aws_region }}
           role-session-name: GitHubActions-MarginCall-${{ github.run_id }}
 
@@ -229,7 +225,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ needs.build.outputs.aws_role_arn }}
+          role-to-assume: ${{ needs.build.outputs.environment == 'dev' && secrets.AWS_ROLE_ARN_DEV || needs.build.outputs.environment == 'test' && secrets.AWS_ROLE_ARN_STG || secrets.AWS_ROLE_ARN_LMN }}
           aws-region: ${{ needs.build.outputs.aws_region }}
           role-session-name: GitHubActions-MarginCall-Verify-${{ github.run_id }}
 

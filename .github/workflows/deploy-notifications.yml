@@ -42,7 +42,6 @@ jobs:
       ecs_cluster: ${{ steps.env.outputs.ecs_cluster }}
       ecs_service: ${{ steps.env.outputs.ecs_service }}
       aws_region: ${{ steps.env.outputs.aws_region }}
-      aws_role_arn: ${{ steps.env.outputs.aws_role_arn }}
     
     steps:
       - name: Checkout code
@@ -75,19 +74,16 @@ jobs:
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
               echo "ecs_cluster=bedrock-dev-use1-1" >> $GITHUB_OUTPUT
               echo "ecs_service=svc-lumerin-notifications-dev-use1" >> $GITHUB_OUTPUT
-              echo "aws_role_arn=${{ secrets.AWS_ROLE_ARN_DEV }}" >> $GITHUB_OUTPUT
               ;;
             test)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
               echo "ecs_cluster=bedrock-stg-use1-1" >> $GITHUB_OUTPUT
               echo "ecs_service=svc-lumerin-notifications-stg-use1" >> $GITHUB_OUTPUT
-              echo "aws_role_arn=${{ secrets.AWS_ROLE_ARN_STG }}" >> $GITHUB_OUTPUT
               ;;
             main)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
               echo "ecs_cluster=bedrock-lmn-use1-1" >> $GITHUB_OUTPUT
               echo "ecs_service=svc-lumerin-notifications-lmn-use1" >> $GITHUB_OUTPUT
-              echo "aws_role_arn=${{ secrets.AWS_ROLE_ARN_LMN }}" >> $GITHUB_OUTPUT
               ;;
           esac
 
@@ -150,7 +146,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ needs.build.outputs.aws_role_arn }}
+          role-to-assume: ${{ needs.build.outputs.environment == 'dev' && secrets.AWS_ROLE_ARN_DEV || needs.build.outputs.environment == 'test' && secrets.AWS_ROLE_ARN_STG || secrets.AWS_ROLE_ARN_LMN }}
           aws-region: ${{ needs.build.outputs.aws_region }}
           role-session-name: GitHubActions-Notifications-${{ github.run_id }}
 
@@ -178,7 +174,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ needs.build.outputs.aws_role_arn }}
+          role-to-assume: ${{ needs.build.outputs.environment == 'dev' && secrets.AWS_ROLE_ARN_DEV || needs.build.outputs.environment == 'test' && secrets.AWS_ROLE_ARN_STG || secrets.AWS_ROLE_ARN_LMN }}
           aws-region: ${{ needs.build.outputs.aws_region }}
           role-session-name: GitHubActions-Notifications-Verify-${{ github.run_id }}
 
