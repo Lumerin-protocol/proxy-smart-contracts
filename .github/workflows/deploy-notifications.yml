@@ -6,6 +6,7 @@ on:
       - dev
       - test
       - main
+      - 'cicd/**'
     paths:
       - 'notifications/**'
       - '.github/workflows/deploy-notifications.yml'
@@ -51,6 +52,9 @@ jobs:
               ENV="main"
             elif [ "$BRANCH" == "test" ]; then
               ENV="test"
+            elif [[ "$BRANCH" == cicd/* ]]; then
+              ENV="dev"
+              echo "🔧 CI/CD feature branch detected - deploying to DEV"
             else
               ENV="dev"
             fi
