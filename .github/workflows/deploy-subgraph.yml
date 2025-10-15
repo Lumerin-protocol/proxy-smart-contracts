@@ -180,6 +180,7 @@ jobs:
             subgraph-futures/build/
             subgraph-futures/generated/
             subgraph-futures/subgraph.yaml
+            abi/
           retention-days: 1
 
   deploy:
