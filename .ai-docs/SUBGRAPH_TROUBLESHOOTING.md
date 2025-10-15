@@ -56,7 +56,40 @@ aws logs tail /aws/ecs/bedrock-dev-lumerin-marketplace-log-group \
 
 ## 🔧 Common Issues & Solutions
 
-### 1. Subgraph Deployment Fails with "403 Forbidden" (IPFS)
+### 1. IPFS Upload Fails with "Content-Type: application/json is required"
+
+**Symptoms:**
+```
+✖ Failed to upload subgraph to IPFS: Failed to upload file to IPFS: 
+Supplied content type is not allowed. Content-Type: application/json is required
+```
+
+**Cause:**
+The `graph deploy` command is being run with `--ipfs` flag pointing to the admin API endpoint, but Graph Node expects to handle IPFS uploads internally.
+
+**Solution:**
+Remove the `--ipfs` flag from the deploy command. Graph Node manages IPFS internally:
+
+```yaml
+# ❌ WRONG - Don't specify IPFS separately
+graph deploy --node https://graphidx.dev.lumerin.io:8020 \
+  --ipfs https://graphidx.dev.lumerin.io:8020 \
+  marketplace
+
+# ✅ CORRECT - Let Graph Node handle IPFS
+graph deploy --node https://graphidx.dev.lumerin.io:8020 \
+  --version-label v0.1.0-dev \
+  marketplace
+```
+
+**Why This Works:**
+- Graph Node has internal access to IPFS via Service Discovery (`ipfs.subgraph.local:5001`)
+- When you deploy to the admin API, Graph Node automatically handles IPFS uploads
+- The `--ipfs` flag is only needed when using external hosted IPFS
+
+---
+
+### 2. Subgraph Deployment Fails with "403 Forbidden" (IPFS)
 
 **Symptoms:**
 ```
@@ -93,7 +126,7 @@ aws logs tail /aws/ecs/bedrock-dev-lumerin-marketplace-log-group \
 
 ---
 
-### 2. Graph Node "Connection Refused" to IPFS
+### 3. Graph Node "Connection Refused" to IPFS
 
 **Symptoms in Graph Node logs:**
 ```

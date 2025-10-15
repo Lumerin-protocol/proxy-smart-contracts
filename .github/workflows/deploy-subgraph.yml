@@ -37,7 +37,6 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       environment: ${{ steps.env.outputs.environment }}
       graph_node_url: ${{ steps.env.outputs.graph_node_url }}
-      ipfs_url: ${{ steps.env.outputs.ipfs_url }}
       subgraph_name: ${{ steps.env.outputs.subgraph_name }}
       aws_region: ${{ steps.env.outputs.aws_region }}
     
@@ -75,24 +74,21 @@ jobs:
           echo "environment=${ENV}" >> $GITHUB_OUTPUT
           
           # Map to endpoints
-          # Note: IPFS uploads happen through the admin API (same as graph_node_url)
+          # Note: Graph Node handles IPFS internally via admin API
           case $ENV in
             dev)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
               echo "graph_node_url=https://graphidx.dev.lumerin.io" >> $GITHUB_OUTPUT
-              echo "ipfs_url=https://graphidx.dev.lumerin.io:8020" >> $GITHUB_OUTPUT
               echo "subgraph_name=marketplace" >> $GITHUB_OUTPUT
               ;;
             test)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
               echo "graph_node_url=https://graphidx.stg.lumerin.io" >> $GITHUB_OUTPUT
-              echo "ipfs_url=https://graphidx.stg.lumerin.io:8020" >> $GITHUB_OUTPUT
               echo "subgraph_name=marketplace" >> $GITHUB_OUTPUT
               ;;
             main)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
               echo "graph_node_url=https://graphidx.lumerin.io" >> $GITHUB_OUTPUT
-              echo "ipfs_url=https://graphidx.lumerin.io:8020" >> $GITHUB_OUTPUT
               echo "subgraph_name=marketplace" >> $GITHUB_OUTPUT
               ;;
           esac
@@ -236,12 +232,11 @@ jobs:
         run: |
           echo "🚀 Deploying to ${{ needs.build.outputs.environment }} environment"
           echo "   Graph Node: ${{ needs.build.outputs.graph_node_url }}"
-          echo "   IPFS: ${{ needs.build.outputs.ipfs_url }}"
           echo "   Subgraph: ${{ needs.build.outputs.subgraph_name }}"
           echo "   Version: ${{ needs.build.outputs.version }}"
           
+          # Graph Node handles IPFS internally - no need to specify --ipfs
           graph deploy --node ${{ needs.build.outputs.graph_node_url }}:8020 \
-            --ipfs ${{ needs.build.outputs.ipfs_url }} \
             --version-label ${{ needs.build.outputs.version }} \
             ${{ needs.build.outputs.subgraph_name }}
           
