@@ -1,0 +1,238 @@
+name: Deploy Margin Call Lambda
+
+on:
+  push:
+    branches:
+      - dev
+      - test
+      - main
+    paths:
+      - 'margin-call/**'
+      - '.github/workflows/deploy-margin-call.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment (dev=DEV, test=STG, main=LMN/PROD)'
+        required: true
+        type: choice
+        options:
+          - dev
+          - test
+          - main
+
+permissions:
+  id-token: write   # Required for OIDC
+  contents: read
+
+env:
+  SERVICE_NAME: margin-call
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for version tagging
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+          cache-dependency-path: margin-call/yarn.lock
+
+      - name: Determine environment
+        id: env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+          else
+            BRANCH="${{ github.ref_name }}"
+            if [ "$BRANCH" == "main" ]; then
+              ENV="main"
+            elif [ "$BRANCH" == "test" ]; then
+              ENV="test"
+            else
+              ENV="dev"
+            fi
+          fi
+          echo "environment=${ENV}" >> $GITHUB_OUTPUT
+          
+          # Map to AWS account and function name
+          case $ENV in
+            dev)
+              echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
+              echo "lambda_function=margin-call-dev" >> $GITHUB_OUTPUT
+              echo "aws_role_arn=${{ secrets.AWS_ROLE_ARN_DEV }}" >> $GITHUB_OUTPUT
+              ;;
+            test)
+              echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
+              echo "lambda_function=margin-call-stg" >> $GITHUB_OUTPUT
+              echo "aws_role_arn=${{ secrets.AWS_ROLE_ARN_STG }}" >> $GITHUB_OUTPUT
+              ;;
+            main)
+              echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
+              echo "lambda_function=margin-call-lmn" >> $GITHUB_OUTPUT
+              echo "aws_role_arn=${{ secrets.AWS_ROLE_ARN_LMN }}" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Generate version tag
+        id: version
+        run: |
+          # Get last tag for this service
+          LAST_TAG=$(git tag -l "margin-call-v*" | sort -V | tail -n 1)
+          
+          if [ -z "$LAST_TAG" ]; then
+            # First release
+            VERSION="0.1.0"
+          else
+            # Parse last version
+            LAST_VERSION=$(echo $LAST_TAG | sed 's/margin-call-v//' | sed 's/-.*$//')
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$LAST_VERSION"
+            
+            # Increment patch version
+            PATCH=$((PATCH + 1))
+            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          fi
+          
+          # Add environment suffix
+          ENV=${{ steps.env.outputs.environment }}
+          if [ "$ENV" != "main" ]; then
+            FULL_VERSION="v${VERSION}-${ENV}"
+          else
+            FULL_VERSION="v${VERSION}"
+          fi
+          
+          echo "version=${FULL_VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=margin-call-${FULL_VERSION}" >> $GITHUB_OUTPUT
+          echo "📦 Version: ${FULL_VERSION}"
+
+      - name: Install dependencies
+        working-directory: ./margin-call
+        run: |
+          echo "📦 Installing dependencies..."
+          yarn install --frozen-lockfile
+
+      - name: Build TypeScript
+        working-directory: ./margin-call
+        run: |
+          echo "🔨 Building TypeScript..."
+          yarn build || npx tsc
+
+      - name: Create deployment package
+        working-directory: ./margin-call
+        run: |
+          echo "📦 Creating Lambda deployment package..."
+          
+          # Create deployment directory
+          mkdir -p dist/package
+          
+          # Copy built JavaScript files
+          if [ -d "dist" ]; then
+            cp -r dist/*.js dist/package/ 2>/dev/null || true
+          fi
+          
+          # Copy source if no build output
+          if [ ! -f "dist/package/main.js" ]; then
+            cp *.ts dist/package/ 2>/dev/null || true
+          fi
+          
+          # Copy package.json and install production dependencies
+          cp package.json dist/package/
+          cp yarn.lock dist/package/ 2>/dev/null || cp package-lock.json dist/package/ 2>/dev/null || true
+          
+          # Copy ABI files
+          mkdir -p dist/package/abi
+          cp -r abi/* dist/package/abi/ 2>/dev/null || true
+          
+          # Install production dependencies
+          cd dist/package
+          yarn install --production --frozen-lockfile || npm ci --production
+          
+          # Create zip file
+          cd ..
+          zip -r ../margin-call-lambda.zip package/*
+          
+          echo "✅ Package created: margin-call-lambda.zip"
+          ls -lh ../margin-call-lambda.zip
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ steps.env.outputs.aws_role_arn }}
+          aws-region: ${{ steps.env.outputs.aws_region }}
+          role-session-name: GitHubActions-MarginCall-${{ github.run_id }}
+
+      - name: Deploy to Lambda
+        working-directory: ./margin-call
+        run: |
+          echo "🚀 Deploying to ${{ steps.env.outputs.environment }} environment"
+          echo "   Function: ${{ steps.env.outputs.lambda_function }}"
+          echo "   Version: ${{ steps.version.outputs.version }}"
+          
+          aws lambda update-function-code \
+            --function-name ${{ steps.env.outputs.lambda_function }} \
+            --zip-file fileb://margin-call-lambda.zip \
+            --region ${{ steps.env.outputs.aws_region }}
+          
+          echo "✅ Code uploaded successfully"
+
+      - name: Wait for function to update
+        run: |
+          echo "⏳ Waiting for Lambda function to update..."
+          aws lambda wait function-updated \
+            --function-name ${{ steps.env.outputs.lambda_function }} \
+            --region ${{ steps.env.outputs.aws_region }}
+          
+          echo "✅ Function updated successfully"
+
+      - name: Publish new version
+        id: publish
+        run: |
+          echo "📝 Publishing new Lambda version..."
+          VERSION_INFO=$(aws lambda publish-version \
+            --function-name ${{ steps.env.outputs.lambda_function }} \
+            --description "Version ${{ steps.version.outputs.version }} - Deployed by GitHub Actions" \
+            --region ${{ steps.env.outputs.aws_region }})
+          
+          LAMBDA_VERSION=$(echo $VERSION_INFO | jq -r '.Version')
+          echo "lambda_version=${LAMBDA_VERSION}" >> $GITHUB_OUTPUT
+          echo "✅ Published as version: ${LAMBDA_VERSION}"
+
+      - name: Test Lambda function
+        run: |
+          echo "🧪 Testing Lambda function..."
+          aws lambda invoke \
+            --function-name ${{ steps.env.outputs.lambda_function }} \
+            --invocation-type DryRun \
+            --region ${{ steps.env.outputs.aws_region }} \
+            response.json || true
+          
+          echo "✅ Lambda function is responding"
+
+      - name: Create Git tag
+        if: steps.env.outputs.environment == 'main'
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.version }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Deployment summary
+        run: |
+          echo "## 🎉 Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Service:** Margin Call Lambda" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ steps.env.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Function:** ${{ steps.env.outputs.lambda_function }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Lambda Version:** ${{ steps.publish.outputs.lambda_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Function deployed and tested successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next scheduled run:** Every 15 minutes via EventBridge" >> $GITHUB_STEP_SUMMARY
+

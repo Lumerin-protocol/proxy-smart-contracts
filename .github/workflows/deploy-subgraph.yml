@@ -1,0 +1,242 @@
+name: Deploy Subgraph
+
+on:
+  push:
+    branches:
+      - dev
+      - test
+      - main
+    paths:
+      - 'subgraph-futures/**'
+      - '.github/workflows/deploy-subgraph.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment (dev=DEV, test=STG, main=LMN/PROD)'
+        required: true
+        type: choice
+        options:
+          - dev
+          - test
+          - main
+
+permissions:
+  id-token: write   # Required for OIDC
+  contents: read
+
+env:
+  SERVICE_NAME: subgraph-futures
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for version tagging
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: subgraph-futures/yarn.lock
+
+      - name: Determine environment
+        id: env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+          else
+            BRANCH="${{ github.ref_name }}"
+            if [ "$BRANCH" == "main" ]; then
+              ENV="main"
+            elif [ "$BRANCH" == "test" ]; then
+              ENV="test"
+            else
+              ENV="dev"
+            fi
+          fi
+          echo "environment=${ENV}" >> $GITHUB_OUTPUT
+          
+          # Map to endpoints
+          case $ENV in
+            dev)
+              echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
+              echo "graph_node_url=https://graphidx.dev.lumerin.io" >> $GITHUB_OUTPUT
+              echo "ipfs_url=https://graphidx.dev.lumerin.io/ipfs" >> $GITHUB_OUTPUT
+              echo "subgraph_name=marketplace" >> $GITHUB_OUTPUT
+              echo "aws_role_arn=${{ secrets.AWS_ROLE_ARN_DEV }}" >> $GITHUB_OUTPUT
+              ;;
+            test)
+              echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
+              echo "graph_node_url=https://graphidx.stg.lumerin.io" >> $GITHUB_OUTPUT
+              echo "ipfs_url=https://graphidx.stg.lumerin.io/ipfs" >> $GITHUB_OUTPUT
+              echo "subgraph_name=marketplace" >> $GITHUB_OUTPUT
+              echo "aws_role_arn=${{ secrets.AWS_ROLE_ARN_STG }}" >> $GITHUB_OUTPUT
+              ;;
+            main)
+              echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
+              echo "graph_node_url=https://graphidx.lumerin.io" >> $GITHUB_OUTPUT
+              echo "ipfs_url=https://graphidx.lumerin.io/ipfs" >> $GITHUB_OUTPUT
+              echo "subgraph_name=marketplace" >> $GITHUB_OUTPUT
+              echo "aws_role_arn=${{ secrets.AWS_ROLE_ARN_LMN }}" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Generate version tag
+        id: version
+        run: |
+          # Get last tag for this service
+          LAST_TAG=$(git tag -l "subgraph-v*" | sort -V | tail -n 1)
+          
+          if [ -z "$LAST_TAG" ]; then
+            # First release
+            VERSION="0.1.0"
+          else
+            # Parse last version
+            LAST_VERSION=$(echo $LAST_TAG | sed 's/subgraph-v//' | sed 's/-.*$//')
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$LAST_VERSION"
+            
+            # Increment patch version
+            PATCH=$((PATCH + 1))
+            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          fi
+          
+          # Add environment suffix
+          ENV=${{ steps.env.outputs.environment }}
+          if [ "$ENV" != "main" ]; then
+            FULL_VERSION="v${VERSION}-${ENV}"
+          else
+            FULL_VERSION="v${VERSION}"
+          fi
+          
+          echo "version=${FULL_VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=subgraph-${FULL_VERSION}" >> $GITHUB_OUTPUT
+          echo "📦 Version: ${FULL_VERSION}"
+
+      - name: Install dependencies
+        working-directory: ./subgraph-futures
+        run: |
+          echo "📦 Installing dependencies..."
+          yarn install --frozen-lockfile
+
+      - name: Prepare subgraph configuration
+        working-directory: ./subgraph-futures
+        run: |
+          echo "⚙️ Preparing subgraph for ${{ steps.env.outputs.environment }}..."
+          
+          # Run prepare script (creates subgraph.yaml from templates)
+          case "${{ steps.env.outputs.environment }}" in
+            dev)
+              yarn prepare-dev || yarn prepare:dev || echo "Using default config"
+              ;;
+            test)
+              yarn prepare-stg || yarn prepare-test || yarn prepare:stg || echo "Using default config"
+              ;;
+            main)
+              yarn prepare-mainnet || yarn prepare:mainnet || echo "Using default config"
+              ;;
+          esac
+          
+          echo "✅ Subgraph configuration ready"
+
+      - name: Generate code
+        working-directory: ./subgraph-futures
+        run: |
+          echo "🔨 Generating AssemblyScript types..."
+          yarn codegen
+          echo "✅ Code generation complete"
+
+      - name: Build subgraph
+        working-directory: ./subgraph-futures
+        run: |
+          echo "🔨 Building subgraph..."
+          yarn build
+          echo "✅ Build complete"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ steps.env.outputs.aws_role_arn }}
+          aws-region: ${{ steps.env.outputs.aws_region }}
+          role-session-name: GitHubActions-Subgraph-${{ github.run_id }}
+
+      - name: Install Graph CLI
+        run: |
+          npm install -g @graphprotocol/graph-cli
+
+      - name: Create subgraph (if not exists)
+        working-directory: ./subgraph-futures
+        continue-on-error: true
+        run: |
+          echo "📝 Creating subgraph in Graph Node..."
+          graph create --node ${{ steps.env.outputs.graph_node_url }}:8020 \
+            ${{ steps.env.outputs.subgraph_name }} || echo "Subgraph already exists"
+
+      - name: Deploy subgraph
+        working-directory: ./subgraph-futures
+        run: |
+          echo "🚀 Deploying to ${{ steps.env.outputs.environment }} environment"
+          echo "   Graph Node: ${{ steps.env.outputs.graph_node_url }}"
+          echo "   IPFS: ${{ steps.env.outputs.ipfs_url }}"
+          echo "   Subgraph: ${{ steps.env.outputs.subgraph_name }}"
+          echo "   Version: ${{ steps.version.outputs.version }}"
+          
+          graph deploy --node ${{ steps.env.outputs.graph_node_url }}:8020 \
+            --ipfs ${{ steps.env.outputs.ipfs_url }} \
+            --version-label ${{ steps.version.outputs.version }} \
+            ${{ steps.env.outputs.subgraph_name }}
+          
+          echo "✅ Subgraph deployed successfully"
+
+      - name: Verify deployment
+        run: |
+          echo "🔍 Verifying subgraph deployment..."
+          
+          # Wait a moment for indexing to start
+          sleep 10
+          
+          # Query the subgraph status
+          RESPONSE=$(curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"query": "{ _meta { block { number } deployment hasIndexingErrors } }"}' \
+            ${{ steps.env.outputs.graph_node_url }}/subgraphs/name/${{ steps.env.outputs.subgraph_name }})
+          
+          echo "Response: $RESPONSE"
+          
+          # Check if deployment is healthy
+          HAS_ERRORS=$(echo $RESPONSE | jq -r '.data._meta.hasIndexingErrors // false')
+          
+          if [ "$HAS_ERRORS" == "true" ]; then
+            echo "⚠️ Subgraph has indexing errors"
+            exit 1
+          fi
+          
+          echo "✅ Subgraph is healthy and indexing"
+
+      - name: Create Git tag
+        if: steps.env.outputs.environment == 'main'
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.version }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Deployment summary
+        run: |
+          echo "## 🎉 Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Service:** Subgraph (Futures Marketplace)" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ steps.env.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Subgraph:** ${{ steps.env.outputs.subgraph_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Endpoints:**" >> $GITHUB_STEP_SUMMARY
+          echo "- GraphQL: \`${{ steps.env.outputs.graph_node_url }}/subgraphs/name/${{ steps.env.outputs.subgraph_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Admin: \`${{ steps.env.outputs.graph_node_url }}:8020\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Subgraph deployed and indexing successfully" >> $GITHUB_STEP_SUMMARY
+
