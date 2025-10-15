@@ -32,14 +32,23 @@ env:
   GHCR_IMAGE: ghcr.io/lumerin-protocol/proxy-notifications
 
 jobs:
-  build-and-deploy:
+  build:
+    name: 🔨 Build
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      environment: ${{ steps.env.outputs.environment }}
+      ecs_cluster: ${{ steps.env.outputs.ecs_cluster }}
+      ecs_service: ${{ steps.env.outputs.ecs_service }}
+      aws_region: ${{ steps.env.outputs.aws_region }}
+      aws_role_arn: ${{ steps.env.outputs.aws_role_arn }}
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for version tagging
+          fetch-depth: 0
 
       - name: Determine environment
         id: env
@@ -61,7 +70,6 @@ jobs:
           fi
           echo "environment=${ENV}" >> $GITHUB_OUTPUT
           
-          # Map to AWS account
           case $ENV in
             dev)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
@@ -86,23 +94,17 @@ jobs:
       - name: Generate version tag
         id: version
         run: |
-          # Get last tag for this service
           LAST_TAG=$(git tag -l "notifications-v*" | sort -V | tail -n 1)
           
           if [ -z "$LAST_TAG" ]; then
-            # First release
             VERSION="0.1.0"
           else
-            # Parse last version
             LAST_VERSION=$(echo $LAST_TAG | sed 's/notifications-v//' | sed 's/-.*$//')
             IFS='.' read -r MAJOR MINOR PATCH <<< "$LAST_VERSION"
-            
-            # Increment patch version
             PATCH=$((PATCH + 1))
             VERSION="${MAJOR}.${MINOR}.${PATCH}"
           fi
           
-          # Add environment suffix
           ENV=${{ steps.env.outputs.environment }}
           if [ "$ENV" != "main" ]; then
             FULL_VERSION="v${VERSION}-${ENV}"
@@ -114,21 +116,17 @@ jobs:
           echo "tag=notifications-${FULL_VERSION}" >> $GITHUB_OUTPUT
           echo "📦 Version: ${FULL_VERSION}"
 
-      ################################################################################
-      # BUILD PHASE
-      ################################################################################
-
-      - name: 🔧 Set up Docker Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: 🔐 Log in to GitHub Container Registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.GHCR_REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 🔨 Build and push Docker image
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./notifications
@@ -143,68 +141,99 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.version.outputs.version }}
 
-      ################################################################################
-      # DEPLOY PHASE
-      ################################################################################
-
-      - name: 🔐 Configure AWS credentials
+  deploy:
+    name: 🚀 Deploy
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ steps.env.outputs.aws_role_arn }}
-          aws-region: ${{ steps.env.outputs.aws_region }}
+          role-to-assume: ${{ needs.build.outputs.aws_role_arn }}
+          aws-region: ${{ needs.build.outputs.aws_region }}
           role-session-name: GitHubActions-Notifications-${{ github.run_id }}
 
-      - name: 🚀 Update ECS service
+      - name: Update ECS service
         run: |
-          echo "🚀 Deploying to ${{ steps.env.outputs.environment }} environment"
-          echo "   Cluster: ${{ steps.env.outputs.ecs_cluster }}"
-          echo "   Service: ${{ steps.env.outputs.ecs_service }}"
-          echo "   Image: ${{ env.GHCR_IMAGE }}:${{ steps.version.outputs.version }}"
+          echo "🚀 Deploying to ${{ needs.build.outputs.environment }} environment"
+          echo "   Cluster: ${{ needs.build.outputs.ecs_cluster }}"
+          echo "   Service: ${{ needs.build.outputs.ecs_service }}"
+          echo "   Image: ${{ env.GHCR_IMAGE }}:${{ needs.build.outputs.version }}"
           
           aws ecs update-service \
-            --cluster ${{ steps.env.outputs.ecs_cluster }} \
-            --service ${{ steps.env.outputs.ecs_service }} \
+            --cluster ${{ needs.build.outputs.ecs_cluster }} \
+            --service ${{ needs.build.outputs.ecs_service }} \
             --force-new-deployment \
-            --region ${{ steps.env.outputs.aws_region }}
+            --region ${{ needs.build.outputs.aws_region }}
           
           echo "✅ Deployment triggered successfully"
 
-      ################################################################################
-      # VERIFY PHASE
-      ################################################################################
+  verify:
+    name: 🔍 Verify
+    runs-on: ubuntu-latest
+    needs: [build, deploy]
+    
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ needs.build.outputs.aws_role_arn }}
+          aws-region: ${{ needs.build.outputs.aws_region }}
+          role-session-name: GitHubActions-Notifications-Verify-${{ github.run_id }}
 
-      - name: ⏳ Wait for service to stabilize
+      - name: Wait for service to stabilize
         run: |
           echo "⏳ Waiting for service to stabilize..."
           aws ecs wait services-stable \
-            --cluster ${{ steps.env.outputs.ecs_cluster }} \
-            --services ${{ steps.env.outputs.ecs_service }} \
-            --region ${{ steps.env.outputs.aws_region }}
+            --cluster ${{ needs.build.outputs.ecs_cluster }} \
+            --services ${{ needs.build.outputs.ecs_service }} \
+            --region ${{ needs.build.outputs.aws_region }}
           
           echo "✅ Service is stable and running"
 
-      ################################################################################
-      # CLEANUP PHASE
-      ################################################################################
+  cleanup:
+    name: 🧹 Cleanup
+    runs-on: ubuntu-latest
+    needs: [build, verify]
+    if: always()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: 🏷️ Create Git tag
-        if: steps.env.outputs.environment == 'main'
+      - name: Create Git tag
+        if: needs.build.outputs.environment == 'main' && needs.verify.result == 'success'
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.version }}"
-          git push origin "${{ steps.version.outputs.tag }}"
+          git tag -a "${{ needs.build.outputs.tag }}" -m "Release ${{ needs.build.outputs.version }}"
+          git push origin "${{ needs.build.outputs.tag }}"
 
-      - name: 📋 Deployment summary
+      - name: Deployment summary
+        if: needs.verify.result == 'success'
         run: |
           echo "## 🎉 Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Service:** Notifications" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ steps.env.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`${{ env.GHCR_IMAGE }}:${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Cluster:** ${{ steps.env.outputs.ecs_cluster }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Service:** ${{ steps.env.outputs.ecs_service }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ needs.build.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.GHCR_IMAGE }}:${{ needs.build.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Cluster:** ${{ needs.build.outputs.ecs_cluster }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Service:** ${{ needs.build.outputs.ecs_service }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ Service deployed and stabilized successfully" >> $GITHUB_STEP_SUMMARY
+
+      - name: Failure summary
+        if: needs.verify.result == 'failure'
+        run: |
+          echo "## ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Service:** Notifications" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ needs.build.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ Deployment or verification failed. Check logs above for details." >> $GITHUB_STEP_SUMMARY
 
