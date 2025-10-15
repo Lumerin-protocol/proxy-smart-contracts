@@ -115,19 +115,23 @@ jobs:
           echo "tag=margin-call-${FULL_VERSION}" >> $GITHUB_OUTPUT
           echo "📦 Version: ${FULL_VERSION}"
 
-      - name: Install dependencies
+      ################################################################################
+      # BUILD PHASE
+      ################################################################################
+
+      - name: 📦 Install dependencies
         working-directory: ./margin-call
         run: |
           echo "📦 Installing dependencies..."
           yarn install --frozen-lockfile
 
-      - name: Build TypeScript
+      - name: 🔨 Build TypeScript
         working-directory: ./margin-call
         run: |
           echo "🔨 Building TypeScript..."
           yarn build || npx tsc
 
-      - name: Create deployment package
+      - name: 📦 Create deployment package
         working-directory: ./margin-call
         run: |
           echo "📦 Creating Lambda deployment package..."
@@ -164,14 +168,18 @@ jobs:
           echo "✅ Package created: margin-call-lambda.zip"
           ls -lh ../margin-call-lambda.zip
 
-      - name: Configure AWS credentials
+      ################################################################################
+      # DEPLOY PHASE
+      ################################################################################
+
+      - name: 🔐 Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ steps.env.outputs.aws_role_arn }}
           aws-region: ${{ steps.env.outputs.aws_region }}
           role-session-name: GitHubActions-MarginCall-${{ github.run_id }}
 
-      - name: Deploy to Lambda
+      - name: 🚀 Deploy to Lambda
         working-directory: ./margin-call
         run: |
           echo "🚀 Deploying to ${{ steps.env.outputs.environment }} environment"
@@ -185,7 +193,7 @@ jobs:
           
           echo "✅ Code uploaded successfully"
 
-      - name: Wait for function to update
+      - name: ⏳ Wait for function to update
         run: |
           echo "⏳ Waiting for Lambda function to update..."
           aws lambda wait function-updated \
@@ -194,7 +202,7 @@ jobs:
           
           echo "✅ Function updated successfully"
 
-      - name: Publish new version
+      - name: 📝 Publish new version
         id: publish
         run: |
           echo "📝 Publishing new Lambda version..."
@@ -207,7 +215,11 @@ jobs:
           echo "lambda_version=${LAMBDA_VERSION}" >> $GITHUB_OUTPUT
           echo "✅ Published as version: ${LAMBDA_VERSION}"
 
-      - name: Test Lambda function
+      ################################################################################
+      # VERIFY PHASE
+      ################################################################################
+
+      - name: 🧪 Test Lambda function
         run: |
           echo "🧪 Testing Lambda function..."
           aws lambda invoke \
@@ -218,7 +230,11 @@ jobs:
           
           echo "✅ Lambda function is responding"
 
-      - name: Create Git tag
+      ################################################################################
+      # CLEANUP PHASE
+      ################################################################################
+
+      - name: 🏷️ Create Git tag
         if: steps.env.outputs.environment == 'main'
         run: |
           git config user.name "GitHub Actions"
@@ -226,7 +242,7 @@ jobs:
           git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.version }}"
           git push origin "${{ steps.version.outputs.tag }}"
 
-      - name: Deployment summary
+      - name: 📋 Deployment summary
         run: |
           echo "## 🎉 Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
