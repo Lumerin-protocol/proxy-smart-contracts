@@ -127,6 +127,20 @@ jobs:
           echo "📦 Installing dependencies..."
           yarn install --frozen-lockfile
 
+      - name: Build contracts and generate ABIs
+        run: |
+          echo "🔨 Compiling smart contracts..."
+          yarn install --frozen-lockfile
+          npx hardhat compile
+          echo "✅ Contracts compiled and ABIs generated"
+          
+          # Copy ABIs to abi directory for subgraph
+          echo "📋 Copying ABIs for subgraph..."
+          mkdir -p abi
+          cp artifacts/contracts/marketplace/Futures.sol/Futures.json abi/
+          cp artifacts/contracts/marketplace/HashrateOracle.sol/HashrateOracle.json abi/
+          echo "✅ ABIs copied to abi/ directory"
+
       - name: Prepare subgraph configuration
         working-directory: ./subgraph-futures
         run: |
