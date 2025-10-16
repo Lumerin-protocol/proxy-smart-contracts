@@ -142,12 +142,12 @@ jobs:
           cd dist/package
           yarn install --production --frozen-lockfile
           
-          # Create the Lambda package
-          cd ..
-          zip -r ../margin-call-lambda.zip package/*
+          # Create the Lambda package (zip from inside package dir to avoid nested structure)
+          zip -r ../../margin-call-lambda.zip .
+          cd ../..
           
           echo "✅ Package created: margin-call-lambda.zip"
-          ls -lh ../margin-call-lambda.zip
+          ls -lh margin-call-lambda.zip
 
       - name: Upload Lambda package
         uses: actions/upload-artifact@v4
