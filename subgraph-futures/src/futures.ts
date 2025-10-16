@@ -32,6 +32,36 @@ function getOrCreateParticipant(address: Address): Participant {
   return participant;
 }
 
+function getOrCreateFutures(event: Initialized | null = null): Futures {
+  let futures = Futures.load(0);
+  if (!futures) {
+    futures = new Futures(0);
+  }
+
+  futures.initializedBlockNumber = event ? event.block.number : BigInt.zero();
+  futures.initializeTimestamp = event ? event.block.timestamp : BigInt.zero();
+  futures.minSellerStake = new BigInt(0);
+  futures.contractCount = 0;
+  futures.contractActiveCount = 0;
+  futures.purchaseCount = 0;
+  futures.closeoutCount = 0;
+
+  const address = dataSource.address();
+  log.info("Futures Address {}", [address.toHexString()]);
+  const futuresContract = FuturesContract.bind(address);
+
+  futures.priceLadderStep = futuresContract.priceLadderStep();
+  futures.sellerLiquidationMarginPercent = futuresContract.sellerLiquidationMarginPercent();
+  futures.buyerLiquidationMarginPercent = futuresContract.buyerLiquidationMarginPercent();
+  futures.speedHps = futuresContract.speedHps();
+  futures.deliveryDurationSeconds = futuresContract.deliveryDurationSeconds();
+  futures.breachPenaltyRatePerDay = futuresContract.breachPenaltyRatePerDay();
+  futures.validatorAddress = futuresContract.validatorAddress();
+  futures.hashrateOracleAddress = futuresContract.hashrateOracle();
+  futures.tokenAddress = futuresContract.token();
+  return futures;
+}
+
 // Helper function to update participant balance
 function updateParticipantBalance(
   participant: Participant,
@@ -52,30 +82,7 @@ function updateParticipantBalance(
 
 export function handleInitialized(event: Initialized): void {
   log.info("Futures contract initialized with version: {}", [event.params.version.toString()]);
-
-  // Create Futures entity
-  const futures = new Futures(0);
-  futures.initializedBlockNumber = event.block.number;
-  futures.initializeTimestamp = event.block.timestamp;
-  futures.minSellerStake = new BigInt(0);
-  futures.contractCount = 0;
-  futures.contractActiveCount = 0;
-  futures.purchaseCount = 0;
-  futures.closeoutCount = 0;
-
-  const address = dataSource.address();
-  log.info("Futures Address {}", [address.toHexString()]);
-  const futuresContract = FuturesContract.bind(address);
-
-  futures.priceLadderStep = futuresContract.priceLadderStep();
-  futures.sellerLiquidationMarginPercent = futuresContract.sellerLiquidationMarginPercent();
-  futures.buyerLiquidationMarginPercent = futuresContract.buyerLiquidationMarginPercent();
-  futures.speedHps = futuresContract.speedHps();
-  futures.deliveryDurationSeconds = futuresContract.deliveryDurationSeconds();
-  futures.breachPenaltyRatePerDay = futuresContract.breachPenaltyRatePerDay();
-  futures.validatorAddress = futuresContract.validatorAddress();
-  futures.hashrateOracleAddress = futuresContract.hashrateOracle();
-  futures.tokenAddress = futuresContract.token();
+  const futures = getOrCreateFutures(event);
   futures.save();
 }
 
@@ -95,11 +102,7 @@ export function handleOrderCreated(event: OrderCreated): void {
   ]);
 
   // Load Futures entity (should exist from Initialized event)
-  const futures = Futures.load(0);
-  if (!futures) {
-    log.error("Futures entity not found - contract may not be initialized", []);
-    return;
-  }
+  let futures = getOrCreateFutures();
 
   // Load or create Participant
   let participant = getOrCreateParticipant(event.params.participant);
@@ -110,7 +113,6 @@ export function handleOrderCreated(event: OrderCreated): void {
   order.participant = participant.id;
   order.price = event.params.price;
   order.deliveryDate = event.params.deliveryDate;
-  order.offsetPositionId = event.params.offsetPositionId;
   order.isBuy = event.params.isBuy;
   order.timestamp = event.block.timestamp;
   order.blockNumber = event.block.number;
@@ -172,11 +174,7 @@ export function handlePositionCreated(event: PositionCreated): void {
   ]);
 
   // Load Futures entity (should exist from Initialized event)
-  const futures = Futures.load(0);
-  if (!futures) {
-    log.error("Futures entity not found - contract may not be initialized", []);
-    return;
-  }
+  let futures = getOrCreateFutures();
 
   // Load or create Seller
   let seller = getOrCreateParticipant(event.params.seller);
@@ -195,6 +193,7 @@ export function handlePositionCreated(event: PositionCreated): void {
   position.blockNumber = event.block.number;
   position.transactionHash = event.transaction.hash;
   position.isActive = true;
+  position.orderId = event.params.orderId;
   position.save();
 
   // Update Seller

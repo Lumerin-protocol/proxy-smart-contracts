@@ -31,13 +31,13 @@ dataSources:
       eventHandlers:
         - event: Initialized(uint64)
           handler: handleInitialized
-        - event: PositionCreated(indexed bytes32,indexed address,indexed address,uint256,uint256)
+        - event: PositionCreated(indexed bytes32,indexed address,indexed address,uint256,uint256,bytes32)
           handler: handlePositionCreated
         - event: PositionClosed(indexed bytes32)
           handler: handlePositionClosed
         - event: PositionDeliveryClosed(indexed bytes32,indexed address)
           handler: handlePositionDeliveryClosed
-        - event: OrderCreated(indexed bytes32,indexed address,uint256,uint256,bytes32,bool)
+        - event: OrderCreated(indexed bytes32,indexed address,uint256,uint256,bool)
           handler: handleOrderCreated
         - event: OrderClosed(indexed bytes32,indexed address)
           handler: handleOrderClosed
