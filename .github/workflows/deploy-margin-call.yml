@@ -159,9 +159,9 @@ jobs:
           
           echo "✅ Created tsx wrapper for TypeScript execution"
           
-          # Install production dependencies + tsx for TypeScript execution
+          # Install production dependencies + tsx for TypeScript execution + ajv-formats for URI validation
           cd dist/package
-          yarn add tsx --production
+          yarn add tsx ajv-formats --production
           yarn install --production --frozen-lockfile
           
           # Create the Lambda package (zip from inside package dir to avoid nested structure)
