@@ -240,7 +240,134 @@ aws ecs update-service \
 
 ---
 
-### 4. Graph Node "Syncing" But Not Progressing
+### 4. Graph Node "Database Unavailable" Error
+
+**Symptoms in Graph Node logs:**
+```
+ERRO Trying again after block polling failed: Ingestor error: database unavailable
+ERRO Postgres connection error, error: could not connect to server: Connection timed out
+```
+
+**Causes:**
+- Missing security group egress rule from Graph Node to RDS (port 5432)
+- RDS instance is stopped or unavailable
+- Network connectivity issue between ECS and RDS
+
+**Check Security Groups:**
+```bash
+# Check Graph Node security group egress rules
+aws ec2 describe-security-groups \
+  --group-ids <GRAPH_NODE_SG_ID> \
+  --profile titanio-dev \
+  --region us-east-1 | jq '.SecurityGroups[0].IpPermissionsEgress'
+
+# Should include:
+# - Port 5432 TCP to RDS security group
+# - Port 443 HTTPS for Ethereum RPC
+# - Port 5001 TCP to IPFS security group
+```
+
+**Check RDS Status:**
+```bash
+aws rds describe-db-instances \
+  --db-instance-identifier subgraph-dev-use1 \
+  --profile titanio-dev \
+  --region us-east-1 | jq '.DBInstances[0].DBInstanceStatus'
+```
+
+**Solution:**
+- Ensure `aws_security_group_rule.graph_node_to_rds` exists in Terraform (08_subgraph_indexer.tf)
+- This egress rule must allow TCP port 5432 from Graph Node SG to RDS SG
+- After applying Terraform, restart Graph Node service to establish new connections
+
+**Why This Happens:**
+During Terraform refactoring to break circular dependencies between security groups, the egress rule from Graph Node to RDS may be removed without being properly recreated. Graph Node can continue working on existing pooled database connections, but once those connections time out (typically 5-10 minutes), it can't create new ones.
+
+**Manual Fix (If Needed):**
+```bash
+# Add egress rule manually
+aws ec2 authorize-security-group-egress \
+  --group-id <GRAPH_NODE_SG_ID> \
+  --protocol tcp \
+  --port 5432 \
+  --source-group <RDS_SG_ID> \
+  --profile titanio-dev \
+  --region us-east-1
+
+# Restart Graph Node to reconnect
+aws ecs update-service \
+  --cluster ecs-lumerin-marketplace-dev-use1 \
+  --service svc-lumerin-graph-node-dev-use1 \
+  --force-new-deployment \
+  --profile titanio-dev \
+  --region us-east-1
+```
+
+---
+
+### 5. Subgraph Deployment Times Out with 504 Error
+
+**Symptoms in GitHub Actions or CLI:**
+```
+✔ Upload subgraph to IPFS
+Build completed: QmPrNjfJgL9bLpxLPL7qymjd6B36ZNVRtBHNCYazLR1t9b
+
+- Deploying to Graph node https://graphidx.dev.lumerin.io:8020/
+✖ HTTP error deploying the subgraph 504
+```
+
+**Causes:**
+- ALB idle timeout too short (default 60 seconds)
+- First deployments can take 2-5 minutes as Graph Node:
+  - Downloads all IPFS content
+  - Validates the subgraph manifest
+  - Creates database schemas
+  - Starts indexing from the start block
+
+**Check ALB Timeout:**
+```bash
+aws elbv2 describe-load-balancer-attributes \
+  --load-balancer-arn $(aws elbv2 describe-load-balancers \
+    --names alb-lumerin-graph-node-ext-use1 \
+    --profile titanio-dev \
+    --region us-east-1 \
+    --query 'LoadBalancers[0].LoadBalancerArn' \
+    --output text) \
+  --profile titanio-dev \
+  --region us-east-1 | jq '.Attributes[] | select(.Key | contains("timeout"))'
+```
+
+**Solution (Terraform):**
+```hcl
+# In 08_subgraph_indexer.tf
+resource "aws_alb" "graph_node_ext_use1" {
+  # ... other config
+  idle_timeout = 300  # 5 minutes for subgraph deployments
+}
+```
+
+**Manual Fix:**
+```bash
+aws elbv2 modify-load-balancer-attributes \
+  --load-balancer-arn $(aws elbv2 describe-load-balancers \
+    --names alb-lumerin-graph-node-ext-use1 \
+    --profile titanio-dev \
+    --region us-east-1 \
+    --query 'LoadBalancers[0].LoadBalancerArn' \
+    --output text) \
+  --attributes Key=idle_timeout.timeout_seconds,Value=300 \
+  --profile titanio-dev \
+  --region us-east-1
+```
+
+**Why 300 seconds?**
+- First deployment: 2-5 minutes (depends on contract history)
+- Subsequent deployments: 30-60 seconds (only new data)
+- 5 minutes provides comfortable buffer for both scenarios
+
+---
+
+### 6. Graph Node "Syncing" But Not Progressing
 
 **Symptoms:**
 ```
