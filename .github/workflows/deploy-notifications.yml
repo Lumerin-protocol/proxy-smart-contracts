@@ -72,7 +72,7 @@ jobs:
           case $ENV in
             dev)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
-              echo "ecs_cluster=bedrock-dev-use1-1" >> $GITHUB_OUTPUT
+              echo "ecs_cluster=ecs-lumerin-marketplace-dev-use1" >> $GITHUB_OUTPUT
               echo "ecs_service=svc-lumerin-notifications-dev-use1" >> $GITHUB_OUTPUT
               ;;
             test)
