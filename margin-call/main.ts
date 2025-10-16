@@ -1,4 +1,4 @@
-import viem from "viem";
+import * as viem from "viem";
 import pino from "pino";
 import { Subgraph } from "./gateway/subgraph";
 import { FuturesABI } from "./abi/Futures";
