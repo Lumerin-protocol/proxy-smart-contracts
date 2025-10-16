@@ -11,6 +11,12 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 import { HashrateOracle } from "./HashrateOracle.sol";
 // import { console } from "hardhat/console.sol";
 
+// TODO:
+// 1. Fix margin calculation before creating order/positions (use getCollateralDeficit)
+// 3. Write tests for offseting order/positions
+// 4. Add fees
+// 6. Do we need to batch same price and delivery date orders/positions so it is a single entry?
+
 contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.UintSet;
@@ -43,7 +49,6 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         uint256 deliveryDate; // date of delivery, when contract delivery is started
         bool isBuy; // true if long/buy position, false if short/sell position
         uint256 timestamp; // when position is opened
-        bytes32 offsetPositionId; // id of the position you want to offset, zero if no offset
     }
 
     struct Position {
@@ -64,19 +69,20 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     mapping(uint256 => mapping(uint256 => EnumerableSet.Bytes32Set)) private deliveryDatePriceOrdersShortIdIndex; // index of short positions by delivery date and price
     mapping(address => EnumerableSet.Bytes32Set) private participantPositionIdsIndex; // index of  positions by participant
     mapping(address => EnumerableSet.Bytes32Set) private participantOrderIdsIndex; // index of orders by participant
+    mapping(address => mapping(uint256 => EnumerableSet.Bytes32Set)) private participantDeliveryDatePositionIdsIndex; // index of positions by participant and delivery date
 
     event DeliveryDateAdded(uint256 deliveryDate);
     event OrderCreated(
-        bytes32 indexed orderId,
-        address indexed participant,
-        uint256 price,
-        uint256 deliveryDate,
-        bytes32 offsetPositionId,
-        bool isBuy
+        bytes32 indexed orderId, address indexed participant, uint256 price, uint256 deliveryDate, bool isBuy
     );
     event OrderClosed(bytes32 indexed orderId, address indexed participant);
     event PositionCreated(
-        bytes32 indexed positionId, address indexed seller, address indexed buyer, uint256 price, uint256 startTime
+        bytes32 indexed positionId,
+        address indexed seller,
+        address indexed buyer,
+        uint256 price,
+        uint256 startTime,
+        bytes32 orderId
     );
     event PositionClosed(bytes32 indexed positionId);
     event PositionDeliveryClosed(bytes32 indexed positionId, address indexed closedBy);
@@ -144,34 +150,19 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         return deliveryDates.at(_index);
     }
 
-    function createOrder(uint256 _price, uint256 _deliveryDate, bool _isBuy) public {
-        _createOrMatchOrder(_price, _deliveryDate, _isBuy, _msgSender(), bytes32(0));
+    function createOrder(uint256 _price, uint256 _deliveryDate, uint8 _qty, bool _isBuy) public {
+        _createOrMatchOrder(_price, _deliveryDate, _qty, _isBuy, _msgSender());
     }
 
-    function createOffsetOrder(bytes32 _offsetPositionId, uint256 _price) public {
-        Position memory position = positions[_offsetPositionId];
-        if (position.startTime == 0) {
-            revert PositionNotExists();
-        }
-        if (position.seller != _msgSender() && position.buyer != _msgSender()) {
-            revert OnlyPositionSellerOrBuyer();
-        }
-        bool isBuy = position.seller == _msgSender();
-        _createOrMatchOrder(_price, position.startTime, isBuy, position.seller, _offsetPositionId);
-    }
-
-    function _createOrMatchOrder(
-        uint256 _price,
-        uint256 _deliveryDate,
-        bool _isBuy,
-        address _participant,
-        bytes32 _offsetPositionId
-    ) private {
+    function _createOrMatchOrder(uint256 _price, uint256 _deliveryDate, uint8 _qty, bool _isBuy, address _participant)
+        private
+    {
         validatePrice(_price);
         validateDeliveryDate(_deliveryDate);
 
-        uint256 minMargin = calculateRequiredMargin(1, _isBuy);
-        if (minMargin > balanceOf(_participant)) {
+        uint256 marginNeeded = calculateRequiredMargin(_qty, _isBuy);
+        int256 collateralDeficit = getCollateralDeficit(_participant);
+        if (-collateralDeficit < int256(marginNeeded)) {
             revert InsufficientMarginBalance();
         }
 
@@ -186,87 +177,65 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             oppositeOrderIndexId = deliveryDatePriceOrdersLongIdIndex[_deliveryDate][_price];
             orderIndexId = deliveryDatePriceOrdersShortIdIndex[_deliveryDate][_price];
         }
+        for (uint8 i = 0; i < _qty; i++) {
+            _createOrMatchSingleOrder(orderIndexId, oppositeOrderIndexId, _participant, _price, _deliveryDate, _isBuy);
+        }
+    }
+
+    function _createOrMatchSingleOrder(
+        EnumerableSet.Bytes32Set storage orderIndexId,
+        EnumerableSet.Bytes32Set storage oppositeOrderIndexId,
+        address _participant,
+        uint256 _price,
+        uint256 _deliveryDate,
+        bool _isBuy
+    ) private {
+        //
+        // No matching order found
+        //
         if (oppositeOrderIndexId.length() == 0) {
             EnumerableSet.Bytes32Set storage participantOrders = participantOrderIdsIndex[_participant];
             if (participantOrders.length() >= MAX_ORDERS_PER_PARTICIPANT) {
                 revert MaxOrdersPerParticipantReached();
             }
-            bytes32 _orderId = _createOrder(_participant, _price, _deliveryDate, _isBuy, _offsetPositionId);
+            bytes32 _orderId = _createOrder(_participant, _price, _deliveryDate, _isBuy);
             orderIndexId.add(_orderId);
             participantOrders.add(_orderId);
             return;
         }
+
         //
         // found matching order
         //
-        bytes32 orderId = oppositeOrderIndexId.at(0);
-        Order memory order = orders[orderId];
+        bytes32 oppositeOrderId = oppositeOrderIndexId.at(0);
+        Order memory oppositeOrder = orders[oppositeOrderId];
 
-        address positionSeller;
-        address positionBuyer;
+        // delete matching order
+        _closeOrder(oppositeOrderId, oppositeOrder);
 
-        if (order.isBuy) {
-            if (_offsetPositionId == bytes32(0)) {
-                positionSeller = _participant;
-            } else {
-                positionSeller = positions[_offsetPositionId].seller;
-            }
-            if (order.offsetPositionId == bytes32(0)) {
-                positionBuyer = order.participant;
-            } else {
-                positionBuyer = positions[_offsetPositionId].buyer;
-            }
-        } else {
-            if (_offsetPositionId == bytes32(0)) {
-                positionBuyer = _participant;
-            } else {
-                Position memory offsetPosition = positions[_offsetPositionId];
-                positionBuyer = offsetPosition.buyer;
-                _removePosition(_offsetPositionId, offsetPosition.seller, offsetPosition.buyer);
-                emit PositionClosed(_offsetPositionId);
-            }
-            if (order.offsetPositionId == bytes32(0)) {
-                positionSeller = order.participant;
-            } else {
-                Position memory offsetPosition = positions[_offsetPositionId];
-                positionSeller = offsetPosition.seller;
-                _removePosition(_offsetPositionId, offsetPosition.seller, offsetPosition.buyer);
-                emit PositionClosed(_offsetPositionId);
-            }
-        }
-
-        // delete order
-        oppositeOrderIndexId.remove(orderId);
-        participantOrderIdsIndex[order.participant].remove(orderId);
-        orderIds.remove(orderId);
-        delete orders[orderId];
-
-        _createPosition(order, _participant);
+        // create new position
+        _createPosition(oppositeOrderId, oppositeOrder, _participant);
     }
 
-    function _createOrder(
-        address _participant,
-        uint256 _price,
-        uint256 _deliveryDate,
-        bool _isBuy,
-        bytes32 _offsetPositionId
-    ) private returns (bytes32) {
+    function _createOrder(address _participant, uint256 _price, uint256 _deliveryDate, bool _isBuy)
+        private
+        returns (bytes32)
+    {
         bytes32 orderId = keccak256(abi.encode(_participant, _price, _deliveryDate, _isBuy, block.timestamp, nonce++));
         orders[orderId] = Order({
             participant: _participant,
             price: _price,
             deliveryDate: _deliveryDate,
             isBuy: _isBuy,
-            timestamp: block.timestamp,
-            offsetPositionId: _offsetPositionId
+            timestamp: block.timestamp
         });
         orderIds.add(orderId);
 
-        emit OrderCreated(orderId, _participant, _price, _deliveryDate, _offsetPositionId, _isBuy);
+        emit OrderCreated(orderId, _participant, _price, _deliveryDate, _isBuy);
         return orderId;
     }
 
-    function _createPosition(Order memory order, address _otherParticipant) private {
+    function _createPosition(bytes32 orderId, Order memory order, address _otherParticipant) private {
         if (order.participant == _otherParticipant) {
             // TODO: check if this correct for buying your own order
             // if the order is already created by the participant, then do not create a position
@@ -277,7 +246,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             // not sure how to display this to the user
             return;
         }
-        // create order
+
+        // create position
         address seller;
         address buyer;
         if (order.isBuy) {
@@ -287,6 +257,28 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             buyer = _otherParticipant;
             seller = order.participant;
         }
+
+        EnumerableSet.Bytes32Set storage participantDeliveryDatePositionIds =
+            participantDeliveryDatePositionIdsIndex[order.participant][order.deliveryDate];
+        if (participantDeliveryDatePositionIds.length() > 0) {
+            bytes32 existingPositionId = participantDeliveryDatePositionIds.at(0);
+            Position memory existingPosition = positions[existingPositionId];
+
+            if (existingPosition.buyer == order.participant && !order.isBuy) {
+                seller = existingPosition.seller;
+                buyer = _otherParticipant;
+                _removePosition(existingPositionId, existingPosition.seller, existingPosition.buyer);
+                emit PositionClosed(existingPositionId);
+                participantDeliveryDatePositionIds.remove(existingPositionId);
+            } else if (existingPosition.seller == order.participant && order.isBuy) {
+                seller = _otherParticipant;
+                buyer = existingPosition.buyer;
+                _removePosition(existingPositionId, existingPosition.seller, existingPosition.buyer);
+                emit PositionClosed(existingPositionId);
+                participantDeliveryDatePositionIds.remove(existingPositionId);
+            }
+        }
+
         bytes32 positionId = keccak256(abi.encode(seller, buyer, order.price, order.deliveryDate, block.timestamp));
         positions[positionId] = Position({
             seller: seller,
@@ -298,7 +290,9 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         positionIds.add(positionId);
         participantPositionIdsIndex[seller].add(positionId);
         participantPositionIdsIndex[buyer].add(positionId);
-        emit PositionCreated(positionId, seller, buyer, order.price, order.deliveryDate);
+        participantDeliveryDatePositionIdsIndex[seller][order.deliveryDate].add(positionId);
+        participantDeliveryDatePositionIdsIndex[buyer][order.deliveryDate].add(positionId);
+        emit PositionCreated(positionId, seller, buyer, order.price, order.deliveryDate, orderId);
     }
 
     function closeOrder(bytes32 _orderId) public {
@@ -602,8 +596,11 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         return clamp(getMarginShortfall(_participant));
     }
 
+    /**
+     * @notice Returns how much participant needs to add to their collateral to cover the margin shortfall
+     */
     function getCollateralDeficit(address _participant) public view returns (int256) {
-        return int256(balanceOf(_participant)) - getMarginShortfall(_participant);
+        return getMarginShortfall(_participant) - int256(balanceOf(_participant));
     }
 
     function clamp(int256 _value) public pure returns (uint256) {

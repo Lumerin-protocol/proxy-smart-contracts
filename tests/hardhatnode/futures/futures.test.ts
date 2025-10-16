@@ -126,7 +126,7 @@ describe("Futures Contract", function () {
       const { seller, pc } = accounts;
 
       const price = parseUnits("100", 6); // $100
-      const margin = parseUnits("10000", 6);
+      const margin = parseUnits("100000", 6);
       const deliveryDate = BigInt(config.deliveryDates.date1);
       const isBuy = true;
 
@@ -134,7 +134,7 @@ describe("Futures Contract", function () {
         account: seller.account,
       });
 
-      const txHash = await futures.write.createOrder([price, deliveryDate, isBuy], {
+      const txHash = await futures.write.createOrder([price, deliveryDate, 1, isBuy], {
         account: seller.account,
       });
 
@@ -166,7 +166,7 @@ describe("Futures Contract", function () {
         account: seller.account,
       });
 
-      const txHash = await futures.write.createOrder([price, deliveryDate, isBuy], {
+      const txHash = await futures.write.createOrder([price, deliveryDate, 1, isBuy], {
         account: seller.account,
       });
 
@@ -194,7 +194,7 @@ describe("Futures Contract", function () {
       const isBuy = true;
 
       await catchError(futures.abi, "InvalidPrice", async () => {
-        await futures.write.createOrder([price, deliveryDate, isBuy], {
+        await futures.write.createOrder([price, deliveryDate, 1, isBuy], {
           account: seller.account,
         });
       });
@@ -210,7 +210,7 @@ describe("Futures Contract", function () {
       const isBuy = true;
 
       await catchError(futures.abi, "InvalidPrice", async () => {
-        await futures.write.createOrder([price, deliveryDate, isBuy], {
+        await futures.write.createOrder([price, deliveryDate, 1, isBuy], {
           account: seller.account,
         });
       });
@@ -227,7 +227,7 @@ describe("Futures Contract", function () {
       const isBuy = true;
 
       await catchError(futures.abi, "DeliveryDateShouldBeInTheFuture", async () => {
-        await futures.write.createOrder([price, pastDate, isBuy], {
+        await futures.write.createOrder([price, pastDate, 1, isBuy], {
           account: seller.account,
         });
       });
@@ -244,7 +244,7 @@ describe("Futures Contract", function () {
       const isBuy = true;
 
       await catchError(futures.abi, "DeliveryDateNotAvailable", async () => {
-        await futures.write.createOrder([price, unavailableDate, isBuy], {
+        await futures.write.createOrder([price, unavailableDate, 1, isBuy], {
           account: seller.account,
         });
       });
@@ -264,7 +264,7 @@ describe("Futures Contract", function () {
       expect(balance).to.equal(0n);
 
       await catchError(futures.abi, "InsufficientMarginBalance", async () => {
-        await futures.write.createOrder([price, deliveryDate, isBuy], {
+        await futures.write.createOrder([price, deliveryDate, 1, isBuy], {
           account: seller.account,
         });
       });
@@ -286,7 +286,7 @@ describe("Futures Contract", function () {
       });
 
       // Create order should succeed
-      const txHash = await futures.write.createOrder([price, deliveryDate, isBuy], {
+      const txHash = await futures.write.createOrder([price, deliveryDate, 1, isBuy], {
         account: seller.account,
       });
 
@@ -323,7 +323,7 @@ describe("Futures Contract", function () {
       expect(balance).to.equal(0n);
 
       await catchError(futures.abi, "InsufficientMarginBalance", async () => {
-        await futures.write.createOrder([price, deliveryDate, isBuy], {
+        await futures.write.createOrder([price, deliveryDate, 1, isBuy], {
           account: seller.account,
         });
       });
@@ -344,7 +344,7 @@ describe("Futures Contract", function () {
       });
 
       // Create position should succeed
-      const txHash = await futures.write.createOrder([price, deliveryDate, isBuy], {
+      const txHash = await futures.write.createOrder([price, deliveryDate, 1, isBuy], {
         account: seller.account,
       });
 
@@ -384,12 +384,12 @@ describe("Futures Contract", function () {
       });
 
       // Create sell order first
-      await futures.write.createOrder([price, deliveryDate, false], {
+      await futures.write.createOrder([price, deliveryDate, 1, false], {
         account: seller.account,
       });
 
       // Create matching long order
-      const txHash = await futures.write.createOrder([price, deliveryDate, true], {
+      const txHash = await futures.write.createOrder([price, deliveryDate, 1, true], {
         account: buyer.account,
       });
 
@@ -426,12 +426,12 @@ describe("Futures Contract", function () {
       });
 
       // Create buy order first
-      await futures.write.createOrder([price, deliveryDate, true], {
+      await futures.write.createOrder([price, deliveryDate, 1, true], {
         account: buyer.account,
       });
 
       // Create matching sell order
-      const txHash = await futures.write.createOrder([price, deliveryDate, false], {
+      const txHash = await futures.write.createOrder([price, deliveryDate, 1, false], {
         account: seller.account,
       });
 
@@ -462,12 +462,12 @@ describe("Futures Contract", function () {
       });
 
       // Create short order
-      await futures.write.createOrder([price, deliveryDate, false], {
+      await futures.write.createOrder([price, deliveryDate, 1, false], {
         account: seller.account,
       });
 
       // Create matching long order with same participant
-      const txHash = await futures.write.createOrder([price, deliveryDate, true], {
+      const txHash = await futures.write.createOrder([price, deliveryDate, 1, true], {
         account: seller.account,
       });
 
@@ -498,7 +498,7 @@ describe("Futures Contract", function () {
         account: seller.account,
       });
 
-      const createTxHash = await futures.write.createOrder([price, deliveryDate, true], {
+      const createTxHash = await futures.write.createOrder([price, deliveryDate, 1, true], {
         account: seller.account,
       });
 
@@ -540,7 +540,7 @@ describe("Futures Contract", function () {
         account: seller.account,
       });
 
-      const createTxHash = await futures.write.createOrder([price, deliveryDate, true], {
+      const createTxHash = await futures.write.createOrder([price, deliveryDate, 1, true], {
         account: seller.account,
       });
 
@@ -649,7 +649,7 @@ describe("Futures Contract", function () {
       });
 
       // Create order to require minimum margin
-      await futures.write.createOrder([price, deliveryDate, false], {
+      await futures.write.createOrder([price, deliveryDate, 1, false], {
         account: seller.account,
       });
 
@@ -679,7 +679,7 @@ describe("Futures Contract", function () {
       });
 
       // Create buy order
-      await futures.write.createOrder([price, date1, true], {
+      await futures.write.createOrder([price, date1, 1, true], {
         account: seller.account,
       });
 
@@ -687,7 +687,7 @@ describe("Futures Contract", function () {
       expect(minMargin > 0n).to.be.true;
 
       // Create a sell order
-      await futures.write.createOrder([price, date2, false], {
+      await futures.write.createOrder([price, date2, 1, false], {
         account: seller.account,
       });
 
@@ -713,10 +713,10 @@ describe("Futures Contract", function () {
       });
 
       // Create matching orders to form an position
-      await futures.write.createOrder([price, deliveryDate, false], {
+      await futures.write.createOrder([price, deliveryDate, 1, false], {
         account: seller.account,
       });
-      await futures.write.createOrder([price, deliveryDate, true], {
+      await futures.write.createOrder([price, deliveryDate, 1, true], {
         account: buyer.account,
       });
 
@@ -747,10 +747,10 @@ describe("Futures Contract", function () {
       });
 
       // Create matching orders to form an position
-      await futures.write.createOrder([price, deliveryDate, false], {
+      await futures.write.createOrder([price, deliveryDate, 1, false], {
         account: seller.account,
       });
-      const txHash = await futures.write.createOrder([price, deliveryDate, true], {
+      const txHash = await futures.write.createOrder([price, deliveryDate, 1, true], {
         account: buyer.account,
       });
 
@@ -788,10 +788,10 @@ describe("Futures Contract", function () {
       });
 
       // Create matching orders to form an position
-      await futures.write.createOrder([price, deliveryDate, false], {
+      await futures.write.createOrder([price, deliveryDate, 1, false], {
         account: seller.account,
       });
-      const txHash = await futures.write.createOrder([price, deliveryDate, true], {
+      const txHash = await futures.write.createOrder([price, deliveryDate, 1, true], {
         account: buyer.account,
       });
 
@@ -828,10 +828,10 @@ describe("Futures Contract", function () {
       await futures.write.addMargin([margin], {
         account: buyer.account,
       });
-      await futures.write.createOrder([price, deliveryDate, false], {
+      await futures.write.createOrder([price, deliveryDate, 1, false], {
         account: seller.account,
       });
-      const txHash = await futures.write.createOrder([price, deliveryDate, true], {
+      const txHash = await futures.write.createOrder([price, deliveryDate, 1, true], {
         account: buyer.account,
       });
 
@@ -850,6 +850,75 @@ describe("Futures Contract", function () {
           account: buyer2.account,
         });
       });
+    });
+
+    it.only("should handle exiting positions", async function () {
+      const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+      const { futures } = contracts;
+      const { seller, buyer, buyer2, pc } = accounts;
+
+      const price = parseUnits("100", 6);
+      const margin = parseUnits("10000", 6);
+      const deliveryDate = config.deliveryDates.date1;
+
+      // setup margin for all participants
+      await futures.write.addMargin([margin], { account: seller.account });
+      await futures.write.addMargin([margin], { account: buyer.account });
+      await futures.write.addMargin([margin], { account: buyer2.account });
+
+      // Create matching orders, to create position
+      await futures.write.createOrder([price, deliveryDate, 1, false], {
+        account: seller.account,
+      });
+      const txHash = await futures.write.createOrder([price, deliveryDate, 1, true], {
+        account: buyer.account,
+      });
+
+      const receipt = await pc.waitForTransactionReceipt({ hash: txHash });
+      const [createdEvent] = parseEventLogs({
+        logs: receipt.logs,
+        abi: futures.abi,
+        eventName: "PositionCreated",
+      });
+
+      // create another order, to exit position
+      const newPrice = price * 2n;
+      const createOrderTxHash = await futures.write.createOrder(
+        [newPrice, deliveryDate, 1, false],
+        { account: buyer.account }
+      );
+      const createOrderReceipt = await pc.waitForTransactionReceipt({ hash: createOrderTxHash });
+      const [order2CreatedEvent] = parseEventLogs({
+        logs: createOrderReceipt.logs,
+        abi: futures.abi,
+        eventName: "OrderCreated",
+      });
+      // match order by buyer2 thus exiting position for buyer
+      const txHash2 = await futures.write.createOrder([newPrice, deliveryDate, 1, true], {
+        account: buyer2.account,
+      });
+
+      const receipt2 = await pc.waitForTransactionReceipt({ hash: txHash2 });
+
+      // old position closed event
+      const [closedEvent] = parseEventLogs({
+        logs: receipt2.logs,
+        abi: futures.abi,
+        eventName: "PositionClosed",
+      });
+      expect(closedEvent.args.positionId).to.equal(createdEvent.args.positionId);
+
+      // new position created event
+      const [createdEvent2] = parseEventLogs({
+        logs: receipt2.logs,
+        abi: futures.abi,
+        eventName: "PositionCreated",
+      });
+      expect(createdEvent2.args.seller).to.equal(getAddress(seller.account.address));
+      expect(createdEvent2.args.buyer).to.equal(getAddress(buyer2.account.address));
+      expect(createdEvent2.args.price).to.equal(newPrice);
+      expect(createdEvent2.args.startTime).to.equal(deliveryDate);
+      expect(createdEvent2.args.orderId).to.equal(order2CreatedEvent.args.orderId);
     });
   });
 
@@ -872,10 +941,10 @@ describe("Futures Contract", function () {
       });
 
       // Create matching orders to form a position
-      await futures.write.createOrder([price, deliveryDate, false], {
+      await futures.write.createOrder([price, deliveryDate, 1, false], {
         account: seller.account,
       });
-      const txHash = await futures.write.createOrder([price, deliveryDate, true], {
+      const txHash = await futures.write.createOrder([price, deliveryDate, 1, true], {
         account: buyer.account,
       });
 
@@ -922,10 +991,10 @@ describe("Futures Contract", function () {
       await futures.write.addMargin([margin], {
         account: buyer.account,
       });
-      await futures.write.createOrder([price, deliveryDate, false], {
+      await futures.write.createOrder([price, deliveryDate, 1, false], {
         account: seller.account,
       });
-      const txHash = await futures.write.createOrder([price, deliveryDate, true], {
+      const txHash = await futures.write.createOrder([price, deliveryDate, 1, true], {
         account: buyer.account,
       });
 
@@ -962,10 +1031,10 @@ describe("Futures Contract", function () {
       await futures.write.addMargin([margin], {
         account: buyer.account,
       });
-      await futures.write.createOrder([price, deliveryDate, false], {
+      await futures.write.createOrder([price, deliveryDate, 1, false], {
         account: seller.account,
       });
-      const txHash = await futures.write.createOrder([price, deliveryDate, true], {
+      const txHash = await futures.write.createOrder([price, deliveryDate, 1, true], {
         account: buyer.account,
       });
 
@@ -1005,7 +1074,7 @@ describe("Futures Contract", function () {
       });
 
       // Create order that requires more margin
-      const tx = await futures.write.createOrder([price, deliveryDate, true], {
+      const tx = await futures.write.createOrder([price, deliveryDate, 1, true], {
         account: seller.account,
       });
       const rec = await pc.waitForTransactionReceipt({ hash: tx });
@@ -1053,7 +1122,7 @@ describe("Futures Contract", function () {
       await futures.write.addMargin([margin], {
         account: seller.account,
       });
-      await futures.write.createOrder([price, deliveryDate, true], {
+      await futures.write.createOrder([price, deliveryDate, 1, true], {
         account: seller.account,
       });
 
@@ -1085,7 +1154,7 @@ describe("Futures Contract", function () {
       // Create maximum number of positions (50)
       for (let i = 0; i < numOrders; i++) {
         await futures.write.createOrder(
-          [price + BigInt(i) * config.priceLadderStep, deliveryDate, true],
+          [price + BigInt(i) * config.priceLadderStep, deliveryDate, 1, true],
           { account: seller.account }
         );
       }
@@ -1093,7 +1162,7 @@ describe("Futures Contract", function () {
       // Try to create one more position
       await catchError(futures.abi, "MaxOrdersPerParticipantReached", async () => {
         await futures.write.createOrder(
-          [price + 50n * config.priceLadderStep, deliveryDate, true],
+          [price + 50n * config.priceLadderStep, deliveryDate, 1, true],
           { account: seller.account }
         );
       });
@@ -1115,10 +1184,10 @@ describe("Futures Contract", function () {
       await futures.write.addMargin([margin], {
         account: buyer.account,
       });
-      await futures.write.createOrder([price, deliveryDate, false], {
+      await futures.write.createOrder([price, deliveryDate, 1, false], {
         account: seller.account,
       });
-      const txHash = await futures.write.createOrder([price, deliveryDate, true], {
+      const txHash = await futures.write.createOrder([price, deliveryDate, 1, true], {
         account: buyer.account,
       });
 

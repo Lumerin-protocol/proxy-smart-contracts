@@ -32,10 +32,10 @@ describe("Futures Delivery", () => {
     logBalance(buyer, "buyer");
 
     // Create matching orders to form a position
-    await futures.write.createOrder([price, deliveryDate, false], {
+    await futures.write.createOrder([price, deliveryDate, 1, false], {
       account: seller.account,
     });
-    const txHash = await futures.write.createOrder([price, deliveryDate, true], {
+    const txHash = await futures.write.createOrder([price, deliveryDate, 1, true], {
       account: buyer.account,
     });
 
