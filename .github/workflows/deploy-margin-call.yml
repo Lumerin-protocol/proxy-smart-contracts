@@ -118,36 +118,31 @@ jobs:
           echo "📦 Installing dependencies..."
           yarn install --frozen-lockfile
 
-      - name: Build TypeScript
-        working-directory: ./margin-call
-        run: |
-          echo "🔨 Building TypeScript..."
-          yarn build || npx tsc
-
       - name: Create deployment package
         working-directory: ./margin-call
         run: |
-          echo "📦 Creating Lambda deployment package..."
+          echo "📦 Creating Lambda deployment package (TypeScript source - no build)..."
           
           mkdir -p dist/package
           
-          if [ -d "dist" ]; then
-            cp -r dist/*.js dist/package/ 2>/dev/null || true
-          fi
+          # Copy all TypeScript source files
+          cp *.ts dist/package/ 2>/dev/null || true
           
-          if [ ! -f "dist/package/main.js" ]; then
-            cp *.ts dist/package/ 2>/dev/null || true
-          fi
-          
+          # Copy package files
           cp package.json dist/package/
-          cp yarn.lock dist/package/ 2>/dev/null || cp package-lock.json dist/package/ 2>/dev/null || true
+          cp yarn.lock dist/package/ 2>/dev/null || true
           
-          mkdir -p dist/package/abi
-          cp -r abi/* dist/package/abi/ 2>/dev/null || true
+          # Copy ABI files if they exist
+          if [ -d "abi" ]; then
+            mkdir -p dist/package/abi
+            cp -r abi/* dist/package/abi/
+          fi
           
+          # Install production dependencies (including TypeScript runtime dependencies)
           cd dist/package
-          yarn install --production --frozen-lockfile || npm ci --production
+          yarn install --production --frozen-lockfile
           
+          # Create the Lambda package
           cd ..
           zip -r ../margin-call-lambda.zip package/*
           
