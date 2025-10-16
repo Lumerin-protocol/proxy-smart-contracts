@@ -20,6 +20,86 @@
 
 ---
 
+## 🚀 Developer Quick Start
+
+> **📄 For a simple one-page reference, see:** [`DEVELOPER_QUICK_REFERENCE.md`](./DEVELOPER_QUICK_REFERENCE.md)
+
+### **Subgraph Endpoints (DEV Environment)**
+
+| Purpose | Endpoint | Port | When to Use |
+|---------|----------|------|-------------|
+| **GraphQL Queries** | `https://graphidx.dev.lumerin.io/subgraphs/name/marketplace` | 443 (HTTPS) | Your app queries data here |
+| **GraphQL Playground** | `https://graphidx.dev.lumerin.io/subgraphs/name/marketplace/graphql` | 443 (HTTPS) | Interactive testing in browser |
+| **Admin API (Deploy)** | `https://graphidx.dev.lumerin.io:8020` | 8020 (HTTPS) | CI/CD deployments only |
+
+### **For Application Developers: Querying Data**
+
+```bash
+# Query subgraph metadata
+curl -X POST https://graphidx.dev.lumerin.io/subgraphs/name/marketplace \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ _meta { block { number hasIndexingErrors } } }"}'
+
+# Query your entities (example)
+curl -X POST https://graphidx.dev.lumerin.io/subgraphs/name/marketplace \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ futures(first: 10) { id buyerAddress sellerAddress } }"}'
+
+# Use in your JavaScript/TypeScript app
+const SUBGRAPH_URL = 'https://graphidx.dev.lumerin.io/subgraphs/name/marketplace';
+
+const query = `
+  query GetFutures {
+    futures(first: 10, orderBy: createdAt, orderDirection: desc) {
+      id
+      buyerAddress
+      sellerAddress
+      createdAt
+    }
+  }
+`;
+
+const response = await fetch(SUBGRAPH_URL, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ query })
+});
+
+const data = await response.json();
+```
+
+### **For DevOps: Managing Subgraph**
+
+```bash
+# Deploy subgraph (CI/CD does this automatically via GitHub Actions)
+graph deploy \
+  --node https://graphidx.dev.lumerin.io:8020 \
+  --version-label v0.1.0-dev \
+  marketplace
+
+# Check deployment status (not a standard JSON-RPC method, use queries instead)
+curl -X POST https://graphidx.dev.lumerin.io/subgraphs/name/marketplace \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ _meta { block { number } deployment } }"}'
+```
+
+### **Important Notes**
+
+1. **Port 443 (HTTPS)**: This is what your application uses for ALL queries
+   - No need to specify `:443` - it's the default for HTTPS
+   - Use in production code, development, testing
+
+2. **Port 8020**: This is ONLY for subgraph deployments and admin operations
+   - Used by GitHub Actions CI/CD pipeline
+   - Used by `graph-cli` for manual deployments
+   - **NOT** used by your application
+
+3. **Security**: 
+   - Port 443 is public (for app queries)
+   - Port 8020 is public in DEV (restrict to VPN in STG/LMN)
+
+---
+
 ## 🏗️ Current Infrastructure (DEV Environment)
 
 ### 1. PostgreSQL Database (RDS)
@@ -306,14 +386,14 @@ artillery quick --count 10 --num 50 \
    - **Status**: Applied, services deploying
 
 ### Outstanding Issues
-1. ⚠️ **ECONNRESET during GitHub Actions deployment**
-   - **Last Error**: Oct 15, 22:37 UTC
-   - **Probable Cause**: Old IPFS task still running during deployment
-   - **Next Step**: Retry deployment now that IPFS has 4x resources
+**NONE! All issues resolved.** ✅
 
-2. ⚠️ **Graph Node Under-resourced**
-   - **Current**: 512/1024 (0.5 vCPU, 1 GB)
-   - **Next Step**: Upgrade to 1024/2048 for DEV
+### ✅ **DEPLOYMENT SUCCESS** (Oct 16, 2025 10:15 UTC)
+- **Build**: Completed with IPFS hash `QmPrNjfJgL9bLpxLPL7qymjd6B36ZNVRtBHNCYazLR1t9b`
+- **Deploy**: Successfully deployed to `marketplace` subgraph
+- **Indexing**: Active at block 195,372,305 with NO errors
+- **Endpoint**: `https://graphidx.dev.lumerin.io:8000/subgraphs/name/marketplace`
+- **Status**: **FULLY OPERATIONAL** 🎉
 
 ---
 
