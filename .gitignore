@@ -22,3 +22,6 @@ node_modules
 
 # tests
 /test-temp
+
+# hide any .internal.md files (LOcal AI discussion notes)
+*.internal.md

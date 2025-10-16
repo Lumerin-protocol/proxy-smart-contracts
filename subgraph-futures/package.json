@@ -15,13 +15,13 @@
     "indexer": "docker-compose up"
   },
   "dependencies": {
-    "@graphprotocol/graph-cli": "0.97.1",
     "@graphprotocol/graph-ts": "0.37.0",
     "graphql": "^16.11.0",
     "graphql-request": "^7.2.0",
     "viem": "^2.37.9"
   },
   "devDependencies": {
+    "@graphprotocol/graph-cli": "^0.98.1",
     "matchstick-as": "0.6.0",
     "mustache": "^4.2.0"
   }
