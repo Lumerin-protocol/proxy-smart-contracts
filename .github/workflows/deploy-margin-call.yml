@@ -125,8 +125,16 @@ jobs:
           
           mkdir -p dist/package
           
-          # Copy all TypeScript source files
+          # Copy all TypeScript source files and directories
           cp *.ts dist/package/ 2>/dev/null || true
+          
+          # Copy source directories (gateway, config, etc.)
+          for dir in gateway config; do
+            if [ -d "$dir" ]; then
+              mkdir -p dist/package/$dir
+              cp -r $dir/* dist/package/$dir/
+            fi
+          done
           
           # Copy and modify package.json to set type: "module" for ES modules
           cp package.json dist/package/
