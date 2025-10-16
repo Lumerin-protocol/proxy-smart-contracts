@@ -1,7 +1,7 @@
 {
   "name": "margin-call",
   "engines": {
-    "node": "22.20"
+    "node": ">=22.0.0"
   },
   "scripts": {
     "copy-abi": "cp ../abi/Futures.json abi/Futures.json",
