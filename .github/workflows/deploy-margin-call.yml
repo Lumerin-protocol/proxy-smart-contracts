@@ -118,55 +118,25 @@ jobs:
           echo "📦 Installing dependencies..."
           yarn install --frozen-lockfile
 
-      - name: Create deployment package
+      - name: Build Lambda package
         working-directory: ./margin-call
         run: |
-          echo "📦 Creating Lambda deployment package (TypeScript source - no build)..."
+          echo "📦 Building Lambda deployment package with esbuild..."
           
-          mkdir -p dist/package
+          # Install all dependencies (including devDependencies for build)
+          yarn install --frozen-lockfile
           
-          # Copy all TypeScript source files and directories
-          cp *.ts dist/package/ 2>/dev/null || true
+          # Run esbuild to bundle everything
+          yarn build
           
-          # Copy source directories (gateway, config, etc.)
-          for dir in gateway config; do
-            if [ -d "$dir" ]; then
-              mkdir -p dist/package/$dir
-              cp -r $dir/* dist/package/$dir/
-            fi
-          done
+          # Copy production dependencies for runtime
+          mkdir -p dist/node_modules
+          cp -r node_modules/ajv-formats dist/node_modules/
           
-          # Copy package files as-is (keep Shev's original config)
-          cp package.json dist/package/
-          cp yarn.lock dist/package/ 2>/dev/null || true
-          
-          # Copy ABI files if they exist
-          if [ -d "abi" ]; then
-            mkdir -p dist/package/abi
-            cp -r abi/* dist/package/abi/
-          fi
-          
-          # Create simple JS wrapper that uses tsx to execute TypeScript
-          # This mimics how Shev runs it locally without code changes
-          cat > dist/package/index.js << 'EOF'
-          // Simple wrapper to execute TypeScript using tsx
-          // This matches Shev's local environment
-          const { register } = require('tsx/cjs/api');
-          const unregister = register();
-          const { handler } = require('./main.ts');
-          module.exports = { handler };
-          EOF
-          
-          echo "✅ Created tsx wrapper for TypeScript execution"
-          
-          # Install production dependencies + tsx for TypeScript execution + ajv-formats for URI validation
-          cd dist/package
-          yarn add tsx ajv-formats --production
-          yarn install --production --frozen-lockfile
-          
-          # Create the Lambda package (zip from inside package dir to avoid nested structure)
-          zip -r ../../margin-call-lambda.zip .
-          cd ../..
+          # Create the Lambda package
+          cd dist
+          zip -r ../margin-call-lambda.zip .
+          cd ..
           
           echo "✅ Package created: margin-call-lambda.zip"
           ls -lh margin-call-lambda.zip
