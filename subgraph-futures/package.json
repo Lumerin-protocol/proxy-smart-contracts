@@ -22,6 +22,7 @@
     "viem": "^2.37.9"
   },
   "devDependencies": {
+    "@graphprotocol/graph-cli": "^0.98.1",
     "matchstick-as": "0.6.0",
     "mustache": "^4.2.0"
   }
