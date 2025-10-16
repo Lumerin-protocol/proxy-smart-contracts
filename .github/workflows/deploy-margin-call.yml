@@ -143,8 +143,11 @@ jobs:
           cat > dist/package/index.mjs << 'EOF'
           // Lambda entry point that loads TypeScript file
           // NODE_OPTIONS=--experimental-strip-types enables TS support
-          import { handler as tsHandler } from './main.ts';
-          export const handler = tsHandler;
+          export const handler = async (event, context) => {
+            // Dynamic import to handle TypeScript ES module exports properly
+            const mainModule = await import('./main.ts');
+            return await mainModule.handler(event, context);
+          };
           EOF
           
           echo "✅ Created index.mjs wrapper for TypeScript support"
