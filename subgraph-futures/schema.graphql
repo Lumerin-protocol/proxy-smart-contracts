@@ -58,7 +58,6 @@ type Order @entity(immutable: false) {
   deliveryDate: BigInt!
   isBuy: Boolean!
   timestamp: BigInt!
-  offsetPositionId: Bytes!
   blockNumber: BigInt!
   transactionHash: Bytes!
 
@@ -77,6 +76,7 @@ type Position @entity(immutable: false) {
   timestamp: BigInt!
   blockNumber: BigInt!
   transactionHash: Bytes!
+  orderId: Bytes!
 
   # Status
   isActive: Boolean!

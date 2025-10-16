@@ -6,7 +6,7 @@
   },
   "arbitrum-sepolia": {
     "Futures": {
-      "address": "0x34bedcf9a8510a8ffb068afcdd78f85f0af14994"
+      "address": "0x74e3ab04fad3ba6534125f7aeae698a9cf94b4f5"
     },
     "HashrateOracle": {
       "address": "0x6f736186d2c93913721e2570c283dff2a08575e9"

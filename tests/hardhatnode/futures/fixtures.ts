@@ -110,16 +110,16 @@ export async function deployOnlyFuturesWithDummyData(
   // create positions
   let d = config.deliveryDates.date1;
   // sell positions
-  await futures.write.createOrder([parseUnits("160", 6), d, false], { account: seller.account });
-  await futures.write.createOrder([parseUnits("155", 6), d, false], { account: seller.account });
-  await futures.write.createOrder([parseUnits("150", 6), d, false], { account: seller.account });
+  await futures.write.createOrder([parseUnits("160", 6), d, 1, false], { account: seller.account });
+  await futures.write.createOrder([parseUnits("155", 6), d, 1, false], { account: seller.account });
+  await futures.write.createOrder([parseUnits("150", 6), d, 1, false], { account: seller.account });
 
   // buy positions
-  await futures.write.createOrder([parseUnits("140", 6), d, true], { account: buyer.account });
-  await futures.write.createOrder([parseUnits("135", 6), d, true], { account: buyer.account });
-  await futures.write.createOrder([parseUnits("130", 6), d, true], { account: buyer.account });
+  await futures.write.createOrder([parseUnits("140", 6), d, 1, true], { account: buyer.account });
+  await futures.write.createOrder([parseUnits("135", 6), d, 1, true], { account: buyer.account });
+  await futures.write.createOrder([parseUnits("130", 6), d, 1, true], { account: buyer.account });
 
   // matched position => order
-  await futures.write.createOrder([parseUnits("150", 6), d, true], { account: buyer.account });
+  await futures.write.createOrder([parseUnits("150", 6), d, 1, true], { account: buyer.account });
   return _data;
 }
