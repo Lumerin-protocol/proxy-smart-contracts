@@ -138,6 +138,17 @@ jobs:
             cp -r abi/* dist/package/abi/
           fi
           
+          # Create JavaScript wrapper for TypeScript entry point
+          # This is needed because AWS Lambda's Node.js 22 runtime doesn't fully support --experimental-strip-types
+          cat > dist/package/index.mjs << 'EOF'
+          // Lambda entry point that loads TypeScript file
+          // NODE_OPTIONS=--experimental-strip-types enables TS support
+          import { handler as tsHandler } from './main.ts';
+          export const handler = tsHandler;
+          EOF
+          
+          echo "✅ Created index.mjs wrapper for TypeScript support"
+          
           # Install production dependencies (including TypeScript runtime dependencies)
           cd dist/package
           yarn install --production --frozen-lockfile
