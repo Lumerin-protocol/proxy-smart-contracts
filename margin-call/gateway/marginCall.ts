@@ -1,10 +1,10 @@
 import pino from "pino";
-import viem, { encodeFunctionData } from "viem";
+import * as viem from "viem";
+import { encodeFunctionData } from "viem";
 import { Multicall3ABI } from "../abi/Multicall3";
 import { FuturesABI } from "../abi/Futures";
 import { config } from "../config/env";
-import { writeContract } from "viem/_types/actions/wallet/writeContract";
-import { waitForTransactionReceipt } from "viem/actions";
+import { writeContract, waitForTransactionReceipt } from "viem/actions";
 import { DeficitEntry } from "./deficitEntry";
 
 export async function executeMarginCalls(

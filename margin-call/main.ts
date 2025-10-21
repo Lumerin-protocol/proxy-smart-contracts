@@ -1,4 +1,4 @@
-import viem from "viem";
+import * as viem from "viem";
 import pino from "pino";
 import { Subgraph } from "./gateway/subgraph";
 import { FuturesABI } from "./abi/Futures";
@@ -67,4 +67,24 @@ async function main() {
   await executeMarginCalls(addressesForMarginCall, ethClient, log);
 }
 
-main();
+// Lambda handler export
+export const handler = async (event: any, context: any) => {
+  try {
+    await main();
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ message: 'Margin call check completed successfully' })
+    };
+  } catch (error) {
+    console.error('Error in margin call handler:', error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'Margin call check failed', details: error instanceof Error ? error.message : String(error) })
+    };
+  }
+};
+
+// For local testing
+if (require.main === module) {
+  main();
+}
