@@ -150,6 +150,72 @@ describe("Futures Contract", function () {
       expect(event.args.isBuy).to.equal(isBuy);
     });
 
+    it("should collect order fee", async function () {
+      const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+      const { futures, usdcMock } = contracts;
+      const { seller, owner, pc } = accounts;
+
+      const price = parseUnits("100", 6);
+      const margin = parseUnits("10000", 6);
+      const deliveryDate = config.deliveryDates.date1;
+      const isBuy = true;
+
+      // Add margin first
+      await futures.write.addMargin([margin], {
+        account: seller.account,
+      });
+
+      // Get initial balances
+      const initialSellerBalance = await futures.read.balanceOf([seller.account.address]);
+      const initialContractBalance = await futures.read.balanceOf([futures.address]);
+      const initialOwnerUsdcBalance = await usdcMock.read.balanceOf([owner.account.address]);
+
+      // Create order - this should collect the order fee
+      const txHash = await futures.write.createOrder([price, deliveryDate, 1, isBuy], {
+        account: seller.account,
+      });
+
+      const receipt = await pc.waitForTransactionReceipt({ hash: txHash });
+      expect(receipt.status).to.equal("success");
+
+      // Verify order fee was deducted from seller's balance
+      const finalSellerBalance = await futures.read.balanceOf([seller.account.address]);
+      expect(finalSellerBalance).to.equal(initialSellerBalance - config.orderFee);
+
+      // Verify order fee was added to contract's balance
+      const finalContractBalance = await futures.read.balanceOf([futures.address]);
+      expect(finalContractBalance).to.equal(initialContractBalance + config.orderFee);
+
+      // Verify order was created successfully
+      const [event] = parseEventLogs({
+        logs: receipt.logs,
+        abi: futures.abi,
+        eventName: "OrderCreated",
+      });
+
+      expect(event.args.orderId).to.not.be.undefined;
+      expect(getAddress(event.args.participant)).to.equal(getAddress(seller.account.address));
+      expect(event.args.price).to.equal(price);
+      expect(event.args.deliveryDate).to.equal(deliveryDate);
+      expect(event.args.isBuy).to.equal(isBuy);
+
+      // Test fee withdrawal by owner
+      const withdrawTxHash = await futures.write.withdrawFees({
+        account: owner.account,
+      });
+
+      const withdrawReceipt = await pc.waitForTransactionReceipt({ hash: withdrawTxHash });
+      expect(withdrawReceipt.status).to.equal("success");
+
+      // Verify fees were withdrawn to owner
+      const finalOwnerUsdcBalance = await usdcMock.read.balanceOf([owner.account.address]);
+      expect(finalOwnerUsdcBalance).to.equal(initialOwnerUsdcBalance + config.orderFee);
+
+      // Verify contract balance is now zero after withdrawal
+      const contractBalanceAfterWithdrawal = await futures.read.balanceOf([futures.address]);
+      expect(contractBalanceAfterWithdrawal).to.equal(0n);
+    });
+
     it("should create a sell order when no matching buy order exists", async function () {
       const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
       const { seller, pc } = accounts;
