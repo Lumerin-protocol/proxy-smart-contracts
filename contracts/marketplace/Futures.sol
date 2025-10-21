@@ -27,8 +27,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     uint256 private constant MAX_BREACH_PENALTY_RATE_PER_DAY = 5 * 10 ** (BREACH_PENALTY_DECIMALS - 2); // 5%
     uint8 public constant MAX_ORDERS_PER_PARTICIPANT = 50;
 
-    uint8 public sellerLiquidationMarginPercent;
-    uint8 public buyerLiquidationMarginPercent;
+    uint8 public liquidationMarginPercent;
 
     IERC20 public token;
     HashrateOracle public hashrateOracle;
@@ -39,6 +38,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     uint256 public speedHps; // speed of the one unit of futures in hashes/second, constant for all positions //TODO: consider making it constant
     uint32 public deliveryDurationSeconds; // 30 days, constant for all orders //TODO: let's make them weeklies
     uint256 public priceLadderStep; // minimum price increment
+    uint256 public orderFee; // fee for creating an order in tokens
 
     uint256 private nonce = 0;
     uint8 private _decimals;
@@ -109,11 +109,11 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         IERC20Metadata _token,
         HashrateOracle _hashrateOracle,
         address _validatorAddress,
-        uint8 _sellerLiquidationMarginPercent,
-        uint8 _buyerLiquidationMarginPercent,
+        uint8 _liquidationMarginPercent,
         uint256 _speedHps,
         uint32 _deliveryDurationSeconds,
-        uint256 _priceLadderStep
+        uint256 _priceLadderStep,
+        uint256 _orderFee
     ) public initializer {
         __Ownable_init(_msgSender());
         __UUPSUpgradeable_init();
@@ -122,12 +122,12 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         token = _token;
         hashrateOracle = _hashrateOracle;
         validatorAddress = _validatorAddress;
-        sellerLiquidationMarginPercent = _sellerLiquidationMarginPercent;
-        buyerLiquidationMarginPercent = _buyerLiquidationMarginPercent;
+        liquidationMarginPercent = _liquidationMarginPercent;
         speedHps = _speedHps;
         deliveryDurationSeconds = _deliveryDurationSeconds; // 30 days
         breachPenaltyRatePerDay = 1 * 10 ** (BREACH_PENALTY_DECIMALS - 2); // 1%
         priceLadderStep = _priceLadderStep;
+        orderFee = _orderFee;
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
@@ -153,17 +153,11 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
 
     // TODO: use int8 qty, positive you're buying, negative you're selling
     function createOrder(uint256 _price, uint256 _deliveryDate, uint8 _qty, bool _isBuy) public {
-        _createOrMatchOrder(_price, _deliveryDate, _qty, _isBuy, _msgSender());
-    }
-
-    function _createOrMatchOrder(uint256 _price, uint256 _deliveryDate, uint8 _qty, bool _isBuy, address _participant)
-        private
-    {
         validatePrice(_price);
         validateDeliveryDate(_deliveryDate);
 
-        uint256 marginNeeded = calculateRequiredMargin(_qty, _isBuy);
-        int256 collateralDeficit = getCollateralDeficit(_participant);
+        uint256 marginNeeded = calculateRequiredMargin(_qty);
+        int256 collateralDeficit = getCollateralDeficit(_msgSender());
         if (-collateralDeficit < int256(marginNeeded)) {
             revert InsufficientMarginBalance();
         }
@@ -180,8 +174,11 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             orderIndexId = deliveryDatePriceOrdersShortIdIndex[_deliveryDate][_price];
         }
         for (uint8 i = 0; i < _qty; i++) {
-            _createOrMatchSingleOrder(orderIndexId, oppositeOrderIndexId, _participant, _price, _deliveryDate, _isBuy);
+            _createOrMatchSingleOrder(orderIndexId, oppositeOrderIndexId, _msgSender(), _price, _deliveryDate, _isBuy);
         }
+
+        // order fee
+        _update(_msgSender(), address(this), orderFee);
     }
 
     function _createOrMatchSingleOrder(
@@ -324,13 +321,25 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     }
 
     function addMargin(uint256 _amount) public {
-        token.safeTransferFrom(_msgSender(), address(this), _amount);
         _mint(_msgSender(), _amount);
+        token.safeTransferFrom(_msgSender(), address(this), _amount);
     }
 
     function removeMargin(uint256 _amount) public enoughMarginBalance(_msgSender(), _amount) {
         _burn(_msgSender(), _amount);
         token.safeTransfer(_msgSender(), _amount);
+    }
+
+    function withdrawFees() public onlyOwner {
+        uint256 balance = balanceOf(address(this));
+        if (balance > 0) {
+            _burn(address(this), balance);
+            token.safeTransfer(owner(), balance);
+        }
+    }
+
+    function setOrderFee(uint256 _orderFee) public onlyOwner {
+        orderFee = _orderFee;
     }
 
     /**
@@ -339,78 +348,49 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
      * @return The minimum margin required to keep the participant's positions and orders open
      */
     function getMarginShortfall(address _participant) public view returns (int256) {
-        uint256 sellQ = 0;
-        uint256 buyQ = 0;
+        uint256 qty = 0;
         int256 marginShortfall = 0;
 
         // calculate orders
         EnumerableSet.Bytes32Set storage _orders = participantOrderIdsIndex[_participant];
-        for (uint256 i = 0; i < _orders.length(); i++) {
-            bytes32 orderId = _orders.at(i);
-            Order memory order = orders[orderId];
-            if (order.isBuy) {
-                buyQ++;
-            } else {
-                sellQ++;
-            }
-        }
+        qty = _orders.length();
 
         //TODO: check if ok to use market price for orders, or should we use price of the order
-        marginShortfall += int256(calculateRequiredMargin(sellQ, false));
-        marginShortfall += int256(calculateRequiredMargin(buyQ, true));
+        marginShortfall += int256(calculateRequiredMargin(qty));
 
         // calculate positions
         int256 positionMarginBalance = 0;
-        buyQ = 0;
-        sellQ = 0;
+        qty = 0;
         EnumerableSet.Bytes32Set storage _positions = participantPositionIdsIndex[_participant];
         for (uint256 i = 0; i < _positions.length(); i++) {
             bytes32 positionId = _positions.at(i);
             Position memory position = positions[positionId];
-            bool isBuy = position.buyer == _participant;
-            positionMarginBalance += getMarginBalance(position, isBuy);
-            if (isBuy) {
-                buyQ++;
-            } else {
-                sellQ++;
-            }
+            positionMarginBalance += getMarginBalance(position);
+            qty++;
         }
 
-        uint256 maintenanceMargin = getMaintenanceMargin(sellQ, false) + getMaintenanceMargin(buyQ, true);
+        uint256 maintenanceMargin = getMaintenanceMargin(qty);
         int256 positionsMarginShortfall = int256(maintenanceMargin) - positionMarginBalance;
 
         return marginShortfall + positionsMarginShortfall;
     }
 
-    function getMarginShortfallForPosition(Position memory position, bool _isBuy) public view returns (int256) {
-        int256 marginBalance = getMarginBalance(position, _isBuy);
-        return int256(getMaintenanceMargin(1, _isBuy)) - marginBalance;
+    function getMarginShortfallForPosition(Position memory position) public view returns (int256) {
+        int256 marginBalance = getMarginBalance(position);
+        return int256(getMaintenanceMargin(1)) - marginBalance;
     }
 
-    // function calculateRequiredMargin(uint256 _sellHps, uint256 _buyHps) public view returns (uint256) {
-    //     // getHashesforToken is never returning 0;
-    //     uint256 hashesForToken = hashrateOracle.getHashesforToken();
-    //     uint256 requiredMargin = (_sellHps * getMarginPercent(false) + _buyHps * getMarginPercent(true))
-    //         * deliveryDurationSeconds / hashesForToken / 100;
-    //     return requiredMargin;
-    // }
-
-    // function calculateRequiredMarginV2(uint256 _hps, bool _isBuy) public view returns (uint256) {
-    //     return _hps * getMarginPercent(_isBuy) * deliveryDurationSeconds / 100 / hashrateOracle.getHashesforToken();
-    // }
-
-    function calculateRequiredMargin(uint256 _quantity, bool _isBuy) public view returns (uint256) {
-        return _quantity * speedHps * deliveryDurationSeconds * getMarginPercent(_isBuy) / 100
+    function calculateRequiredMargin(uint256 _quantity) public view returns (uint256) {
+        return _quantity * speedHps * deliveryDurationSeconds * getMarginPercent() / 100
             / hashrateOracle.getHashesforToken();
     }
 
     /**
      * @notice Gets the virtual margin balance (initial margin + unrealized PnL) of a position
      * @param position The position to get the margin balance of
-     * @param _isBuy Whether the position is a buy position
      */
-    function getMarginBalance(Position memory position, bool _isBuy) private view returns (int256) {
-        uint256 initialMargin = calculateRequiredMargin(1, _isBuy);
+    function getMarginBalance(Position memory position) private view returns (int256) {
+        uint256 initialMargin = calculateRequiredMargin(1);
         int256 unrealizedPnL = int256(position.price) - int256(_getMarketPrice(hashrateOracle.getHashesforToken()));
         return int256(initialMargin) + unrealizedPnL;
     }
@@ -418,21 +398,16 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     /**
      * @notice Gets the maintenance margin - minimal margin balance required to keep the position open
      * @param _quantity The quantity of the position
-     * @param _isBuy Whether the position is a buy position
      */
-    function getMaintenanceMargin(uint256 _quantity, bool _isBuy) private view returns (uint256) {
-        return _quantity * _getMarketPrice(hashrateOracle.getHashesforToken()) * getMarginPercent(_isBuy) / 100;
+    function getMaintenanceMargin(uint256 _quantity) private view returns (uint256) {
+        return _quantity * _getMarketPrice(hashrateOracle.getHashesforToken()) * getMarginPercent() / 100;
     }
 
     // TODO: calculate related to remaining delivery time
-    function getMarginPercent(bool _isBuy) public view returns (uint8) {
+    function getMarginPercent() public view returns (uint8) {
         uint8 breachPenaltyMarginPercent =
             uint8(breachPenaltyRatePerDay * deliveryDurationSeconds / 10 ** (BREACH_PENALTY_DECIMALS - 2));
-        if (_isBuy) {
-            return buyerLiquidationMarginPercent + breachPenaltyMarginPercent;
-        } else {
-            return sellerLiquidationMarginPercent + breachPenaltyMarginPercent;
-        }
+        return liquidationMarginPercent + breachPenaltyMarginPercent;
     }
 
     function marginCall(address _participant) external onlyValidator {
@@ -450,11 +425,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             bytes32 orderId = _orders.at(0);
             Order memory order = orders[orderId];
             _closeOrder(orderId, order);
-            if (order.isBuy) {
-                reclaimedMargin += int256(getMaintenanceMargin(1, true));
-            } else {
-                reclaimedMargin += int256(getMaintenanceMargin(1, false));
-            }
+
+            reclaimedMargin += int256(getMaintenanceMargin(1));
             if (reclaimedMargin >= marginShortfall) {
                 return;
             }
@@ -466,7 +438,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             bytes32 positionId = _positions.at(0);
             Position storage position = positions[positionId];
 
-            int256 marginBalance = getMarginBalance(position, position.seller == _participant);
+            int256 marginBalance = getMarginBalance(position);
             _closeAndCashSettleDeliveryAndPenalize(positionId, position, position.seller == _participant);
             reclaimedMargin += marginBalance;
             // TODO: update margin deficit since order closed and settled

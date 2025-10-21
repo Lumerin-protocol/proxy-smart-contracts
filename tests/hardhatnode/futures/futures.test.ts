@@ -24,10 +24,8 @@ describe("Futures Contract", function () {
       expect(getAddress(validatorAddress)).to.equal(getAddress(accounts.validator.account.address));
 
       // Check margin percentages
-      const sellerMargin = await futures.read.sellerLiquidationMarginPercent();
-      const buyerMargin = await futures.read.buyerLiquidationMarginPercent();
-      expect(sellerMargin).to.equal(config.sellerLiquidationMarginPercent);
-      expect(buyerMargin).to.equal(config.buyerLiquidationMarginPercent);
+      const liquidationMarginPercent = await futures.read.liquidationMarginPercent();
+      expect(liquidationMarginPercent).to.equal(config.liquidationMarginPercent);
 
       // Check speed
       const speed = await futures.read.speedHps();
@@ -639,7 +637,7 @@ describe("Futures Contract", function () {
       const { seller } = accounts;
 
       const price = parseUnits("100", 6);
-      const minMargin = await futures.read.calculateRequiredMargin([1n, false]);
+      const minMargin = await futures.read.calculateRequiredMargin([1n]);
       console.log("minMargin", minMargin);
       const deliveryDate = config.deliveryDates.date1;
 
@@ -852,7 +850,7 @@ describe("Futures Contract", function () {
       });
     });
 
-    it.only("should handle exiting positions", async function () {
+    it("should handle exiting positions", async function () {
       const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
       const { futures } = contracts;
       const { seller, buyer, buyer2, pc } = accounts;
@@ -1065,7 +1063,7 @@ describe("Futures Contract", function () {
       const { seller, validator, pc } = accounts;
 
       const price = parseUnits("100", 6);
-      const minMargin = await futures.read.calculateRequiredMargin([1n, true]);
+      const minMargin = await futures.read.calculateRequiredMargin([1n]);
       const deliveryDate = config.deliveryDates.date1;
 
       // Add small margin

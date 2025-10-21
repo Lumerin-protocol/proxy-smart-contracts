@@ -18,11 +18,11 @@ export async function deployOnlyFuturesFixture(
   const { validator, seller, buyer, buyer2, owner, pc, tc } = accounts;
   const { oracle } = config;
 
-  const sellerLiquidationMarginPercent = 20;
-  const buyerLiquidationMarginPercent = 20;
+  const liquidationMarginPercent = 20;
   const speedHps = parseUnits("100", 12); // 100 TH/s
   const deliveryDurationSeconds = 30 * 24 * 3600; // 30 days
-  const priceLadderStep = parseUnits("0.05", 6);
+  const priceLadderStep = parseUnits("0.05", 6); // 0.05 USDC
+  const orderFee = parseUnits("1", 6); // 1 USDC
 
   // Deploy Futures contract
   const futuresImpl = await viem.deployContract("contracts/marketplace/Futures.sol:Futures", []);
@@ -35,11 +35,11 @@ export async function deployOnlyFuturesFixture(
         usdcMock.address,
         hashrateOracle.address,
         validator.account.address,
-        sellerLiquidationMarginPercent,
-        buyerLiquidationMarginPercent,
+        liquidationMarginPercent,
         speedHps,
         deliveryDurationSeconds,
         priceLadderStep,
+        orderFee,
       ],
     }),
   ]);
@@ -70,10 +70,10 @@ export async function deployOnlyFuturesFixture(
         date3: deliveryDate3,
       },
       speedHps,
-      sellerLiquidationMarginPercent,
-      buyerLiquidationMarginPercent,
+      liquidationMarginPercent,
       deliveryDurationSeconds,
       priceLadderStep,
+      orderFee,
     },
     contracts: {
       usdcMock,
