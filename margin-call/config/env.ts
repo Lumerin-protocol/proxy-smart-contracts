@@ -1,5 +1,7 @@
 import { type Static, StringOptions, TUnsafe, Type } from "@sinclair/typebox";
 import envSchema from "env-schema";
+import Ajv from "ajv";
+import addFormats from "ajv-formats";
 
 const TypeEthAddress = (opt?: StringOptions) =>
   Type.String({ ...opt, pattern: "^0x[a-fA-F0-9]{40}$" }) as TUnsafe<`0x${string}`>;
@@ -28,7 +30,19 @@ const schema = Type.Object({
 
 export type Config = Static<typeof schema>;
 
+// Create custom Ajv instance with format validation
+const ajv = new Ajv({
+  allErrors: true,
+  removeAdditional: true,
+  useDefaults: true,
+  coerceTypes: true,
+});
+
+// Add format validators (including "uri")
+addFormats(ajv);
+
 export const config = envSchema<Config>({
   schema,
   dotenv: true, // load .env if it is there, default: false
+  ajv, // Pass our custom Ajv instance with format support
 });

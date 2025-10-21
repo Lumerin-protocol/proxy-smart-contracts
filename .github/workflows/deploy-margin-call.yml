@@ -118,41 +118,28 @@ jobs:
           echo "📦 Installing dependencies..."
           yarn install --frozen-lockfile
 
-      - name: Build TypeScript
+      - name: Build Lambda package
         working-directory: ./margin-call
         run: |
-          echo "🔨 Building TypeScript..."
-          yarn build || npx tsc
-
-      - name: Create deployment package
-        working-directory: ./margin-call
-        run: |
-          echo "📦 Creating Lambda deployment package..."
+          echo "📦 Building Lambda deployment package with esbuild..."
           
-          mkdir -p dist/package
+          # Install all dependencies (including devDependencies for build)
+          yarn install --frozen-lockfile
           
-          if [ -d "dist" ]; then
-            cp -r dist/*.js dist/package/ 2>/dev/null || true
-          fi
+          # Run esbuild to bundle everything
+          yarn build
           
-          if [ ! -f "dist/package/main.js" ]; then
-            cp *.ts dist/package/ 2>/dev/null || true
-          fi
+          # Copy production dependencies for runtime
+          mkdir -p dist/node_modules
+          cp -r node_modules/ajv-formats dist/node_modules/
           
-          cp package.json dist/package/
-          cp yarn.lock dist/package/ 2>/dev/null || cp package-lock.json dist/package/ 2>/dev/null || true
-          
-          mkdir -p dist/package/abi
-          cp -r abi/* dist/package/abi/ 2>/dev/null || true
-          
-          cd dist/package
-          yarn install --production --frozen-lockfile || npm ci --production
-          
+          # Create the Lambda package
+          cd dist
+          zip -r ../margin-call-lambda.zip .
           cd ..
-          zip -r ../margin-call-lambda.zip package/*
           
           echo "✅ Package created: margin-call-lambda.zip"
-          ls -lh ../margin-call-lambda.zip
+          ls -lh margin-call-lambda.zip
 
       - name: Upload Lambda package
         uses: actions/upload-artifact@v4

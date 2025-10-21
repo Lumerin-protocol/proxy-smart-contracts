@@ -77,12 +77,12 @@ jobs:
               ;;
             test)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
-              echo "ecs_cluster=bedrock-stg-use1-1" >> $GITHUB_OUTPUT
+              echo "ecs_cluster=ecs-lumerin-marketplace-stg-use1" >> $GITHUB_OUTPUT
               echo "ecs_service=svc-lumerin-notifications-stg-use1" >> $GITHUB_OUTPUT
               ;;
             main)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
-              echo "ecs_cluster=bedrock-lmn-use1-1" >> $GITHUB_OUTPUT
+              echo "ecs_cluster=ecs-lumerin-marketplace-lmn-use1" >> $GITHUB_OUTPUT
               echo "ecs_service=svc-lumerin-notifications-lmn-use1" >> $GITHUB_OUTPUT
               ;;
           esac
