@@ -12,7 +12,8 @@ async function main() {
     bot.start(),
     server.listen({
       port: 3000,
-      listenTextResolver: (address) => `Server is listening on http://${address}`,
+      host: '0.0.0.0',  // Listen on all interfaces (required for ECS ALB health checks)
+      listenTextResolver: (address) => `Server is listening on ${address}`,
     }),
   ]);
 }
