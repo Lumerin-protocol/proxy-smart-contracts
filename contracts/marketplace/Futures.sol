@@ -35,10 +35,10 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     address public validatorAddress; // address of the validator that can close orders that are not delivered and regularly calls marginCall function
     uint256 public breachPenaltyRatePerDay; // penalty for breaching the contract either by seller or buyer
 
-    EnumerableSet.UintSet private deliveryDates; // delivery dates for the futures
-    uint256 public speedHps; // speed of the one unit of futures in hashes/second, constant for all positions
-    uint32 public deliveryDurationSeconds; // 30 days, constant for all orders
-    uint256 public priceLadderStep;
+    EnumerableSet.UintSet private deliveryDates; // expiry dates for the futures, start of the delivery. //TODO: week distance
+    uint256 public speedHps; // speed of the one unit of futures in hashes/second, constant for all positions //TODO: consider making it constant
+    uint32 public deliveryDurationSeconds; // 30 days, constant for all orders //TODO: let's make them weeklies
+    uint256 public priceLadderStep; // minimum price increment
 
     uint256 private nonce = 0;
     uint8 private _decimals;
@@ -134,6 +134,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         // Only the owner can upgrade the contract
     }
 
+    // TODO: automatic calculating of delivery dates (12 (configurable) weeks in the future)
     function addDeliveryDate(uint256 _deliveryDate) public onlyOwner {
         if (_deliveryDate < block.timestamp) {
             revert DeliveryDateShouldBeInTheFuture();
@@ -150,6 +151,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         return deliveryDates.at(_index);
     }
 
+    // TODO: use int8 qty, positive you're buying, negative you're selling
     function createOrder(uint256 _price, uint256 _deliveryDate, uint8 _qty, bool _isBuy) public {
         _createOrMatchOrder(_price, _deliveryDate, _qty, _isBuy, _msgSender());
     }
@@ -264,6 +266,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             bytes32 existingPositionId = participantDeliveryDatePositionIds.at(0);
             Position memory existingPosition = positions[existingPositionId];
 
+            // TODO: remove duplications
             if (existingPosition.buyer == order.participant && !order.isBuy) {
                 seller = existingPosition.seller;
                 buyer = _otherParticipant;
@@ -280,6 +283,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         }
 
         bytes32 positionId = keccak256(abi.encode(seller, buyer, order.price, order.deliveryDate, block.timestamp));
+        // TODO: matched order
         positions[positionId] = Position({
             seller: seller,
             buyer: buyer,
@@ -470,6 +474,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
                 return;
             }
         }
+
+        //TODO: what happens if not enough funds to cover positions
     }
 
     /**
