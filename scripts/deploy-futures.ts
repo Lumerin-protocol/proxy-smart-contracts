@@ -9,19 +9,18 @@ async function main() {
   console.log("Futures deployment script");
   console.log();
 
-  const env = <
-    {
-      LUMERIN_TOKEN_ADDRESS: `0x${string}`;
-      USDC_TOKEN_ADDRESS: `0x${string}`;
-      HASHRATE_ORACLE_ADDRESS: `0x${string}`;
-      VALIDATOR_ADDRESS: `0x${string}`;
-      SELLER_LIQUIDATION_MARGIN_PERCENT: string;
-      BUYER_LIQUIDATION_MARGIN_PERCENT: string;
-      SPEED_HPS: string;
-      DELIVERY_DURATION_SECONDS: string;
-      PRICE_LADDER_STEP: string;
-    }
-  >requireEnvsSet("LUMERIN_TOKEN_ADDRESS", "USDC_TOKEN_ADDRESS", "HASHRATE_ORACLE_ADDRESS", "VALIDATOR_ADDRESS", "SELLER_LIQUIDATION_MARGIN_PERCENT", "BUYER_LIQUIDATION_MARGIN_PERCENT", "SPEED_HPS", "DELIVERY_DURATION_SECONDS", "PRICE_LADDER_STEP");
+  const env = requireEnvsSet(
+    "LUMERIN_TOKEN_ADDRESS",
+    "USDC_TOKEN_ADDRESS",
+    "HASHRATE_ORACLE_ADDRESS",
+    "VALIDATOR_ADDRESS",
+    "LIQUIDATION_MARGIN_PERCENT",
+    "SPEED_HPS",
+    "MINIMUM_PRICE_INCREMENT",
+    "DELIVERY_DURATION_DAYS",
+    "DELIVERY_INTERVAL_DAYS",
+    "FUTURE_DELIVERY_DATES_COUNT"
+  );
   const SAFE_OWNER_ADDRESS = process.env.SAFE_OWNER_ADDRESS as `0x${string}` | undefined;
 
   const [deployer] = await viem.getWalletClients();
@@ -30,7 +29,7 @@ async function main() {
   // Verify token contracts
   const paymentToken = await viem.getContractAt(
     "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol:IERC20Metadata",
-    env.USDC_TOKEN_ADDRESS
+    env.USDC_TOKEN_ADDRESS as `0x${string}`
   );
   console.log("Payment token:", paymentToken.address);
   console.log("Name:", await paymentToken.read.name());
@@ -67,6 +66,10 @@ async function main() {
 
   console.log();
 
+  const nearestMonday = new Date();
+  nearestMonday.setDate(nearestMonday.getDate() + 1);
+  nearestMonday.setHours(0, 0, 0, 0);
+
   // Deploy Futures proxy
   console.log("Deploying Futures proxy...");
   const encodedInitFn = encodeFunctionData({
@@ -76,11 +79,13 @@ async function main() {
       env.USDC_TOKEN_ADDRESS as `0x${string}`, // payment token
       env.HASHRATE_ORACLE_ADDRESS as `0x${string}`, // hashrate oracle
       env.VALIDATOR_ADDRESS as `0x${string}`, // validator address
-      Number(env.SELLER_LIQUIDATION_MARGIN_PERCENT), // seller liquidation margin percent
-      Number(env.BUYER_LIQUIDATION_MARGIN_PERCENT), // buyer liquidation margin percent
+      Number(env.LIQUIDATION_MARGIN_PERCENT), // seller liquidation margin percent
       BigInt(env.SPEED_HPS), // speed HPS
-      Number(env.DELIVERY_DURATION_SECONDS), // delivery duration seconds
-      BigInt(env.PRICE_LADDER_STEP), // price ladder step
+      BigInt(env.MINIMUM_PRICE_INCREMENT), // minimum price increment
+      Number(env.DELIVERY_DURATION_DAYS), // delivery duration days
+      Number(env.DELIVERY_INTERVAL_DAYS), // delivery interval days
+      Number(env.FUTURE_DELIVERY_DATES_COUNT), // future delivery dates count
+      BigInt(BigInt(nearestMonday.getTime() / 1000)), // first future delivery date
     ],
   });
 
