@@ -5,13 +5,13 @@ import {
   PositionClosed,
   OrderCreated,
   OrderClosed,
-  DeliveryDateAdded,
   Transfer,
   Futures as FuturesContract,
   PositionDeliveryClosed,
+  OrderFeeUpdated,
 } from "../generated/Futures/Futures";
-import { Futures, Participant, Position, Order, DeliveryDate } from "../generated/schema";
-import { log, Bytes, Address, dataSource } from "@graphprotocol/graph-ts";
+import { Futures, Participant, Position, Order } from "../generated/schema";
+import { log, Address, dataSource } from "@graphprotocol/graph-ts";
 
 // Helper function to get or create a participant with balance tracking
 function getOrCreateParticipant(address: Address): Participant {
@@ -40,7 +40,6 @@ function getOrCreateFutures(event: Initialized | null = null): Futures {
 
   futures.initializedBlockNumber = event ? event.block.number : BigInt.zero();
   futures.initializeTimestamp = event ? event.block.timestamp : BigInt.zero();
-  futures.minSellerStake = new BigInt(0);
   futures.contractCount = 0;
   futures.contractActiveCount = 0;
   futures.purchaseCount = 0;
@@ -50,15 +49,18 @@ function getOrCreateFutures(event: Initialized | null = null): Futures {
   log.info("Futures Address {}", [address.toHexString()]);
   const futuresContract = FuturesContract.bind(address);
 
-  futures.priceLadderStep = futuresContract.priceLadderStep();
-  futures.sellerLiquidationMarginPercent = futuresContract.sellerLiquidationMarginPercent();
-  futures.buyerLiquidationMarginPercent = futuresContract.buyerLiquidationMarginPercent();
+  futures.minimumPriceIncrement = futuresContract.minimumPriceIncrement();
+  futures.liquidationMarginPercent = futuresContract.liquidationMarginPercent();
   futures.speedHps = futuresContract.speedHps();
-  futures.deliveryDurationSeconds = futuresContract.deliveryDurationSeconds();
+  futures.deliveryDurationDays = futuresContract.deliveryDurationDays();
+  futures.deliveryIntervalDays = futuresContract.deliveryIntervalDays();
+  futures.futureDeliveryDatesCount = futuresContract.futureDeliveryDatesCount();
+  futures.firstFutureDeliveryDate = futuresContract.firstFutureDeliveryDate();
   futures.breachPenaltyRatePerDay = futuresContract.breachPenaltyRatePerDay();
   futures.validatorAddress = futuresContract.validatorAddress();
   futures.hashrateOracleAddress = futuresContract.hashrateOracle();
   futures.tokenAddress = futuresContract.token();
+  futures.orderFee = futuresContract.orderFee();
   return futures;
 }
 
@@ -86,15 +88,6 @@ export function handleInitialized(event: Initialized): void {
   futures.save();
 }
 
-export function handleDeliveryDateAdded(event: DeliveryDateAdded): void {
-  log.info("Delivery date added: {}", [event.params.deliveryDate.toString()]);
-  const deliveryDate = new DeliveryDate(
-    changetype<Bytes>(Bytes.fromBigInt(event.params.deliveryDate))
-  );
-  deliveryDate.deliveryDate = event.params.deliveryDate;
-  deliveryDate.save();
-}
-
 export function handleOrderCreated(event: OrderCreated): void {
   log.info("Order created: {} by {}", [
     event.params.orderId.toHexString(),
@@ -111,19 +104,20 @@ export function handleOrderCreated(event: OrderCreated): void {
   const order = new Order(event.params.orderId);
   order.id = event.params.orderId;
   order.participant = participant.id;
-  order.price = event.params.price;
-  order.deliveryDate = event.params.deliveryDate;
+  order.pricePerDay = event.params.pricePerDay;
+  order.deliveryAt = event.params.deliveryAt;
   order.isBuy = event.params.isBuy;
   order.timestamp = event.block.timestamp;
   order.blockNumber = event.block.number;
   order.transactionHash = event.transaction.hash;
   order.isActive = true;
+  order.destURL = event.params.destURL;
   order.save();
 
   // Update Participant
   participant.orders = participant.orders.concat([order.id]);
   participant.orderCount++;
-  participant.totalVolume = participant.totalVolume.plus(event.params.price);
+  // TODO: participant.totalVolume = participant.totalVolume.plus(event.params.price);
   participant.save();
 
   // Update Futures stats
@@ -187,25 +181,26 @@ export function handlePositionCreated(event: PositionCreated): void {
   position.id = event.params.positionId;
   position.seller = seller.id;
   position.buyer = buyer.id;
-  position.price = event.params.price;
-  position.startTime = event.params.startTime;
+  position.pricePerDay = event.params.pricePerDay;
+  position.deliveryAt = event.params.deliveryAt;
   position.timestamp = event.block.timestamp;
   position.blockNumber = event.block.number;
   position.transactionHash = event.transaction.hash;
   position.isActive = true;
   position.orderId = event.params.orderId;
+  position.destURL = event.params.destURL;
   position.save();
 
   // Update Seller
   seller.orders = seller.orders.concat([position.id]);
   seller.orderCount++;
-  seller.totalVolume = seller.totalVolume.plus(event.params.price);
+  // TODO: seller.totalVolume = seller.totalVolume.plus(event.params.price);
   seller.save();
 
   // Update Buyer
   buyer.orders = buyer.orders.concat([position.id]);
   buyer.orderCount++;
-  buyer.totalVolume = buyer.totalVolume.plus(event.params.price);
+  // TODO: buyer.totalVolume = buyer.totalVolume.plus(event.params.price);
   buyer.save();
 
   // Update Futures stats
@@ -328,4 +323,13 @@ export function handleTransfer(event: Transfer): void {
     from.toHexString(),
     to.toHexString(),
   ]);
+}
+
+export function handleOrderFeeUpdated(event: OrderFeeUpdated): void {
+  log.info("Order fee updated: {}", [event.params.orderFee.toString()]);
+  const futures = Futures.load(0);
+  if (futures) {
+    futures.orderFee = event.params.orderFee;
+    futures.save();
+  }
 }

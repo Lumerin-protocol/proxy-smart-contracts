@@ -1,8 +1,8 @@
 {
   "network": "arbitrum-sepolia",
-  "futuresAddress": "0x74e3ab04fad3ba6534125f7aeae698a9cf94b4f5",
-  "startBlockFutures": 204998579,
+  "futuresAddress": "0x241a2537e20b83bbd89e19cc8bb2b9ed7ad84979",
+  "startBlockFutures": 211707097,
   "hashrateOracleAddress": "0x6F736186d2c93913721e2570c283dff2a08575e9",
-  "startBlockHashrateOracle": 204998579,
+  "startBlockHashrateOracle": 210707097,
   "hashrateOraclePollingBlockInterval": 15000
 }

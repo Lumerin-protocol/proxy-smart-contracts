@@ -22,7 +22,7 @@ export async function deployOnlyFuturesFixture(
   const speedHps = parseUnits("100", 12); // 100 TH/s
   const deliveryDurationDays = 7;
   const deliveryDurationSeconds = deliveryDurationDays * 24 * 3600; // 30 days
-  const priceLadderStep = parseUnits("0.05", 6); // 0.05 USDC
+  const priceLadderStep = parseUnits("0.01", 6); // 0.01 USDC
   const orderFee = parseUnits("1", 6); // 1 USDC
   const { timestamp: now } = await pc.getBlock({ blockTag: "latest" });
   const futureDeliveryDatesCount = 3;

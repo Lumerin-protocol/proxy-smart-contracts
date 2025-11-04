@@ -111,7 +111,6 @@ const ContractSpecsQuery = gql`
       contractCount
       deliveryDurationSeconds
       hashrateOracleAddress
-      minSellerStake
       priceLadderStep
       purchaseCount
       sellerLiquidationMarginPercent
