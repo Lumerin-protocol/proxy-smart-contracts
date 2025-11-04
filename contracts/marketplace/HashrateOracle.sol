@@ -19,7 +19,7 @@ contract HashrateOracle is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     uint256 public btcPriceTTL;
 
     uint256 private constant BTC_DECIMALS = 8;
-    string public constant VERSION = "2.0.8";
+    string public constant VERSION = "2.0.9";
 
     struct Feed {
         uint256 value;

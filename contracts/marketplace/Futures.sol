@@ -16,6 +16,7 @@ import { HashrateOracle } from "./HashrateOracle.sol";
 // 3. Write tests for offseting order/positions
 // 4. Add fees
 // 6. Do we need to batch same price and delivery date orders/positions so it is a single entry?
+// 7. What if i create sell and buy orders for the different prices and both of them eventually are matched? I should exit
 
 contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     using SafeERC20 for IERC20;
@@ -27,73 +28,87 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     uint256 private constant MAX_BREACH_PENALTY_RATE_PER_DAY = 5 * 10 ** (BREACH_PENALTY_DECIMALS - 2); // 5%
     uint8 public constant MAX_ORDERS_PER_PARTICIPANT = 50;
 
-    uint8 public sellerLiquidationMarginPercent;
-    uint8 public buyerLiquidationMarginPercent;
+    uint8 public liquidationMarginPercent;
 
     IERC20 public token;
     HashrateOracle public hashrateOracle;
     address public validatorAddress; // address of the validator that can close orders that are not delivered and regularly calls marginCall function
     uint256 public breachPenaltyRatePerDay; // penalty for breaching the contract either by seller or buyer
 
-    EnumerableSet.UintSet private deliveryDates; // delivery dates for the futures
     uint256 public speedHps; // speed of the one unit of futures in hashes/second, constant for all positions
-    uint32 public deliveryDurationSeconds; // 30 days, constant for all orders
-    uint256 public priceLadderStep;
+    uint32 public deliveryDurationDays; // duration of the delivery in seconds
+    uint32 public deliveryIntervalDays; // interval between two closest delivery dates in days
+    uint32 public futureDeliveryDatesCount; // number of future delivery dates to be available for orders
+    uint256 public firstFutureDeliveryDate; // timestamp of the first future delivery date
+
+    uint256 public minimumPriceIncrement; // difference between two closest prices in the order table
+    uint256 public orderFee; // fee for creating an order in tokens
 
     uint256 private nonce = 0;
     uint8 private _decimals;
 
+    /// @notice Represents an order to buy or sell a futures contract
+    /// @dev Created when a participant places an order
     struct Order {
-        address participant; // address of seller or buyer
-        uint256 price; // price of the position
-        uint256 deliveryDate; // date of delivery, when contract delivery is started
         bool isBuy; // true if long/buy position, false if short/sell position
-        uint256 timestamp; // when position is opened
+        address participant; // address of seller or buyer
+        string destURL;
+        uint256 pricePerDay; // price of the hashrate in tokens for one day
+        uint256 deliveryAt; // date of delivery, when contract delivery is started
+        uint256 createdAt; // timestamp of the creation of the order
     }
 
+    /// @notice Represents an active futures contract between seller and buyer
+    /// @dev Created when two opposing orders are matched
     struct Position {
-        address seller;
-        address buyer;
-        uint256 price;
-        uint256 startTime;
-        uint256 timestamp;
+        address seller; // party obligated to deliver
+        address buyer; // party entitled to receive delivery
+        string destURL;
+        uint256 pricePerDay; // price of the hashrate in tokens for one day
+        uint256 deliveryAt; // start of the delivery
+        uint256 createdAt; // timestamp of the creation of the position
     }
 
     mapping(bytes32 => Order) private orders;
     mapping(bytes32 => Position) private positions;
-
-    EnumerableSet.Bytes32Set private orderIds;
-    EnumerableSet.Bytes32Set private positionIds;
 
     mapping(uint256 => mapping(uint256 => EnumerableSet.Bytes32Set)) private deliveryDatePriceOrdersLongIdIndex; // index of long positions by delivery date and price
     mapping(uint256 => mapping(uint256 => EnumerableSet.Bytes32Set)) private deliveryDatePriceOrdersShortIdIndex; // index of short positions by delivery date and price
     mapping(address => EnumerableSet.Bytes32Set) private participantPositionIdsIndex; // index of  positions by participant
     mapping(address => EnumerableSet.Bytes32Set) private participantOrderIdsIndex; // index of orders by participant
     mapping(address => mapping(uint256 => EnumerableSet.Bytes32Set)) private participantDeliveryDatePositionIdsIndex; // index of positions by participant and delivery date
+    mapping(address => mapping(uint256 => mapping(uint256 => EnumerableSet.Bytes32Set))) private
+        participantDeliveryDatePriceOrderIdsIndex;
 
-    event DeliveryDateAdded(uint256 deliveryDate);
     event OrderCreated(
-        bytes32 indexed orderId, address indexed participant, uint256 price, uint256 deliveryDate, bool isBuy
+        bytes32 indexed orderId,
+        address indexed participant,
+        string destURL,
+        uint256 pricePerDay,
+        uint256 deliveryAt,
+        bool isBuy
     );
     event OrderClosed(bytes32 indexed orderId, address indexed participant);
+    event OrderFeeUpdated(uint256 orderFee);
     event PositionCreated(
         bytes32 indexed positionId,
         address indexed seller,
         address indexed buyer,
-        uint256 price,
-        uint256 startTime,
+        uint256 pricePerDay,
+        uint256 deliveryAt,
+        string destURL,
         bytes32 orderId
     );
     event PositionClosed(bytes32 indexed positionId);
     event PositionDeliveryClosed(bytes32 indexed positionId, address indexed closedBy);
 
     error InvalidPrice();
+    error InvalidQty();
     error DeliveryDateShouldBeInTheFuture();
     error DeliveryDateNotAvailable();
     error OrderNotBelongToSender();
     error InsufficientMarginBalance();
     error OnlyValidator(); // when the function is called by a non-validator address
-    error OnlyPositionSellerOrBuyer();
     error OnlyValidatorOrPositionParticipant();
     error PositionNotExists();
     error PositionDeliveryNotStartedYet();
@@ -109,85 +124,84 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         IERC20Metadata _token,
         HashrateOracle _hashrateOracle,
         address _validatorAddress,
-        uint8 _sellerLiquidationMarginPercent,
-        uint8 _buyerLiquidationMarginPercent,
+        uint8 _liquidationMarginPercent,
         uint256 _speedHps,
-        uint32 _deliveryDurationSeconds,
-        uint256 _priceLadderStep
+        uint256 _minimumPriceIncrement,
+        uint32 _deliveryDurationDays,
+        uint32 _deliveryIntervalDays,
+        uint32 _futureDeliveryDatesCount,
+        uint256 _firstFutureDeliveryDate
     ) public initializer {
         __Ownable_init(_msgSender());
         __UUPSUpgradeable_init();
+        _initializeFuturesToken(_token);
+        hashrateOracle = _hashrateOracle;
+        validatorAddress = _validatorAddress;
+        liquidationMarginPercent = _liquidationMarginPercent;
+        breachPenaltyRatePerDay = 1 * 10 ** (BREACH_PENALTY_DECIMALS - 2); // 1%
+        minimumPriceIncrement = _minimumPriceIncrement;
+        speedHps = _speedHps;
+        deliveryDurationDays = _deliveryDurationDays;
+        deliveryIntervalDays = _deliveryIntervalDays;
+        // TODO: validate _futureDeliveryDatesCount > 0
+        // and add setter for _futureDeliveryDatesCount, cause we might adjust it on the fly
+        futureDeliveryDatesCount = _futureDeliveryDatesCount;
+        firstFutureDeliveryDate = _firstFutureDeliveryDate;
+    }
+
+    function _initializeFuturesToken(IERC20Metadata _token) private {
         __ERC20_init(string.concat("Lumerin Futures ", _token.symbol()), string.concat("w", _token.symbol()));
         _decimals = _token.decimals();
         token = _token;
-        hashrateOracle = _hashrateOracle;
-        validatorAddress = _validatorAddress;
-        sellerLiquidationMarginPercent = _sellerLiquidationMarginPercent;
-        buyerLiquidationMarginPercent = _buyerLiquidationMarginPercent;
-        speedHps = _speedHps;
-        deliveryDurationSeconds = _deliveryDurationSeconds; // 30 days
-        breachPenaltyRatePerDay = 1 * 10 ** (BREACH_PENALTY_DECIMALS - 2); // 1%
-        priceLadderStep = _priceLadderStep;
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
         // Only the owner can upgrade the contract
     }
 
-    function addDeliveryDate(uint256 _deliveryDate) public onlyOwner {
-        if (_deliveryDate < block.timestamp) {
-            revert DeliveryDateShouldBeInTheFuture();
-        }
-        deliveryDates.add(_deliveryDate);
-        emit DeliveryDateAdded(_deliveryDate);
-    }
-
-    function deliveryDatesLength() public view returns (uint256) {
-        return deliveryDates.length();
-    }
-
-    function deliveryDateByIndex(uint256 _index) public view returns (uint256) {
-        return deliveryDates.at(_index);
-    }
-
-    function createOrder(uint256 _price, uint256 _deliveryDate, uint8 _qty, bool _isBuy) public {
-        _createOrMatchOrder(_price, _deliveryDate, _qty, _isBuy, _msgSender());
-    }
-
-    function _createOrMatchOrder(uint256 _price, uint256 _deliveryDate, uint8 _qty, bool _isBuy, address _participant)
-        private
-    {
+    function createOrder(uint256 _price, uint256 _deliveryDate, string memory _destURL, int8 _qty) public {
         validatePrice(_price);
         validateDeliveryDate(_deliveryDate);
+        validateQty(_qty);
 
-        uint256 marginNeeded = calculateRequiredMargin(_qty, _isBuy);
-        int256 collateralDeficit = getCollateralDeficit(_participant);
+        uint256 marginNeeded = calculateRequiredMargin(_qty);
+        int256 collateralDeficit = getCollateralDeficit(_msgSender());
         if (-collateralDeficit < int256(marginNeeded)) {
             revert InsufficientMarginBalance();
         }
+        bool _isBuy = _qty > 0;
 
-        // check if there is a different order with same price and delivery date
-        EnumerableSet.Bytes32Set storage oppositeOrderIndexId;
-        EnumerableSet.Bytes32Set storage orderIndexId;
+        // cache order indexes since they are the same for the loop
+        EnumerableSet.Bytes32Set storage orderIndex = _deliveryDatePriceOrderIds(_deliveryDate, _price, _isBuy);
+        EnumerableSet.Bytes32Set storage oppositeOrderIndex = _deliveryDatePriceOrderIds(_deliveryDate, _price, !_isBuy);
+        EnumerableSet.Bytes32Set storage participantPriceOrderIds =
+            participantDeliveryDatePriceOrderIdsIndex[_msgSender()][_deliveryDate][_price];
 
-        if (_isBuy) {
-            oppositeOrderIndexId = deliveryDatePriceOrdersShortIdIndex[_deliveryDate][_price];
-            orderIndexId = deliveryDatePriceOrdersLongIdIndex[_deliveryDate][_price];
-        } else {
-            oppositeOrderIndexId = deliveryDatePriceOrdersLongIdIndex[_deliveryDate][_price];
-            orderIndexId = deliveryDatePriceOrdersShortIdIndex[_deliveryDate][_price];
+        for (uint8 i = 0; i < abs8(_qty); i++) {
+            _createOrMatchSingleOrder(
+                orderIndex,
+                oppositeOrderIndex,
+                participantPriceOrderIds,
+                _msgSender(),
+                _price,
+                _deliveryDate,
+                _destURL,
+                _isBuy
+            );
         }
-        for (uint8 i = 0; i < _qty; i++) {
-            _createOrMatchSingleOrder(orderIndexId, oppositeOrderIndexId, _participant, _price, _deliveryDate, _isBuy);
-        }
+
+        // order fee
+        _update(_msgSender(), address(this), orderFee);
     }
 
     function _createOrMatchSingleOrder(
         EnumerableSet.Bytes32Set storage orderIndexId,
         EnumerableSet.Bytes32Set storage oppositeOrderIndexId,
+        EnumerableSet.Bytes32Set storage participantPriceOrderIds,
         address _participant,
         uint256 _price,
         uint256 _deliveryDate,
+        string memory _destURL,
         bool _isBuy
     ) private {
         //
@@ -198,10 +212,23 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             if (participantOrders.length() >= MAX_ORDERS_PER_PARTICIPANT) {
                 revert MaxOrdersPerParticipantReached();
             }
-            bytes32 _orderId = _createOrder(_participant, _price, _deliveryDate, _isBuy);
+            bytes32 _orderId = _createOrder(_participant, _price, _deliveryDate, _isBuy, _destURL);
             orderIndexId.add(_orderId);
             participantOrders.add(_orderId);
+            participantPriceOrderIds.add(_orderId);
             return;
+        }
+
+        //
+        // Check if there are no matching orders by the same participant, ignoring their ordering
+        //
+        if (participantPriceOrderIds.length() > 0) {
+            bytes32 orderId = participantPriceOrderIds.at(0);
+            Order memory order = orders[orderId];
+            if (order.isBuy != _isBuy) {
+                _closeOrder(orderId, order);
+                return;
+            }
         }
 
         //
@@ -214,28 +241,34 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         _closeOrder(oppositeOrderId, oppositeOrder);
 
         // create new position
-        _createPosition(oppositeOrderId, oppositeOrder, _participant);
+        _createPosition(oppositeOrderId, oppositeOrder, _participant, _destURL);
     }
 
-    function _createOrder(address _participant, uint256 _price, uint256 _deliveryDate, bool _isBuy)
-        private
-        returns (bytes32)
-    {
-        bytes32 orderId = keccak256(abi.encode(_participant, _price, _deliveryDate, _isBuy, block.timestamp, nonce++));
+    function _createOrder(
+        address _participant,
+        uint256 _pricePerDay,
+        uint256 _deliveryAt,
+        bool _isBuy,
+        string memory _destURL
+    ) private returns (bytes32) {
+        bytes32 orderId =
+            keccak256(abi.encode(_participant, _pricePerDay, _deliveryAt, _isBuy, block.timestamp, nonce++));
         orders[orderId] = Order({
             participant: _participant,
-            price: _price,
-            deliveryDate: _deliveryDate,
+            pricePerDay: _pricePerDay,
+            deliveryAt: _deliveryAt,
             isBuy: _isBuy,
-            timestamp: block.timestamp
+            createdAt: block.timestamp,
+            destURL: _destURL
         });
-        orderIds.add(orderId);
 
-        emit OrderCreated(orderId, _participant, _price, _deliveryDate, _isBuy);
+        emit OrderCreated(orderId, _participant, _destURL, _pricePerDay, _deliveryAt, _isBuy);
         return orderId;
     }
 
-    function _createPosition(bytes32 orderId, Order memory order, address _otherParticipant) private {
+    function _createPosition(bytes32 orderId, Order memory order, address _otherParticipant, string memory _destURL)
+        private
+    {
         if (order.participant == _otherParticipant) {
             // TODO: check if this correct for buying your own order
             // if the order is already created by the participant, then do not create a position
@@ -250,20 +283,24 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         // create position
         address seller;
         address buyer;
+        string memory destURL;
         if (order.isBuy) {
             buyer = order.participant;
             seller = _otherParticipant;
+            destURL = order.destURL;
         } else {
             buyer = _otherParticipant;
             seller = order.participant;
+            destURL = _destURL;
         }
 
         EnumerableSet.Bytes32Set storage participantDeliveryDatePositionIds =
-            participantDeliveryDatePositionIdsIndex[order.participant][order.deliveryDate];
+            participantDeliveryDatePositionIdsIndex[order.participant][order.deliveryAt];
         if (participantDeliveryDatePositionIds.length() > 0) {
             bytes32 existingPositionId = participantDeliveryDatePositionIds.at(0);
             Position memory existingPosition = positions[existingPositionId];
 
+            // TODO: remove duplications
             if (existingPosition.buyer == order.participant && !order.isBuy) {
                 seller = existingPosition.seller;
                 buyer = _otherParticipant;
@@ -279,20 +316,21 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             }
         }
 
-        bytes32 positionId = keccak256(abi.encode(seller, buyer, order.price, order.deliveryDate, block.timestamp));
+        bytes32 positionId = keccak256(abi.encode(seller, buyer, order.pricePerDay, order.deliveryAt, block.timestamp));
+        // TODO: matched order
         positions[positionId] = Position({
             seller: seller,
             buyer: buyer,
-            price: order.price,
-            startTime: order.deliveryDate,
-            timestamp: block.timestamp
+            pricePerDay: order.pricePerDay,
+            deliveryAt: order.deliveryAt,
+            createdAt: block.timestamp,
+            destURL: destURL
         });
-        positionIds.add(positionId);
         participantPositionIdsIndex[seller].add(positionId);
         participantPositionIdsIndex[buyer].add(positionId);
-        participantDeliveryDatePositionIdsIndex[seller][order.deliveryDate].add(positionId);
-        participantDeliveryDatePositionIdsIndex[buyer][order.deliveryDate].add(positionId);
-        emit PositionCreated(positionId, seller, buyer, order.price, order.deliveryDate, orderId);
+        participantDeliveryDatePositionIdsIndex[seller][order.deliveryAt].add(positionId);
+        participantDeliveryDatePositionIdsIndex[buyer][order.deliveryAt].add(positionId);
+        emit PositionCreated(positionId, seller, buyer, order.pricePerDay, order.deliveryAt, destURL, orderId);
     }
 
     function closeOrder(bytes32 _orderId) public {
@@ -304,29 +342,48 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     }
 
     function _closeOrder(bytes32 orderId, Order memory order) private {
-        EnumerableSet.Bytes32Set storage orderIndexId;
-        if (order.isBuy) {
-            orderIndexId = deliveryDatePriceOrdersLongIdIndex[order.deliveryDate][order.price];
-        } else {
-            orderIndexId = deliveryDatePriceOrdersShortIdIndex[order.deliveryDate][order.price];
-        }
-
+        EnumerableSet.Bytes32Set storage orderIndexId =
+            _deliveryDatePriceOrderIds(order.deliveryAt, order.pricePerDay, order.isBuy);
         orderIndexId.remove(orderId);
-        orderIds.remove(orderId);
 
         participantOrderIdsIndex[order.participant].remove(orderId);
+        participantDeliveryDatePriceOrderIdsIndex[order.participant][order.deliveryAt][order.pricePerDay].remove(
+            orderId
+        );
         delete orders[orderId];
         emit OrderClosed(orderId, order.participant);
     }
 
     function addMargin(uint256 _amount) public {
-        token.safeTransferFrom(_msgSender(), address(this), _amount);
         _mint(_msgSender(), _amount);
+        token.safeTransferFrom(_msgSender(), address(this), _amount);
     }
 
     function removeMargin(uint256 _amount) public enoughMarginBalance(_msgSender(), _amount) {
         _burn(_msgSender(), _amount);
         token.safeTransfer(_msgSender(), _amount);
+    }
+
+    // Admin functions
+
+    function setBreachPenaltyRatePerDay(uint256 _breachPenaltyRatePerDay) public onlyOwner {
+        if (_breachPenaltyRatePerDay > MAX_BREACH_PENALTY_RATE_PER_DAY) {
+            revert ValueOutOfRange(0, int256(MAX_BREACH_PENALTY_RATE_PER_DAY));
+        }
+        breachPenaltyRatePerDay = _breachPenaltyRatePerDay;
+    }
+
+    function withdrawFees() public onlyOwner {
+        uint256 balance = balanceOf(address(this));
+        if (balance > 0) {
+            _burn(address(this), balance);
+            token.safeTransfer(owner(), balance);
+        }
+    }
+
+    function setOrderFee(uint256 _orderFee) public onlyOwner {
+        orderFee = _orderFee;
+        emit OrderFeeUpdated(_orderFee);
     }
 
     /**
@@ -335,100 +392,67 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
      * @return The minimum margin required to keep the participant's positions and orders open
      */
     function getMarginShortfall(address _participant) public view returns (int256) {
-        uint256 sellQ = 0;
-        uint256 buyQ = 0;
+        uint256 qty = 0;
         int256 marginShortfall = 0;
 
         // calculate orders
         EnumerableSet.Bytes32Set storage _orders = participantOrderIdsIndex[_participant];
-        for (uint256 i = 0; i < _orders.length(); i++) {
-            bytes32 orderId = _orders.at(i);
-            Order memory order = orders[orderId];
-            if (order.isBuy) {
-                buyQ++;
-            } else {
-                sellQ++;
-            }
-        }
+        qty = _orders.length();
 
         //TODO: check if ok to use market price for orders, or should we use price of the order
-        marginShortfall += int256(calculateRequiredMargin(sellQ, false));
-        marginShortfall += int256(calculateRequiredMargin(buyQ, true));
+        marginShortfall += int256(calculateRequiredMargin(int256(qty)));
 
         // calculate positions
         int256 positionMarginBalance = 0;
-        buyQ = 0;
-        sellQ = 0;
+        qty = 0;
         EnumerableSet.Bytes32Set storage _positions = participantPositionIdsIndex[_participant];
         for (uint256 i = 0; i < _positions.length(); i++) {
             bytes32 positionId = _positions.at(i);
             Position memory position = positions[positionId];
-            bool isBuy = position.buyer == _participant;
-            positionMarginBalance += getMarginBalance(position, isBuy);
-            if (isBuy) {
-                buyQ++;
-            } else {
-                sellQ++;
-            }
+            positionMarginBalance += getMarginBalance(position);
+            qty++;
         }
 
-        uint256 maintenanceMargin = getMaintenanceMargin(sellQ, false) + getMaintenanceMargin(buyQ, true);
+        uint256 maintenanceMargin = getMaintenanceMargin(qty);
         int256 positionsMarginShortfall = int256(maintenanceMargin) - positionMarginBalance;
 
         return marginShortfall + positionsMarginShortfall;
     }
 
-    function getMarginShortfallForPosition(Position memory position, bool _isBuy) public view returns (int256) {
-        int256 marginBalance = getMarginBalance(position, _isBuy);
-        return int256(getMaintenanceMargin(1, _isBuy)) - marginBalance;
+    function getMarginShortfallForPosition(Position memory position) public view returns (int256) {
+        int256 marginBalance = getMarginBalance(position);
+        return int256(getMaintenanceMargin(1)) - marginBalance;
     }
 
-    // function calculateRequiredMargin(uint256 _sellHps, uint256 _buyHps) public view returns (uint256) {
-    //     // getHashesforToken is never returning 0;
-    //     uint256 hashesForToken = hashrateOracle.getHashesforToken();
-    //     uint256 requiredMargin = (_sellHps * getMarginPercent(false) + _buyHps * getMarginPercent(true))
-    //         * deliveryDurationSeconds / hashesForToken / 100;
-    //     return requiredMargin;
-    // }
-
-    // function calculateRequiredMarginV2(uint256 _hps, bool _isBuy) public view returns (uint256) {
-    //     return _hps * getMarginPercent(_isBuy) * deliveryDurationSeconds / 100 / hashrateOracle.getHashesforToken();
-    // }
-
-    function calculateRequiredMargin(uint256 _quantity, bool _isBuy) public view returns (uint256) {
-        return _quantity * speedHps * deliveryDurationSeconds * getMarginPercent(_isBuy) / 100
+    function calculateRequiredMargin(int256 _quantity) public view returns (uint256) {
+        return uint256(abs(_quantity)) * speedHps * deliveryDurationSeconds() * getMarginPercent() / 100
             / hashrateOracle.getHashesforToken();
     }
 
     /**
      * @notice Gets the virtual margin balance (initial margin + unrealized PnL) of a position
      * @param position The position to get the margin balance of
-     * @param _isBuy Whether the position is a buy position
      */
-    function getMarginBalance(Position memory position, bool _isBuy) private view returns (int256) {
-        uint256 initialMargin = calculateRequiredMargin(1, _isBuy);
-        int256 unrealizedPnL = int256(position.price) - int256(_getMarketPrice(hashrateOracle.getHashesforToken()));
+    function getMarginBalance(Position memory position) private view returns (int256) {
+        uint256 initialMargin = calculateRequiredMargin(1);
+        int256 unrealizedPnL = int256(position.pricePerDay * deliveryDurationDays)
+            - int256(_getMarketPrice(hashrateOracle.getHashesforToken()));
         return int256(initialMargin) + unrealizedPnL;
     }
 
     /**
      * @notice Gets the maintenance margin - minimal margin balance required to keep the position open
      * @param _quantity The quantity of the position
-     * @param _isBuy Whether the position is a buy position
      */
-    function getMaintenanceMargin(uint256 _quantity, bool _isBuy) private view returns (uint256) {
-        return _quantity * _getMarketPrice(hashrateOracle.getHashesforToken()) * getMarginPercent(_isBuy) / 100;
+    function getMaintenanceMargin(uint256 _quantity) private view returns (uint256) {
+        return _quantity * _getMarketPrice(hashrateOracle.getHashesforToken()) * getMarginPercent() / 100;
     }
 
     // TODO: calculate related to remaining delivery time
-    function getMarginPercent(bool _isBuy) public view returns (uint8) {
+    function getMarginPercent() public view returns (uint8) {
         uint8 breachPenaltyMarginPercent =
-            uint8(breachPenaltyRatePerDay * deliveryDurationSeconds / 10 ** (BREACH_PENALTY_DECIMALS - 2));
-        if (_isBuy) {
-            return buyerLiquidationMarginPercent + breachPenaltyMarginPercent;
-        } else {
-            return sellerLiquidationMarginPercent + breachPenaltyMarginPercent;
-        }
+            uint8(breachPenaltyRatePerDay * deliveryDurationSeconds() / 10 ** (BREACH_PENALTY_DECIMALS - 2));
+        return liquidationMarginPercent + breachPenaltyMarginPercent;
     }
 
     function marginCall(address _participant) external onlyValidator {
@@ -446,11 +470,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             bytes32 orderId = _orders.at(0);
             Order memory order = orders[orderId];
             _closeOrder(orderId, order);
-            if (order.isBuy) {
-                reclaimedMargin += int256(getMaintenanceMargin(1, true));
-            } else {
-                reclaimedMargin += int256(getMaintenanceMargin(1, false));
-            }
+
+            reclaimedMargin += int256(getMaintenanceMargin(1));
             if (reclaimedMargin >= marginShortfall) {
                 return;
             }
@@ -462,7 +483,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             bytes32 positionId = _positions.at(0);
             Position storage position = positions[positionId];
 
-            int256 marginBalance = getMarginBalance(position, position.seller == _participant);
+            int256 marginBalance = getMarginBalance(position);
             _closeAndCashSettleDeliveryAndPenalize(positionId, position, position.seller == _participant);
             reclaimedMargin += marginBalance;
             // TODO: update margin deficit since order closed and settled
@@ -470,6 +491,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
                 return;
             }
         }
+
+        //TODO: what happens if not enough funds to cover positions
     }
 
     /**
@@ -494,10 +517,10 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             revert OnlyValidatorOrPositionParticipant();
         }
 
-        if (block.timestamp < position.startTime) {
+        if (block.timestamp < position.deliveryAt) {
             revert PositionDeliveryNotStartedYet();
         }
-        if (block.timestamp > position.startTime + deliveryDurationSeconds) {
+        if (block.timestamp > position.deliveryAt + deliveryDurationSeconds()) {
             revert PositionDeliveryExpired();
         }
 
@@ -514,8 +537,10 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         private
     {
         // calculate and pay breach penalty
-        uint256 breachPenalty =
-            _calculateBreachPenalty(position.price, position.startTime + deliveryDurationSeconds - block.timestamp);
+        uint256 breachPenalty = _calculateBreachPenalty(
+            position.pricePerDay * deliveryDurationDays,
+            position.deliveryAt + deliveryDurationSeconds() - block.timestamp
+        );
         if (_blameSeller) {
             _transfer(position.seller, position.buyer, breachPenalty);
         } else {
@@ -533,9 +558,9 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     function _closeAndCashSettleDelivery(bytes32 _positionId, Position storage position) private {
         uint256 positionElapsedTime = 0;
         uint256 positionRemainingTime = 0;
-        if (block.timestamp > position.startTime) {
-            positionElapsedTime = block.timestamp - position.startTime;
-            positionRemainingTime = position.startTime + deliveryDurationSeconds - block.timestamp;
+        if (block.timestamp > position.deliveryAt) {
+            positionElapsedTime = block.timestamp - position.deliveryAt;
+            positionRemainingTime = position.deliveryAt + deliveryDurationSeconds() - block.timestamp;
         }
 
         uint256 hashesForToken = hashrateOracle.getHashesforToken();
@@ -543,11 +568,12 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         // if the position is not started yet, then use the current price
         uint256 currentPrice = _getMarketPrice(hashesForToken);
 
-        uint256 deliveredPayment = position.price * positionElapsedTime / deliveryDurationSeconds;
+        uint256 deliveredPayment =
+            position.pricePerDay * deliveryDurationDays * positionElapsedTime / deliveryDurationSeconds();
         _transfer(position.buyer, position.seller, deliveredPayment);
 
-        int256 priceDifference = int256(currentPrice) - int256(position.price);
-        uint256 pnl = abs(priceDifference) * positionRemainingTime / deliveryDurationSeconds;
+        int256 priceDifference = int256(currentPrice) - int256(position.pricePerDay * deliveryDurationDays);
+        uint256 pnl = abs(priceDifference) * positionRemainingTime / deliveryDurationSeconds();
         if (priceDifference > 0) {
             _transfer(position.seller, position.buyer, pnl);
         } else {
@@ -566,15 +592,14 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         delete positions[_positionId];
         participantPositionIdsIndex[_seller].remove(_positionId);
         participantPositionIdsIndex[_buyer].remove(_positionId);
-        positionIds.remove(_positionId);
-    }
-
-    function _getMarketPrice(uint256 _hashesForToken) private view returns (uint256) {
-        return deliveryDurationSeconds * speedHps / _hashesForToken;
     }
 
     function getMarketPrice() public view returns (uint256) {
         return _getMarketPrice(hashrateOracle.getHashesforToken());
+    }
+
+    function _getMarketPrice(uint256 _hashesForToken) private view returns (uint256) {
+        return deliveryDurationSeconds() * speedHps / _hashesForToken;
     }
 
     function getOrderById(bytes32 _orderId) public view returns (Order memory) {
@@ -585,22 +610,53 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         return positions[_positionId];
     }
 
-    function setBreachPenaltyRatePerDay(uint256 _breachPenaltyRatePerDay) public onlyOwner {
-        if (_breachPenaltyRatePerDay > MAX_BREACH_PENALTY_RATE_PER_DAY) {
-            revert ValueOutOfRange(0, int256(MAX_BREACH_PENALTY_RATE_PER_DAY));
-        }
-        breachPenaltyRatePerDay = _breachPenaltyRatePerDay;
-    }
-
     function getMinMargin(address _participant) public view returns (uint256) {
         return clamp(getMarginShortfall(_participant));
     }
 
-    /**
-     * @notice Returns how much participant needs to add to their collateral to cover the margin shortfall
-     */
+    /// @notice Returns how much participant needs to add to their collateral to cover the margin shortfall
     function getCollateralDeficit(address _participant) public view returns (int256) {
         return getMarginShortfall(_participant) - int256(balanceOf(_participant));
+    }
+
+    function getDeliveryDates() public view returns (uint256[] memory) {
+        uint256[] memory deliveryDatesArray = new uint256[](futureDeliveryDatesCount);
+        for (uint256 i = 0; i < futureDeliveryDatesCount; i++) {
+            deliveryDatesArray[i] = firstFutureDeliveryDate + deliveryIntervalSeconds() * i;
+        }
+        return deliveryDatesArray;
+    }
+
+    // Helper functions
+
+    function deliveryDurationSeconds() private view returns (uint256) {
+        return deliveryDurationDays * SECONDS_PER_DAY;
+    }
+
+    function deliveryIntervalSeconds() private view returns (uint256) {
+        return deliveryIntervalDays * SECONDS_PER_DAY;
+    }
+
+    /// @dev Convenience function to get the order index by delivery date and price
+    function _deliveryDatePriceOrderIds(uint256 _deliveryDate, uint256 _price, bool _isBuy)
+        private
+        view
+        returns (EnumerableSet.Bytes32Set storage)
+    {
+        if (_isBuy) {
+            return (deliveryDatePriceOrdersLongIdIndex[_deliveryDate][_price]);
+        } else {
+            return (deliveryDatePriceOrdersShortIdIndex[_deliveryDate][_price]);
+        }
+    }
+
+    function _getHashesForToken() private view returns (uint256) {
+        return (hashrateOracle.getHashesforToken() + minimumPriceIncrement / 2) / minimumPriceIncrement
+            * minimumPriceIncrement;
+    }
+
+    function _roundToNearest(uint256 _value, uint256 _increment) private pure returns (uint256) {
+        return (_value + _increment / 2) / _increment * _increment;
     }
 
     function clamp(int256 _value) public pure returns (uint256) {
@@ -619,11 +675,21 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         }
     }
 
+    function abs8(int8 _value) public pure returns (uint8) {
+        if (_value > 0) {
+            return uint8(_value);
+        } else {
+            return uint8(-_value);
+        }
+    }
+
+    // Validation functions
+
     function validatePrice(uint256 _price) private view {
         if (_price == 0) {
             revert InvalidPrice();
         }
-        if (_price % priceLadderStep != 0) {
+        if (_price % minimumPriceIncrement != 0) {
             revert InvalidPrice();
         }
     }
@@ -632,13 +698,25 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         if (_deliveryDate <= block.timestamp) {
             revert DeliveryDateShouldBeInTheFuture();
         }
-
-        if (!deliveryDates.contains(_deliveryDate)) {
+        if (_deliveryDate < firstFutureDeliveryDate) {
+            revert DeliveryDateNotAvailable();
+        }
+        uint256 elapsedFromFirstDeliveryDate = _deliveryDate - firstFutureDeliveryDate;
+        if (elapsedFromFirstDeliveryDate % deliveryIntervalSeconds() != 0) {
+            revert DeliveryDateNotAvailable();
+        }
+        if (elapsedFromFirstDeliveryDate > (futureDeliveryDatesCount - 1) * deliveryIntervalSeconds()) {
             revert DeliveryDateNotAvailable();
         }
     }
 
-    // ERC20
+    function validateQty(int8 _qty) private pure {
+        if (_qty == 0) {
+            revert InvalidQty();
+        }
+    }
+
+    // ERC20 functions
 
     function decimals() public view override returns (uint8) {
         return _decimals;
@@ -661,6 +739,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     {
         return super.transferFrom(_from, _to, _amount);
     }
+
+    // Modifiers
 
     modifier enoughMarginBalance(address _from, uint256 _amount) {
         uint256 balance = balanceOf(_from);

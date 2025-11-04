@@ -18,11 +18,15 @@ export async function deployOnlyFuturesFixture(
   const { validator, seller, buyer, buyer2, owner, pc, tc } = accounts;
   const { oracle } = config;
 
-  const sellerLiquidationMarginPercent = 20;
-  const buyerLiquidationMarginPercent = 20;
+  const liquidationMarginPercent = 20;
   const speedHps = parseUnits("100", 12); // 100 TH/s
-  const deliveryDurationSeconds = 30 * 24 * 3600; // 30 days
-  const priceLadderStep = parseUnits("0.05", 6);
+  const deliveryDurationDays = 7;
+  const deliveryDurationSeconds = deliveryDurationDays * 24 * 3600; // 30 days
+  const priceLadderStep = parseUnits("0.05", 6); // 0.05 USDC
+  const orderFee = parseUnits("1", 6); // 1 USDC
+  const { timestamp: now } = await pc.getBlock({ blockTag: "latest" });
+  const futureDeliveryDatesCount = 3;
+  const firstFutureDeliveryDate = now + BigInt(deliveryDurationSeconds);
 
   // Deploy Futures contract
   const futuresImpl = await viem.deployContract("contracts/marketplace/Futures.sol:Futures", []);
@@ -35,15 +39,20 @@ export async function deployOnlyFuturesFixture(
         usdcMock.address,
         hashrateOracle.address,
         validator.account.address,
-        sellerLiquidationMarginPercent,
-        buyerLiquidationMarginPercent,
+        liquidationMarginPercent,
         speedHps,
-        deliveryDurationSeconds,
         priceLadderStep,
+        deliveryDurationDays,
+        deliveryDurationDays,
+        futureDeliveryDatesCount,
+        firstFutureDeliveryDate,
       ],
     }),
   ]);
   const futures = await viem.getContractAt("Futures", futuresProxy.address);
+  await futures.write.setOrderFee([orderFee], { account: owner.account });
+
+  const deliveryDates = await futures.read.getDeliveryDates();
 
   // Approve futures contract to spend USDC for all accounts
   await usdcMock.write.approve([futures.address, maxUint256], { account: seller.account });
@@ -51,29 +60,15 @@ export async function deployOnlyFuturesFixture(
   await usdcMock.write.approve([futures.address, maxUint256], { account: buyer2.account });
   await usdcMock.write.approve([futures.address, maxUint256], { account: validator.account });
 
-  // Add some delivery dates for testing
-  const currentTime = BigInt(await time.latest());
-  const deliveryDate1 = currentTime + 30n * 86400n; // 1 day from now
-  const deliveryDate2 = currentTime + 60n * 86400n; // 2 days from now
-  const deliveryDate3 = currentTime + 90n * 86400n; // 3 days from now
-
-  await futures.write.addDeliveryDate([deliveryDate1], { account: owner.account });
-  await futures.write.addDeliveryDate([deliveryDate2], { account: owner.account });
-  await futures.write.addDeliveryDate([deliveryDate3], { account: owner.account });
-
   return {
     config: {
       oracle,
-      deliveryDates: {
-        date1: deliveryDate1,
-        date2: deliveryDate2,
-        date3: deliveryDate3,
-      },
       speedHps,
-      sellerLiquidationMarginPercent,
-      buyerLiquidationMarginPercent,
+      liquidationMarginPercent,
       deliveryDurationSeconds,
       priceLadderStep,
+      orderFee,
+      deliveryDates,
     },
     contracts: {
       usdcMock,
@@ -108,18 +103,19 @@ export async function deployOnlyFuturesWithDummyData(
   await futures.write.addMargin([marginAmount], { account: buyer2.account });
 
   // create positions
-  let d = config.deliveryDates.date1;
+  let d = config.deliveryDates[0];
+  const dst = "https://destination-url.com";
   // sell positions
-  await futures.write.createOrder([parseUnits("160", 6), d, 1, false], { account: seller.account });
-  await futures.write.createOrder([parseUnits("155", 6), d, 1, false], { account: seller.account });
-  await futures.write.createOrder([parseUnits("150", 6), d, 1, false], { account: seller.account });
+  await futures.write.createOrder([parseUnits("160", 6), d, "", -1], { account: seller.account });
+  await futures.write.createOrder([parseUnits("155", 6), d, "", -1], { account: seller.account });
+  await futures.write.createOrder([parseUnits("150", 6), d, "", -1], { account: seller.account });
 
   // buy positions
-  await futures.write.createOrder([parseUnits("140", 6), d, 1, true], { account: buyer.account });
-  await futures.write.createOrder([parseUnits("135", 6), d, 1, true], { account: buyer.account });
-  await futures.write.createOrder([parseUnits("130", 6), d, 1, true], { account: buyer.account });
+  await futures.write.createOrder([parseUnits("140", 6), d, dst, 1], { account: buyer.account });
+  await futures.write.createOrder([parseUnits("135", 6), d, dst, 1], { account: buyer.account });
+  await futures.write.createOrder([parseUnits("130", 6), d, dst, 1], { account: buyer.account });
 
   // matched position => order
-  await futures.write.createOrder([parseUnits("150", 6), d, 1, true], { account: buyer.account });
+  await futures.write.createOrder([parseUnits("150", 6), d, dst, 1], { account: buyer.account });
   return _data;
 }

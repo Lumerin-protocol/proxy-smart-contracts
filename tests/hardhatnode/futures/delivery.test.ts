@@ -18,7 +18,7 @@ describe("Futures Delivery", () => {
 
     const price = quantizePrice(await futures.read.getMarketPrice(), config.priceLadderStep);
     const marginAmount = parseUnits("1000", 6);
-    const deliveryDate = config.deliveryDates.date1;
+    const deliveryDate = config.deliveryDates[0];
 
     // Add margin for both participants
     await futures.write.addMargin([marginAmount], {
@@ -32,10 +32,11 @@ describe("Futures Delivery", () => {
     logBalance(buyer, "buyer");
 
     // Create matching orders to form a position
-    await futures.write.createOrder([price, deliveryDate, 1, false], {
+    const dst = "https://destination-url.com";
+    await futures.write.createOrder([price, deliveryDate, "", -1], {
       account: seller.account,
     });
-    const txHash = await futures.write.createOrder([price, deliveryDate, 1, true], {
+    const txHash = await futures.write.createOrder([price, deliveryDate, dst, 1], {
       account: buyer.account,
     });
 
