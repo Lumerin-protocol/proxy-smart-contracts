@@ -15,13 +15,14 @@ services:
       - localhost:host-gateway
     env_file:
       - ../.env
+      - .env
     environment:
       postgres_host: postgres
       postgres_user: graph-node
       postgres_pass: let-me-in
       postgres_db: graph-node
       ipfs: "ipfs:5001"
-      ethereum: "localhost:http://localhost:8545"
+      ethereum: "${SUBGRAPH_ETH_NODE}"
       GRAPH_LOG: debug
   ipfs:
     image: ipfs/kubo:v0.17.0

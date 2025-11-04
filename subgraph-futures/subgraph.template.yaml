@@ -24,27 +24,26 @@ dataSources:
         - Participant
         - Position
         - Order
-        - DeliveryDate
       abis:
         - name: Futures
           file: ../abi/Futures.json
       eventHandlers:
         - event: Initialized(uint64)
           handler: handleInitialized
-        - event: PositionCreated(indexed bytes32,indexed address,indexed address,uint256,uint256,bytes32)
+        - event: PositionCreated(indexed bytes32,indexed address,indexed address,uint256,uint256,string,bytes32)
           handler: handlePositionCreated
         - event: PositionClosed(indexed bytes32)
           handler: handlePositionClosed
         - event: PositionDeliveryClosed(indexed bytes32,indexed address)
           handler: handlePositionDeliveryClosed
-        - event: OrderCreated(indexed bytes32,indexed address,uint256,uint256,bool)
+        - event: OrderCreated(indexed bytes32,indexed address,string,uint256,uint256,bool)
           handler: handleOrderCreated
         - event: OrderClosed(indexed bytes32,indexed address)
           handler: handleOrderClosed
-        - event: DeliveryDateAdded(uint256)
-          handler: handleDeliveryDateAdded
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleTransfer
+        - event: OrderFeeUpdated(uint256)
+          handler: handleOrderFeeUpdated
       file: ./src/futures.ts
   - kind: ethereum
     name: HashrateOracle

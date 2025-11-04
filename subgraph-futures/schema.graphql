@@ -6,12 +6,14 @@ type Futures @entity(immutable: false) {
   initializeTimestamp: BigInt!
 
   "Contract configuration parameters"
-  minSellerStake: BigInt!
-  priceLadderStep: BigInt!
-  sellerLiquidationMarginPercent: Int!
-  buyerLiquidationMarginPercent: Int!
+  minimumPriceIncrement: BigInt!
+  orderFee: BigInt!
+  liquidationMarginPercent: Int!
   speedHps: BigInt!
-  deliveryDurationSeconds: BigInt!
+  deliveryDurationDays: Int!
+  deliveryIntervalDays: Int!
+  futureDeliveryDatesCount: Int!
+  firstFutureDeliveryDate: BigInt!
   breachPenaltyRatePerDay: BigInt!
   validatorAddress: Bytes!
   hashrateOracleAddress: Bytes!
@@ -25,11 +27,6 @@ type Futures @entity(immutable: false) {
   # purchase stats
   purchaseCount: Int!
   closeoutCount: Int!
-}
-
-type DeliveryDate @entity(immutable: true) {
-  id: Bytes!
-  deliveryDate: BigInt!
 }
 
 # Futures Contract Entities
@@ -54,12 +51,13 @@ type Participant @entity(immutable: false) {
 type Order @entity(immutable: false) {
   id: Bytes!
   participant: Participant!
-  price: BigInt!
-  deliveryDate: BigInt!
+  pricePerDay: BigInt!
+  deliveryAt: BigInt!
   isBuy: Boolean!
   timestamp: BigInt!
   blockNumber: BigInt!
   transactionHash: Bytes!
+  destURL: String!
 
   # Status
   isActive: Boolean!
@@ -71,12 +69,13 @@ type Position @entity(immutable: false) {
   id: Bytes!
   seller: Participant!
   buyer: Participant!
-  price: BigInt!
-  startTime: BigInt!
+  pricePerDay: BigInt!
+  deliveryAt: BigInt!
   timestamp: BigInt!
   blockNumber: BigInt!
   transactionHash: Bytes!
   orderId: Bytes!
+  destURL: String!
 
   # Status
   isActive: Boolean!

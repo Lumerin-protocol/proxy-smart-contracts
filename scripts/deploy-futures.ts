@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { requireEnvsSet } from "../lib/utils";
 import { viem } from "hardhat";
-import { encodeFunctionData, zeroAddress } from "viem";
+import { encodeFunctionData } from "viem";
 import { writeAndWait } from "./lib/writeContract";
 import { verifyContract } from "./lib/verify";
 

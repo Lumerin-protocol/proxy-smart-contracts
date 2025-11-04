@@ -23,29 +23,39 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
-    uint8 public constant BREACH_PENALTY_DECIMALS = 18;
-    uint32 private constant SECONDS_PER_DAY = 3600 * 24;
-    uint256 private constant MAX_BREACH_PENALTY_RATE_PER_DAY = 5 * 10 ** (BREACH_PENALTY_DECIMALS - 2); // 5%
-    uint8 public constant MAX_ORDERS_PER_PARTICIPANT = 50;
+    // mappings
+    mapping(bytes32 => Order) private orders;
+    mapping(bytes32 => Position) private positions;
+    mapping(uint256 => mapping(uint256 => EnumerableSet.Bytes32Set)) private deliveryDatePriceOrdersLongIdIndex; // index of long positions by delivery date and price
+    mapping(uint256 => mapping(uint256 => EnumerableSet.Bytes32Set)) private deliveryDatePriceOrdersShortIdIndex; // index of short positions by delivery date and price
+    mapping(address => EnumerableSet.Bytes32Set) private participantPositionIdsIndex; // index of  positions by participant
+    mapping(address => EnumerableSet.Bytes32Set) private participantOrderIdsIndex; // index of orders by participant
+    mapping(address => mapping(uint256 => EnumerableSet.Bytes32Set)) private participantDeliveryDatePositionIdsIndex; // index of positions by participant and delivery date
+    mapping(address => mapping(uint256 => mapping(uint256 => EnumerableSet.Bytes32Set))) private
+        participantDeliveryDatePriceOrderIdsIndex;
 
-    uint8 public liquidationMarginPercent;
+    uint256 public breachPenaltyRatePerDay; // penalty for breaching the contract either by seller or buyer
+    uint256 public firstFutureDeliveryDate; // timestamp of the first future delivery date
+    uint256 public speedHps; // speed of the one unit of futures in hashes/second, constant for all positions
+    uint256 public minimumPriceIncrement; // difference between two closest prices in the order table
+    uint256 public orderFee; // fee for creating an order in tokens
+    uint256 private nonce = 0; // nonce for the order id
 
     IERC20 public token;
     HashrateOracle public hashrateOracle;
     address public validatorAddress; // address of the validator that can close orders that are not delivered and regularly calls marginCall function
-    uint256 public breachPenaltyRatePerDay; // penalty for breaching the contract either by seller or buyer
 
-    uint256 public speedHps; // speed of the one unit of futures in hashes/second, constant for all positions
-    uint32 public deliveryDurationDays; // duration of the delivery in seconds
-    uint32 public deliveryIntervalDays; // interval between two closest delivery dates in days
-    uint32 public futureDeliveryDatesCount; // number of future delivery dates to be available for orders
-    uint256 public firstFutureDeliveryDate; // timestamp of the first future delivery date
+    uint8 public deliveryDurationDays; // duration of the delivery in seconds
+    uint8 public deliveryIntervalDays; // interval between two closest delivery dates in days
+    uint8 public futureDeliveryDatesCount; // number of future delivery dates to be available for orders
+    uint8 public liquidationMarginPercent;
+    uint8 private _decimals; // decimals of the wrapped token
 
-    uint256 public minimumPriceIncrement; // difference between two closest prices in the order table
-    uint256 public orderFee; // fee for creating an order in tokens
-
-    uint256 private nonce = 0;
-    uint8 private _decimals;
+    // constants
+    uint8 public constant MAX_ORDERS_PER_PARTICIPANT = 50;
+    uint8 public constant BREACH_PENALTY_DECIMALS = 18;
+    uint32 private constant SECONDS_PER_DAY = 3600 * 24;
+    uint256 private constant MAX_BREACH_PENALTY_RATE_PER_DAY = 5 * 10 ** (BREACH_PENALTY_DECIMALS - 2); // 5%
 
     /// @notice Represents an order to buy or sell a futures contract
     /// @dev Created when a participant places an order
@@ -69,17 +79,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         uint256 createdAt; // timestamp of the creation of the position
     }
 
-    mapping(bytes32 => Order) private orders;
-    mapping(bytes32 => Position) private positions;
-
-    mapping(uint256 => mapping(uint256 => EnumerableSet.Bytes32Set)) private deliveryDatePriceOrdersLongIdIndex; // index of long positions by delivery date and price
-    mapping(uint256 => mapping(uint256 => EnumerableSet.Bytes32Set)) private deliveryDatePriceOrdersShortIdIndex; // index of short positions by delivery date and price
-    mapping(address => EnumerableSet.Bytes32Set) private participantPositionIdsIndex; // index of  positions by participant
-    mapping(address => EnumerableSet.Bytes32Set) private participantOrderIdsIndex; // index of orders by participant
-    mapping(address => mapping(uint256 => EnumerableSet.Bytes32Set)) private participantDeliveryDatePositionIdsIndex; // index of positions by participant and delivery date
-    mapping(address => mapping(uint256 => mapping(uint256 => EnumerableSet.Bytes32Set))) private
-        participantDeliveryDatePriceOrderIdsIndex;
-
+    // events
     event OrderCreated(
         bytes32 indexed orderId,
         address indexed participant,
@@ -102,6 +102,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     event PositionClosed(bytes32 indexed positionId);
     event PositionDeliveryClosed(bytes32 indexed positionId, address indexed closedBy);
 
+    // errors
     error InvalidPrice();
     error InvalidQty();
     error DeliveryDateShouldBeInTheFuture();
@@ -127,9 +128,9 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         uint8 _liquidationMarginPercent,
         uint256 _speedHps,
         uint256 _minimumPriceIncrement,
-        uint32 _deliveryDurationDays,
-        uint32 _deliveryIntervalDays,
-        uint32 _futureDeliveryDatesCount,
+        uint8 _deliveryDurationDays,
+        uint8 _deliveryIntervalDays,
+        uint8 _futureDeliveryDatesCount,
         uint256 _firstFutureDeliveryDate
     ) public initializer {
         __Ownable_init(_msgSender());
@@ -138,14 +139,12 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         hashrateOracle = _hashrateOracle;
         validatorAddress = _validatorAddress;
         liquidationMarginPercent = _liquidationMarginPercent;
-        breachPenaltyRatePerDay = 1 * 10 ** (BREACH_PENALTY_DECIMALS - 2); // 1%
+        breachPenaltyRatePerDay = 0;
         minimumPriceIncrement = _minimumPriceIncrement;
         speedHps = _speedHps;
         deliveryDurationDays = _deliveryDurationDays;
         deliveryIntervalDays = _deliveryIntervalDays;
-        // TODO: validate _futureDeliveryDatesCount > 0
-        // and add setter for _futureDeliveryDatesCount, cause we might adjust it on the fly
-        futureDeliveryDatesCount = _futureDeliveryDatesCount;
+        setFutureDeliveryDatesCount(_futureDeliveryDatesCount);
         firstFutureDeliveryDate = _firstFutureDeliveryDate;
     }
 
@@ -373,17 +372,28 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         breachPenaltyRatePerDay = _breachPenaltyRatePerDay;
     }
 
+    function setLiquidationMarginPercent(uint8 _liquidationMarginPercent) public onlyOwner {
+        liquidationMarginPercent = _liquidationMarginPercent;
+    }
+
+    function setFutureDeliveryDatesCount(uint8 _futureDeliveryDatesCount) public onlyOwner {
+        if (_futureDeliveryDatesCount < 1) {
+            revert ValueOutOfRange(1, int256(uint256(type(uint8).max)));
+        }
+        futureDeliveryDatesCount = _futureDeliveryDatesCount;
+    }
+
+    function setOrderFee(uint256 _orderFee) public onlyOwner {
+        orderFee = _orderFee;
+        emit OrderFeeUpdated(_orderFee);
+    }
+
     function withdrawFees() public onlyOwner {
         uint256 balance = balanceOf(address(this));
         if (balance > 0) {
             _burn(address(this), balance);
             token.safeTransfer(owner(), balance);
         }
-    }
-
-    function setOrderFee(uint256 _orderFee) public onlyOwner {
-        orderFee = _orderFee;
-        emit OrderFeeUpdated(_orderFee);
     }
 
     /**
@@ -659,7 +669,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         return (_value + _increment / 2) / _increment * _increment;
     }
 
-    function clamp(int256 _value) public pure returns (uint256) {
+    function clamp(int256 _value) private pure returns (uint256) {
         if (_value > 0) {
             return uint256(_value);
         } else {
@@ -667,7 +677,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         }
     }
 
-    function abs(int256 _value) public pure returns (uint256) {
+    function abs(int256 _value) private pure returns (uint256) {
         if (_value > 0) {
             return uint256(_value);
         } else {
@@ -675,7 +685,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         }
     }
 
-    function abs8(int8 _value) public pure returns (uint8) {
+    function abs8(int8 _value) private pure returns (uint8) {
         if (_value > 0) {
             return uint8(_value);
         } else {
