@@ -211,7 +211,7 @@ export function handlePositionCreated(event: PositionCreated): void {
 }
 
 export function handlePositionClosed(event: PositionClosed): void {
-  log.info("Position closed: {} by {}", [event.params.positionId.toHexString()]);
+  log.info("Position closed: {}", [event.params.positionId.toHexString()]);
 
   const position = Position.load(event.params.positionId);
   if (!position) {
@@ -247,7 +247,7 @@ export function handlePositionClosed(event: PositionClosed): void {
 }
 
 export function handlePositionDeliveryClosed(event: PositionDeliveryClosed): void {
-  log.info("Position delivery closed: {} by {}", [event.params.positionId.toHexString()]);
+  log.info("Position delivery closed: {}", [event.params.positionId.toHexString()]);
 
   const position = Position.load(event.params.positionId);
   if (!position) {
