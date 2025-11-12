@@ -11,7 +11,7 @@ import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableS
 import { HashrateOracle } from "./HashrateOracle.sol";
 import { StructuredLinkedList } from "solidity-linked-list/contracts/StructuredLinkedList.sol";
 
-import { console } from "hardhat/console.sol";
+// import { console } from "hardhat/console.sol";
 
 // TODO:
 // 3. Write tests for offseting order/positions
@@ -342,7 +342,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             }
         }
 
-        bytes32 positionId = keccak256(abi.encode(seller, buyer, order.pricePerDay, order.deliveryAt, block.timestamp));
+        bytes32 positionId =
+            keccak256(abi.encode(seller, buyer, order.pricePerDay, order.deliveryAt, block.timestamp, nonce++));
         positions[positionId] = Position({
             seller: seller,
             buyer: buyer,
@@ -443,7 +444,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             // will affect total effective margin of the participant, reducing it
             // but if the order is close to market we have to make sure it maintains the margin requirement,
             // so it could be immediately matched
-            effectiveMargin += int256(clamp(getMinMarginForPosition(order.pricePerDay, qty)));
+            int256 margin = int256(clamp(getMinMarginForPosition(order.pricePerDay, qty)));
+            effectiveMargin += margin;
         }
         // calculate positions
         EnumerableSet.Bytes32Set storage _positions = participantPositionIdsIndex[_participant];
@@ -451,7 +453,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             bytes32 positionId = _positions.at(i);
             Position memory position = positions[positionId];
             int256 qty = position.buyer == _participant ? int256(1) : int256(-1);
-            effectiveMargin += getMinMarginForPosition(position.pricePerDay, qty);
+            int256 _margin = getMinMarginForPosition(position.pricePerDay, qty);
+            effectiveMargin += _margin;
         }
         return effectiveMargin;
     }
@@ -470,7 +473,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             return;
         }
 
-        int256 marginShortfall = int256(userCollateral) - effectiveMargin;
+        int256 marginShortfall = effectiveMargin - int256(userCollateral);
 
         int256 reclaimedMargin; // amount of margin that will be reclaimed by closing positions/orders
 
@@ -480,9 +483,11 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             bytes32 orderId = _orders.at(0);
             Order memory order = orders[orderId];
 
-            _closeOrder(orderId, order);
             int256 qty = order.isBuy ? int256(1) : int256(-1);
-            reclaimedMargin += int256(clamp(getMinMarginForPosition(order.pricePerDay, qty)));
+            int256 _margin = int256(clamp(getMinMarginForPosition(order.pricePerDay, qty)));
+            _closeOrder(orderId, order);
+
+            reclaimedMargin += _margin;
             if (reclaimedMargin >= marginShortfall) {
                 return;
             }
@@ -494,14 +499,13 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             bytes32 positionId = _positions.at(0);
             Position storage position = positions[positionId];
 
-            int256 qty = position.buyer == _participant ? int256(1) : int256(-1);
-            int256 _margin = getMinMarginForPosition(position.pricePerDay, qty);
-            // TODO: return how much of margin was utilized to cash settle the delivery
-            // TODO: force liquidation instead of cash settle
-            _closeAndCashSettleDeliveryAndPenalize(positionId, position, position.seller == _participant);
-            reclaimedMargin += _margin;
-            // TODO: update margin deficit since order closed and settled
-            if (reclaimedMargin >= marginShortfall) {
+            // int256 qty = position.buyer == _participant ? int256(1) : int256(-1);
+            // int256 _margin = getMinMarginForPosition(position.pricePerDay, qty);
+            // Force liquidation: settle unrealized PnL at market price and close position
+            _forceLiquidatePosition(positionId, position);
+            uint256 collateralBalance = balanceOf(_participant);
+            int256 minMargin = getMinMargin(_participant);
+            if (int256(collateralBalance) >= minMargin) {
                 return;
             }
         }
@@ -601,6 +605,36 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
 
     function _calculateBreachPenalty(uint256 _price, uint256 remainingTime) private view returns (uint256) {
         return _price * breachPenaltyRatePerDay * remainingTime / SECONDS_PER_DAY / 10 ** BREACH_PENALTY_DECIMALS;
+    }
+
+    /**
+     * @notice Force liquidates a position by settling unrealized PnL at current market price
+     * @param _positionId The id of the position to liquidate
+     * @param position The position to liquidate
+     */
+    function _forceLiquidatePosition(bytes32 _positionId, Position storage position) private returns (int256) {
+        uint256 marketPricePerDay = getMarketPrice();
+        int256 entryPricePerDay = int256(position.pricePerDay);
+
+        // Calculate PnL for buyer (qty = +1)
+        int256 buyerPnL = (int256(marketPricePerDay) - entryPricePerDay) * int256(uint256(deliveryDurationDays));
+
+        // Transfer PnL: if buyerPnL > 0, buyer profits (seller pays), if buyerPnL < 0, buyer loses (seller gains)
+        if (buyerPnL > 0) {
+            // Buyer profits, seller pays
+            _transfer(position.seller, position.buyer, uint256(buyerPnL));
+        } else if (buyerPnL < 0) {
+            // Buyer loses, seller gains
+            _transfer(position.buyer, position.seller, uint256(-buyerPnL));
+        }
+
+        // Remove position from all indexes
+        _removePosition(_positionId, position.seller, position.buyer);
+        participantDeliveryDatePositionIdsIndex[position.seller][position.deliveryAt].remove(_positionId);
+        participantDeliveryDatePositionIdsIndex[position.buyer][position.deliveryAt].remove(_positionId);
+
+        emit PositionClosed(_positionId);
+        return buyerPnL;
     }
 
     function _removePosition(bytes32 _positionId, address _seller, address _buyer) private {
