@@ -41,7 +41,6 @@ const config: HardhatUserConfig = {
             //   },
             // },
           },
-          // viaIR: true,
         },
       },
     ],

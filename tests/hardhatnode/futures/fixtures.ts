@@ -27,6 +27,7 @@ export async function deployOnlyFuturesFixture(
   const { timestamp: now } = await pc.getBlock({ blockTag: "latest" });
   const futureDeliveryDatesCount = 3;
   const firstFutureDeliveryDate = now + BigInt(deliveryDurationSeconds);
+  const collateralAmount = parseUnits("10000", 6);
 
   // Deploy Futures contract
   const futuresImpl = await viem.deployContract("contracts/marketplace/Futures.sol:Futures", []);
@@ -51,14 +52,15 @@ export async function deployOnlyFuturesFixture(
   ]);
   const futures = await viem.getContractAt("Futures", futuresProxy.address);
   await futures.write.setOrderFee([orderFee], { account: owner.account });
-
   const deliveryDates = await futures.read.getDeliveryDates();
-
   // Approve futures contract to spend USDC for all accounts
   await usdcMock.write.approve([futures.address, maxUint256], { account: seller.account });
   await usdcMock.write.approve([futures.address, maxUint256], { account: buyer.account });
   await usdcMock.write.approve([futures.address, maxUint256], { account: buyer2.account });
   await usdcMock.write.approve([futures.address, maxUint256], { account: validator.account });
+  await usdcMock.write.approve([futures.address, maxUint256], { account: owner.account });
+
+  await futures.write.depositReservePool([collateralAmount], { account: owner.account });
 
   return {
     config: {
@@ -69,6 +71,10 @@ export async function deployOnlyFuturesFixture(
       priceLadderStep,
       orderFee,
       deliveryDates,
+      futureDeliveryDatesCount,
+      firstFutureDeliveryDate,
+      deliveryDurationDays,
+      deliveryIntervalDays: deliveryDurationDays,
     },
     contracts: {
       usdcMock,
