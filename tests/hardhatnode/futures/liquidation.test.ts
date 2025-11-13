@@ -434,5 +434,127 @@ describe("Futures - Liquidation", function () {
         expect(sellerDiff <= tolerance).to.be.true;
       }
     });
+
+    it("should create counterparty order when buyer is liquidated", async function () {
+      const { contracts, accounts, positionId } = await loadFixture(positionWithMarginFixture);
+      const { futures, hashrateOracle } = contracts;
+      const { seller, buyer, validator, pc } = accounts;
+
+      // Get position details before liquidation
+      const position = await futures.read.getPositionById([positionId!]);
+      expect(position.seller).to.equal(getAddress(seller.account.address));
+      expect(position.buyer).to.equal(getAddress(buyer.account.address));
+      const positionPrice = position.pricePerDay;
+      const positionDeliveryDate = position.deliveryAt;
+      const positionDestURL = position.destURL;
+
+      // Move market price down significantly (buyer is at loss)
+      const hashesForBTC = await hashrateOracle.read.getHashesForBTC();
+      await hashrateOracle.write.setHashesForBTC([(hashesForBTC.value * 150n) / 100n]);
+
+      // Verify buyer has insufficient margin
+      const buyerMinMargin = await futures.read.getMinMargin([buyer.account.address]);
+      const buyerCollateral = await futures.read.balanceOf([buyer.account.address]);
+      expect(buyerCollateral < buyerMinMargin).to.be.true;
+
+      // Execute margin call on buyer
+      const txHash = await futures.write.marginCall([buyer.account.address], {
+        account: validator.account,
+      });
+
+      // Check events
+      const receipt = await pc.waitForTransactionReceipt({ hash: txHash });
+      const positionClosedEvents = parseEventLogs({
+        logs: receipt.logs,
+        abi: futures.abi,
+        eventName: "PositionClosed",
+      });
+      expect(positionClosedEvents.length).to.equal(1);
+      expect(positionClosedEvents[0].args.positionId).to.equal(positionId);
+
+      // Verify OrderCreated event for counterparty (seller)
+      const orderCreatedEvents = parseEventLogs({
+        logs: receipt.logs,
+        abi: futures.abi,
+        eventName: "OrderCreated",
+      });
+      expect(orderCreatedEvents.length).to.equal(1);
+
+      const counterpartyOrder = orderCreatedEvents[0].args;
+      expect(counterpartyOrder.participant).to.equal(getAddress(seller.account.address));
+      expect(counterpartyOrder.pricePerDay).to.equal(positionPrice);
+      expect(counterpartyOrder.deliveryAt).to.equal(positionDeliveryDate);
+      expect(counterpartyOrder.destURL).to.equal(positionDestURL);
+      // When buyer is liquidated, seller (counterparty) should get a sell order (isBuy = false)
+      expect(counterpartyOrder.isBuy).to.equal(false);
+
+      // Verify the order exists in the contract
+      const order = await futures.read.getOrderById([counterpartyOrder.orderId]);
+      expect(order.participant).to.equal(getAddress(seller.account.address));
+      expect(order.pricePerDay).to.equal(positionPrice);
+      expect(order.deliveryAt).to.equal(positionDeliveryDate);
+      expect(order.isBuy).to.equal(false);
+    });
+
+    it("should create counterparty order when seller is liquidated", async function () {
+      const { contracts, accounts, positionId } = await loadFixture(positionWithMarginFixture);
+      const { futures, hashrateOracle } = contracts;
+      const { seller, buyer, validator, pc } = accounts;
+
+      // Get position details before liquidation
+      const position = await futures.read.getPositionById([positionId!]);
+      expect(position.seller).to.equal(getAddress(seller.account.address));
+      expect(position.buyer).to.equal(getAddress(buyer.account.address));
+      const positionPrice = position.pricePerDay;
+      const positionDeliveryDate = position.deliveryAt;
+      const positionDestURL = position.destURL;
+
+      // Move market price up (seller is at loss)
+      const hashesForBTC = await hashrateOracle.read.getHashesForBTC();
+      await hashrateOracle.write.setHashesForBTC([(hashesForBTC.value * 80n) / 100n]);
+
+      // Verify seller has insufficient margin
+      const sellerMinMargin = await futures.read.getMinMargin([seller.account.address]);
+      const sellerCollateral = await futures.read.balanceOf([seller.account.address]);
+      expect(sellerCollateral < sellerMinMargin).to.be.true;
+
+      // Execute margin call on seller
+      const txHash = await futures.write.marginCall([seller.account.address], {
+        account: validator.account,
+      });
+
+      // Check events
+      const receipt = await pc.waitForTransactionReceipt({ hash: txHash });
+      const positionClosedEvents = parseEventLogs({
+        logs: receipt.logs,
+        abi: futures.abi,
+        eventName: "PositionClosed",
+      });
+      expect(positionClosedEvents.length).to.equal(1);
+      expect(positionClosedEvents[0].args.positionId).to.equal(positionId);
+
+      // Verify OrderCreated event for counterparty (buyer)
+      const orderCreatedEvents = parseEventLogs({
+        logs: receipt.logs,
+        abi: futures.abi,
+        eventName: "OrderCreated",
+      });
+      expect(orderCreatedEvents.length).to.equal(1);
+
+      const counterpartyOrder = orderCreatedEvents[0].args;
+      expect(counterpartyOrder.participant).to.equal(getAddress(buyer.account.address));
+      expect(counterpartyOrder.pricePerDay).to.equal(positionPrice);
+      expect(counterpartyOrder.deliveryAt).to.equal(positionDeliveryDate);
+      expect(counterpartyOrder.destURL).to.equal(positionDestURL);
+      // When seller is liquidated, buyer (counterparty) should get a buy order (isBuy = true)
+      expect(counterpartyOrder.isBuy).to.equal(true);
+
+      // Verify the order exists in the contract
+      const order = await futures.read.getOrderById([counterpartyOrder.orderId]);
+      expect(order.participant).to.equal(getAddress(buyer.account.address));
+      expect(order.pricePerDay).to.equal(positionPrice);
+      expect(order.deliveryAt).to.equal(positionDeliveryDate);
+      expect(order.isBuy).to.equal(true);
+    });
   });
 });

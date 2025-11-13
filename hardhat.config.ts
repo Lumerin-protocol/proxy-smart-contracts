@@ -8,6 +8,7 @@ import "hardhat-abi-exporter";
 import "dotenv/config";
 import "@nomicfoundation/hardhat-viem";
 import "hardhat-storage-layout";
+import "hardhat-gas-reporter";
 
 import chai from "chai";
 import chaiAsPromised from "chai-as-promised";
@@ -32,6 +33,7 @@ const config: HardhatUserConfig = {
       {
         version: "0.8.30",
         settings: {
+          // viaIR: true,
           optimizer: {
             enabled: true,
             runs: 200,
@@ -84,6 +86,14 @@ const config: HardhatUserConfig = {
     ],
   },
   mocha: {},
+  gasReporter: {
+    enabled: process.env.REPORT_GAS === "true",
+    currency: "USD",
+    gasPrice: 1,
+    outputFile: "gas-report.md",
+    reportPureAndViewMethods: true,
+    reportFormat: "markdown",
+  },
 };
 
 export default config;

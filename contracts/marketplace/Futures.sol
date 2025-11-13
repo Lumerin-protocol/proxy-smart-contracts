@@ -75,6 +75,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         address seller; // party obligated to deliver
         address buyer; // party entitled to receive delivery
         string destURL;
+        // TODO: retrieve the price difference at the delivery
+        uint256 initialPricePerDay; // initial price (captures the difference between the entry and exit price)
         uint256 pricePerDay; // price of the hashrate in tokens for one day
         uint256 deliveryAt; // start of the delivery
         uint256 createdAt; // timestamp of the creation of the position
@@ -304,37 +306,42 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         }
 
         // create position
-        address seller;
-        address buyer;
-        string memory destURL;
+
+        Position memory _temp;
+
+        // address seller;
+        // address buyer;
+        // string memory destURL;
         if (order.isBuy) {
-            buyer = order.participant;
-            seller = _otherParticipant;
-            destURL = order.destURL;
+            _temp.buyer = order.participant;
+            _temp.seller = _otherParticipant;
+            _temp.destURL = order.destURL;
         } else {
-            buyer = _otherParticipant;
-            seller = order.participant;
-            destURL = _destURL;
+            _temp.buyer = _otherParticipant;
+            _temp.seller = order.participant;
+            _temp.destURL = _destURL;
         }
+        _temp.initialPricePerDay = order.pricePerDay;
 
         EnumerableSet.Bytes32Set storage participantDeliveryDatePositionIds =
             participantDeliveryDatePositionIdsIndex[order.participant][order.deliveryAt];
         if (participantDeliveryDatePositionIds.length() > 0) {
             bytes32 existingPositionId = participantDeliveryDatePositionIds.at(0);
             Position memory existingPosition = positions[existingPositionId];
+            _temp.initialPricePerDay = existingPosition.pricePerDay;
 
             int256 pnlPerDay = 0; // negative is profit, positive is loss
             if (existingPosition.buyer == order.participant && !order.isBuy) {
                 pnlPerDay = int256(existingPosition.pricePerDay) - int256(order.pricePerDay);
-                seller = existingPosition.seller;
-                buyer = _otherParticipant;
+                _temp.seller = existingPosition.seller;
+                _temp.buyer = _otherParticipant;
                 _removePosition(existingPositionId, existingPosition.seller, existingPosition.buyer);
                 emit PositionClosed(existingPositionId);
                 participantDeliveryDatePositionIds.remove(existingPositionId);
             } else if (existingPosition.seller == order.participant && order.isBuy) {
                 pnlPerDay = int256(order.pricePerDay) - int256(existingPosition.pricePerDay);
-                seller = _otherParticipant;
-                buyer = existingPosition.buyer;
+                _temp.seller = _otherParticipant;
+                _temp.buyer = existingPosition.buyer;
                 _removePosition(existingPositionId, existingPosition.seller, existingPosition.buyer);
                 emit PositionClosed(existingPositionId);
                 participantDeliveryDatePositionIds.remove(existingPositionId);
@@ -348,22 +355,26 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             }
         }
 
-        bytes32 positionId =
-            keccak256(abi.encode(seller, buyer, order.pricePerDay, order.deliveryAt, block.timestamp, nonce++));
+        bytes32 positionId = keccak256(
+            abi.encode(_temp.seller, _temp.buyer, order.pricePerDay, order.deliveryAt, block.timestamp, nonce++)
+        );
         positions[positionId] = Position({
-            seller: seller,
-            buyer: buyer,
+            seller: _temp.seller,
+            buyer: _temp.buyer,
+            initialPricePerDay: _temp.initialPricePerDay,
             pricePerDay: order.pricePerDay,
             deliveryAt: order.deliveryAt,
             createdAt: block.timestamp,
-            destURL: destURL,
+            destURL: _temp.destURL,
             paid: false
         });
-        participantPositionIdsIndex[seller].add(positionId);
-        participantPositionIdsIndex[buyer].add(positionId);
-        participantDeliveryDatePositionIdsIndex[seller][order.deliveryAt].add(positionId);
-        participantDeliveryDatePositionIdsIndex[buyer][order.deliveryAt].add(positionId);
-        emit PositionCreated(positionId, seller, buyer, order.pricePerDay, order.deliveryAt, destURL, orderId);
+        participantPositionIdsIndex[_temp.seller].add(positionId);
+        participantPositionIdsIndex[_temp.buyer].add(positionId);
+        participantDeliveryDatePositionIdsIndex[_temp.seller][order.deliveryAt].add(positionId);
+        participantDeliveryDatePositionIdsIndex[_temp.buyer][order.deliveryAt].add(positionId);
+        emit PositionCreated(
+            positionId, _temp.seller, _temp.buyer, order.pricePerDay, order.deliveryAt, _temp.destURL, orderId
+        );
     }
 
     function closeOrder(bytes32 _orderId) public {
@@ -536,7 +547,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             // int256 qty = position.buyer == _participant ? int256(1) : int256(-1);
             // int256 _margin = getMinMarginForPosition(position.pricePerDay, qty);
             // Force liquidation: settle unrealized PnL at market price and close position
-            _forceLiquidatePosition(positionId, position);
+            //TODO: avoid calling getMinMargin on each iteration, return reclaimed margin instead
+            _forceLiquidatePosition(positionId, position, _participant);
             uint256 collateralBalance = balanceOf(_participant);
             int256 minMargin = getMinMargin(_participant);
             if (int256(collateralBalance) >= minMargin) {
@@ -646,7 +658,10 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
      * @param _positionId The id of the position to liquidate
      * @param position The position to liquidate
      */
-    function _forceLiquidatePosition(bytes32 _positionId, Position storage position) private returns (int256) {
+    function _forceLiquidatePosition(bytes32 _positionId, Position storage position, address _participant)
+        private
+        returns (int256)
+    {
         uint256 marketPricePerDay = getMarketPrice();
         int256 entryPricePerDay = int256(position.pricePerDay);
 
@@ -662,12 +677,27 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             _transfer(position.buyer, position.seller, uint256(-buyerPnL));
         }
 
-        // Remove position from all indexes
+        // Create order from a counterparty position
+        address counterparty = position.seller == _participant ? position.buyer : position.seller;
+        bool isBuy = position.buyer == counterparty;
+        _createOrMatchSingleOrder(
+            _deliveryDatePriceOrderIds(position.deliveryAt, position.pricePerDay, isBuy),
+            _deliveryDatePriceOrderIds(position.deliveryAt, position.pricePerDay, !isBuy),
+            participantDeliveryDatePriceOrderIdsIndex[counterparty][position.deliveryAt][position.pricePerDay],
+            counterparty,
+            position.pricePerDay,
+            position.deliveryAt,
+            position.destURL,
+            isBuy
+        );
+
+        // Remove old position from all indexes
         _removePosition(_positionId, position.seller, position.buyer);
         participantDeliveryDatePositionIdsIndex[position.seller][position.deliveryAt].remove(_positionId);
         participantDeliveryDatePositionIdsIndex[position.buyer][position.deliveryAt].remove(_positionId);
 
         emit PositionClosed(_positionId);
+
         return buyerPnL;
     }
 
