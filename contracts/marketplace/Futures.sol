@@ -78,6 +78,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         uint256 pricePerDay; // price of the hashrate in tokens for one day
         uint256 deliveryAt; // start of the delivery
         uint256 createdAt; // timestamp of the creation of the position
+        bool paid; // true if the delivery payment is paid, false if not
     }
 
     // events
@@ -115,8 +116,10 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     error PositionNotExists();
     error PositionDeliveryNotStartedYet();
     error PositionDeliveryExpired();
+    error DeliveryDateExpired();
     error MaxOrdersPerParticipantReached();
     error ValueOutOfRange(int256 min, int256 max);
+    error DeliveryNotFinishedYet();
 
     constructor() {
         _disableInitializers();
@@ -350,7 +353,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             pricePerDay: order.pricePerDay,
             deliveryAt: order.deliveryAt,
             createdAt: block.timestamp,
-            destURL: destURL
+            destURL: destURL,
+            paid: false
         });
         participantPositionIdsIndex[seller].add(positionId);
         participantPositionIdsIndex[buyer].add(positionId);
@@ -672,6 +676,50 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             deliveryDatesArray[i] = firstFutureDeliveryDate + deliveryIntervalSeconds() * i;
         }
         return deliveryDatesArray;
+    }
+
+    // Delivery deposit functions
+    function depositDeliveryPayment(uint256 _amount, uint256 _deliveryDate) public {
+        if (block.timestamp > _deliveryDate) {
+            revert DeliveryDateExpired();
+        }
+
+        // get all user positions for the delivery date
+        EnumerableSet.Bytes32Set storage _positions =
+            participantDeliveryDatePositionIdsIndex[_msgSender()][_deliveryDate];
+        for (uint256 i = 0; i < _positions.length(); i++) {
+            bytes32 positionId = _positions.at(i);
+            Position storage position = positions[positionId];
+            if (position.buyer == _msgSender()) {
+                uint256 totalPayment = position.pricePerDay * deliveryDurationDays;
+                if (totalPayment > _amount) {
+                    break;
+                }
+                _amount -= totalPayment;
+                // TODO: make sure it is not withdrawable by owner
+                _transfer(position.buyer, address(this), totalPayment);
+                position.paid = true;
+            }
+        }
+    }
+
+    function withdrawDeliveryPayment(uint256 _deliveryDate) public {
+        if (block.timestamp < _deliveryDate + deliveryDurationSeconds()) {
+            revert DeliveryNotFinishedYet();
+        }
+
+        // get all user positions for the delivery date
+        EnumerableSet.Bytes32Set storage _positions =
+            participantDeliveryDatePositionIdsIndex[_msgSender()][_deliveryDate];
+        for (uint256 i = 0; i < _positions.length(); i++) {
+            bytes32 positionId = _positions.at(i);
+            Position storage position = positions[positionId];
+            if (position.seller == _msgSender() && position.paid) {
+                uint256 totalPayment = position.pricePerDay * deliveryDurationDays;
+                _transfer(address(this), position.seller, totalPayment);
+                position.paid = false;
+            }
+        }
     }
 
     // Helper functions
