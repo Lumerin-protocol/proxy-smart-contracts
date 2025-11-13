@@ -525,4 +525,74 @@ describe("Order Creation", function () {
     expect(remainingOrder.pricePerDay).to.equal(price);
     expect(remainingOrder.deliveryAt).to.equal(deliveryDate);
   });
+
+  it("should automatically remove outdated orders when creating a new order", async function () {
+    const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+    const { futures } = contracts;
+    const { seller, pc, tc } = accounts;
+
+    const price = parseUnits("100", 6);
+    const margin = parseUnits("10000", 6);
+    const oldDeliveryDate = config.deliveryDates[0];
+    const newDeliveryDate = config.deliveryDates[1];
+
+    // Add margin first
+    await futures.write.addMargin([margin], {
+      account: seller.account,
+    });
+
+    // Create an order with an old delivery date
+    const oldOrderTxHash = await futures.write.createOrder([price, oldDeliveryDate, "", 1], {
+      account: seller.account,
+    });
+
+    const oldOrderReceipt = await pc.waitForTransactionReceipt({ hash: oldOrderTxHash });
+    const oldOrderEvents = parseEventLogs({
+      logs: oldOrderReceipt.logs,
+      abi: futures.abi,
+      eventName: "OrderCreated",
+    });
+    const oldOrderId = oldOrderEvents[0].args.orderId;
+
+    // Verify the old order exists
+    let oldOrder = await futures.read.getOrderById([oldOrderId]);
+    expect(getAddress(oldOrder.participant)).to.equal(getAddress(seller.account.address));
+    expect(oldOrder.deliveryAt).to.equal(oldDeliveryDate);
+
+    // Advance time past the old delivery date to make it outdated
+    await tc.setNextBlockTimestamp({ timestamp: oldDeliveryDate + 1n });
+
+    // Create a new order - this should automatically remove the outdated order
+    const newOrderTxHash = await futures.write.createOrder([price, newDeliveryDate, "", 1], {
+      account: seller.account,
+    });
+
+    const newOrderReceipt = await pc.waitForTransactionReceipt({ hash: newOrderTxHash });
+
+    // Verify OrderClosed event was emitted for the outdated order
+    const orderClosedEvents = parseEventLogs({
+      logs: newOrderReceipt.logs,
+      abi: futures.abi,
+      eventName: "OrderClosed",
+    });
+
+    expect(orderClosedEvents.length).to.equal(1);
+    expect(orderClosedEvents[0].args.orderId).to.equal(oldOrderId);
+    expect(getAddress(orderClosedEvents[0].args.participant)).to.equal(
+      getAddress(seller.account.address)
+    );
+
+    // Verify the old order no longer exists (participant is zeroAddress)
+    oldOrder = await futures.read.getOrderById([oldOrderId]);
+    expect(oldOrder.participant).to.equal(zeroAddress);
+
+    // Verify the new order was created
+    const newOrderEvents = parseEventLogs({
+      logs: newOrderReceipt.logs,
+      abi: futures.abi,
+      eventName: "OrderCreated",
+    });
+    expect(newOrderEvents.length).to.equal(1);
+    expect(newOrderEvents[0].args.deliveryAt).to.equal(newDeliveryDate);
+  });
 });

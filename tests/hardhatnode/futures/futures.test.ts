@@ -609,8 +609,8 @@ describe("Futures Contract", function () {
       });
       const { orderId } = createdEvent.args;
 
-      // Increase bitcoin price
-      await btcPriceOracleMock.write.setPrice([config.oracle.btcPrice * 2n, 8]);
+      // Decrease bitcoin price
+      await btcPriceOracleMock.write.setPrice([config.oracle.btcPrice / 2n, 8]);
 
       // Perform margin call
       const txHash = await futures.write.marginCall([seller.account.address], {

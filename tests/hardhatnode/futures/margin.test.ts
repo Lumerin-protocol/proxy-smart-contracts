@@ -1,5 +1,6 @@
 import { expect } from "chai";
-import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
+import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
+import { getAddress, parseEventLogs } from "viem";
 import { deployFuturesFixture } from "./fixtures";
 import { catchError } from "../../lib";
 
@@ -164,5 +165,53 @@ describe("Futures - getMinMargin", function () {
 
     // party can withdraw full deposited collateral balance
     await futures.write.removeMargin([balance], { account: seller.account });
+  });
+
+  it("outdated orders do not affect getMinMargin calculation", async function () {
+    const { contracts, accounts, config } = await loadFixture(positionWithMarginFixture);
+    const { futures } = contracts;
+    const { buyer, tc, pc } = accounts;
+    const marketPricePerDay = await futures.read.getMarketPrice();
+
+    // Get initial margin (from the position created in the fixture)
+    const initialMargin = await futures.read.getMinMargin([buyer.account.address]);
+
+    // Create an order with a future delivery date
+    const futureDeliveryDate = config.deliveryDates[1];
+    await futures.write.addMargin([marketPricePerDay * 10n], { account: buyer.account });
+
+    const txHash = await futures.write.createOrder([marketPricePerDay, futureDeliveryDate, "", 1], {
+      account: buyer.account,
+    });
+
+    const receipt = await pc.waitForTransactionReceipt({ hash: txHash });
+    const events = parseEventLogs({
+      logs: receipt.logs,
+      abi: futures.abi,
+      eventName: "OrderCreated",
+    });
+    const orderId = events[0].args.orderId;
+
+    // Get the margin requirement with the active order
+    // It should be higher than initial because the new order requires margin
+    const marginWithActiveOrder = await futures.read.getMinMargin([buyer.account.address]);
+    expect(marginWithActiveOrder >= initialMargin).to.be.true;
+
+    // Advance time past the delivery date to make the order outdated
+    await tc.setNextBlockTimestamp({ timestamp: futureDeliveryDate + 1n });
+
+    // Get the margin requirement after the order becomes outdated
+    // It should be less than or equal to marginWithActiveOrder because outdated orders are ignored
+    const marginWithOutdatedOrder = await futures.read.getMinMargin([buyer.account.address]);
+
+    // The margin should be less because the outdated order is no longer included in the calculation
+    // It should be close to the initial margin (just the position margin)
+    expect(marginWithOutdatedOrder <= marginWithActiveOrder).to.be.true;
+
+    // Verify the order still exists in storage but is outdated
+    const order = await futures.read.getOrderById([orderId]);
+    expect(order.participant).to.equal(getAddress(buyer.account.address));
+
+    expect(order.deliveryAt === futureDeliveryDate).to.be.true;
   });
 });

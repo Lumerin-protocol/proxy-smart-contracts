@@ -163,6 +163,9 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     }
 
     function createOrder(uint256 _price, uint256 _deliveryDate, string memory _destURL, int8 _qty) public {
+        // Remove outdated orders to keep state clean and ensure accurate limit checks
+        removeOutdatedOrdersForParticipant(_msgSender());
+
         validatePrice(_price);
         validateDeliveryDate(_deliveryDate);
         validateQty(_qty);
@@ -371,6 +374,27 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         _closeOrder(_orderId, order);
     }
 
+    /// @notice Removes all outdated orders for a specific participant
+    /// @dev An order is considered outdated if its deliveryAt timestamp is in the past
+    /// @param _participant The address of the participant whose outdated orders should be removed
+    /// @return count The number of outdated orders removed
+    function removeOutdatedOrdersForParticipant(address _participant) public returns (uint256 count) {
+        EnumerableSet.Bytes32Set storage _orders = participantOrderIdsIndex[_participant];
+        uint256 ordersLength = _orders.length();
+
+        // Iterate backwards to safely remove items while iterating
+        for (uint256 i = ordersLength; i > 0; i--) {
+            bytes32 orderId = _orders.at(i - 1);
+            Order memory order = orders[orderId];
+
+            // Check if order is outdated (delivery date has passed)
+            if (order.deliveryAt < block.timestamp) {
+                _closeOrder(orderId, order);
+                count++;
+            }
+        }
+    }
+
     function _closeOrder(bytes32 orderId, Order memory order) private {
         StructuredLinkedList.List storage orderIndexId =
             _deliveryDatePriceOrderIds(order.deliveryAt, order.pricePerDay, order.isBuy);
@@ -443,6 +467,9 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         for (uint256 i = 0; i < _orders.length(); i++) {
             bytes32 orderId = _orders.at(i);
             Order memory order = orders[orderId];
+            if (order.deliveryAt < block.timestamp) {
+                continue;
+            }
             int256 qty = order.isBuy ? int256(1) : int256(-1);
             // clamp cuts off negative values for orders, because otherwise orders with negative effective margin
             // will affect total effective margin of the participant, reducing it
@@ -456,6 +483,9 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         for (uint256 i = 0; i < _positions.length(); i++) {
             bytes32 positionId = _positions.at(i);
             Position memory position = positions[positionId];
+            if (position.deliveryAt < block.timestamp) {
+                continue;
+            }
             int256 qty = position.buyer == _participant ? int256(1) : int256(-1);
             int256 _margin = getMinMarginForPosition(position.pricePerDay, qty);
             effectiveMargin += _margin;
