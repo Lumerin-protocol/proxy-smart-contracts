@@ -626,6 +626,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         if (block.timestamp > position.deliveryAt) {
             positionElapsedTime = block.timestamp - position.deliveryAt;
             positionRemainingTime = position.deliveryAt + deliveryDurationSeconds() - block.timestamp;
+        } else {
+            positionRemainingTime = deliveryDurationSeconds();
         }
 
         uint256 hashesForToken = _getHashesForToken();
@@ -643,6 +645,21 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             _transfer(position.seller, position.buyer, pnl);
         } else {
             _transfer(position.buyer, position.seller, pnl);
+        }
+
+        // Collect or credit the difference between initialPricePerDay and pricePerDay
+        // This represents the price change that occurred when the position was offset
+        int256 initialPriceDifference = int256(position.initialPricePerDay) - int256(position.pricePerDay);
+        if (initialPriceDifference != 0) {
+            uint256 priceDiffAmount =
+                abs(initialPriceDifference) * deliveryDurationDays * positionRemainingTime / deliveryDurationSeconds();
+            if (initialPriceDifference > 0) {
+                // Buyer originally paid more, so buyer gets refund from seller
+                _transfer(position.seller, position.buyer, priceDiffAmount);
+            } else {
+                // Buyer originally paid less, so buyer pays more to seller
+                _transfer(position.buyer, position.seller, priceDiffAmount);
+            }
         }
 
         // remove position

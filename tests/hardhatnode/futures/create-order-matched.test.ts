@@ -191,4 +191,116 @@ describe("Futures - createOrder - Order Matching and Position Creation", functio
     const orderFee = await futures.read.orderFee();
     expect(account2Profit + orderFee).to.equal(expectedProfit);
   });
+
+  it("should exit position with loss and verify accounting is correct", async function () {
+    const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+    const { futures } = contracts;
+    const { seller: account1, buyer: account2, buyer2: account3, pc } = accounts;
+
+    const price = parseUnits("100", 6);
+    const exitPrice = parseUnits("90", 6); // Lower price for exiting (loss scenario)
+    const margin = parseUnits("10000", 6);
+    const deliveryDate = config.deliveryDates[0];
+
+    // Setup margin for all participants
+    await futures.write.addMargin([margin], {
+      account: account1.account,
+    });
+    await futures.write.addMargin([margin], {
+      account: account2.account,
+    });
+    await futures.write.addMargin([margin], {
+      account: account3.account,
+    });
+
+    // Step 1: Create initial position (account1 sells, account2 buys at $100)
+    await futures.write.createOrder([price, deliveryDate, "", -1], {
+      account: account1.account,
+    });
+    const initialTxHash = await futures.write.createOrder([price, deliveryDate, "", 1], {
+      account: account2.account,
+    });
+
+    const initialReceipt = await pc.waitForTransactionReceipt({ hash: initialTxHash });
+    const [initialPositionCreatedEvent] = parseEventLogs({
+      logs: initialReceipt.logs,
+      abi: futures.abi,
+      eventName: "PositionCreated",
+    });
+
+    const initialPositionId = initialPositionCreatedEvent.args.positionId;
+    expect(getAddress(initialPositionCreatedEvent.args.seller)).to.equal(
+      getAddress(account1.account.address)
+    );
+    expect(getAddress(initialPositionCreatedEvent.args.buyer)).to.equal(
+      getAddress(account2.account.address)
+    );
+
+    // Get account2's balance before exit (after entry order fee)
+    const account2BalanceBefore = await futures.read.balanceOf([account2.account.address]);
+
+    // Step 2: account2 creates a sell order in opposite direction with lower price (loss scenario)
+    // This order will match with account3's buy order, exiting account2's position
+    await futures.write.createOrder([exitPrice, deliveryDate, "", -1], {
+      account: account2.account,
+    });
+
+    // Get contract balance after account2 creates exit order (includes order fee from exit order)
+    const contractBalanceBefore = await futures.read.balanceOf([futures.address]);
+
+    // Step 3: account2's sell order matches with account3's buy order, exiting the original position
+    const exitTxHash = await futures.write.createOrder([exitPrice, deliveryDate, "", 1], {
+      account: account3.account,
+    });
+
+    const exitReceipt = await pc.waitForTransactionReceipt({ hash: exitTxHash });
+
+    // Get account2's balance after exit
+    const account2BalanceAfter = await futures.read.balanceOf([account2.account.address]);
+    const contractBalanceAfter = await futures.read.balanceOf([futures.address]);
+
+    // Verify PositionClosed event for the original position
+    const [positionClosedEvent] = parseEventLogs({
+      logs: exitReceipt.logs,
+      abi: futures.abi,
+      eventName: "PositionClosed",
+    });
+
+    expect(positionClosedEvent.args.positionId).to.equal(initialPositionId);
+
+    // Verify new PositionCreated event (account3 is now the buyer, account1 remains the seller)
+    const [newPositionCreatedEvent] = parseEventLogs({
+      logs: exitReceipt.logs,
+      abi: futures.abi,
+      eventName: "PositionCreated",
+    });
+
+    expect(getAddress(newPositionCreatedEvent.args.seller)).to.equal(
+      getAddress(account1.account.address)
+    );
+    expect(getAddress(newPositionCreatedEvent.args.buyer)).to.equal(
+      getAddress(account3.account.address)
+    );
+    expect(newPositionCreatedEvent.args.pricePerDay).to.equal(exitPrice);
+    expect(newPositionCreatedEvent.args.deliveryAt).to.equal(BigInt(deliveryDate));
+
+    // Verify account2's loss
+    // account2 bought at $100/day and sold at $90/day
+    // Loss = (price - exitPrice) * deliveryDurationDays = (100 - 90) * deliveryDurationDays
+    const deliveryDurationDays = await futures.read.deliveryDurationDays();
+    const expectedLoss = (price - exitPrice) * BigInt(deliveryDurationDays);
+    const account2BalanceChange = account2BalanceAfter - account2BalanceBefore;
+
+    // Account2 should have lost money equal to the price difference times delivery duration
+    // Also account for the order fee that was paid when creating the exit order
+    const orderFee = await futures.read.orderFee();
+    // Balance change = -expectedLoss - orderFee (both negative)
+    expect(account2BalanceChange).to.equal(-expectedLoss - orderFee);
+
+    // Verify contract balance increased by the loss amount (account2 paid the contract)
+    // Contract receives: loss amount + order fee from account3's buy order
+    // Note: account2's exit order fee is already included in contractBalanceBefore
+    const expectedContractBalanceChange = expectedLoss + orderFee; // Only account3's order fee is new
+    expect(contractBalanceAfter - contractBalanceBefore).to.equal(expectedContractBalanceChange);
+  });
 });
