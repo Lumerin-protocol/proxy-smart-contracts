@@ -73,8 +73,8 @@ dataSources:
             # prettier-ignore
             every: {{ hashrateOraclePollingBlockInterval }}
       file: ./src/hashrate-oracle.ts
-features:
-  - grafting
-graft:
-  base: QmavKbXkb74nrNkrGCZ96y7UMhSPvintSTnLnTUTYC5Gfj
-  block: 213834223
+# features:
+#   - grafting
+# graft:
+#   base: QmSagdeMzbrcwppgzTwsJk4uhKSXT5wXRDxWC3Bt1i4sQg
+#   block: 213834223
