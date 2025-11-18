@@ -234,33 +234,67 @@ jobs:
           echo "   Graph Node: ${{ needs.build.outputs.graph_node_url }}"
           echo "   Subgraph: ${{ needs.build.outputs.subgraph_name }}"
           echo "   Version: ${{ needs.build.outputs.version }}"
+          echo "   Start time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
           echo ""
           
           # Retry logic to handle transient network issues
           MAX_ATTEMPTS=3
           ATTEMPT=1
+          DEPLOY_START_TIME=$(date +%s)
           
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            echo "📤 Deployment attempt $ATTEMPT of $MAX_ATTEMPTS..."
+            ATTEMPT_START_TIME=$(date +%s)
+            echo "================================================"
+            echo "📤 Deployment attempt $ATTEMPT of $MAX_ATTEMPTS"
+            echo "   Timestamp: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
+            echo "================================================"
             
             # Graph Node handles IPFS internally - no need to specify --ipfs
-            if graph deploy --node ${{ needs.build.outputs.graph_node_url }}:8020 \
+            set +e  # Don't exit on error, capture it
+            graph deploy --node ${{ needs.build.outputs.graph_node_url }}:8020 \
               --version-label ${{ needs.build.outputs.version }} \
-              ${{ needs.build.outputs.subgraph_name }}; then
+              ${{ needs.build.outputs.subgraph_name }}
+            DEPLOY_EXIT_CODE=$?
+            set -e
+            
+            ATTEMPT_END_TIME=$(date +%s)
+            ATTEMPT_DURATION=$((ATTEMPT_END_TIME - ATTEMPT_START_TIME))
+            
+            if [ $DEPLOY_EXIT_CODE -eq 0 ]; then
+              TOTAL_DURATION=$((ATTEMPT_END_TIME - DEPLOY_START_TIME))
+              echo "================================================"
               echo "✅ Subgraph deployed successfully"
+              echo "   Attempt: $ATTEMPT"
+              echo "   Attempt duration: ${ATTEMPT_DURATION}s"
+              echo "   Total duration: ${TOTAL_DURATION}s"
+              echo "   End time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
+              echo "================================================"
               exit 0
             fi
             
+            echo "================================================"
+            echo "❌ Deployment attempt $ATTEMPT failed"
+            echo "   Exit code: $DEPLOY_EXIT_CODE"
+            echo "   Duration: ${ATTEMPT_DURATION}s"
+            echo "   End time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
+            echo "================================================"
+            
             if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
               WAIT_TIME=$((ATTEMPT * 30))
-              echo "⚠️  Deployment failed, waiting ${WAIT_TIME} seconds before retry..."
+              echo "⏳ Waiting ${WAIT_TIME} seconds before retry..."
+              echo ""
               sleep $WAIT_TIME
             fi
             
             ATTEMPT=$((ATTEMPT + 1))
           done
           
+          TOTAL_DURATION=$(($(date +%s) - DEPLOY_START_TIME))
+          echo "================================================"
           echo "❌ Deployment failed after $MAX_ATTEMPTS attempts"
+          echo "   Total duration: ${TOTAL_DURATION}s"
+          echo "   Final time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
+          echo "================================================"
           exit 1
 
   verify:
