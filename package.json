@@ -30,7 +30,7 @@
     "chai": "^4.2.0",
     "ethers": "5.5.4",
     "hardhat": "2.26.3",
-    "hardhat-gas-reporter": "^1.0.8",
+    "hardhat-gas-reporter": "2.3.0",
     "hardhat-storage-layout": "^0.1.7",
     "solidity-coverage": "^0.8.16",
     "ts-node": "^10.9.2",
@@ -50,6 +50,7 @@
     "ecies-geth": "^1.7.0",
     "hardhat-abi-exporter": "^2.10.1",
     "multicall3": "github:mds1/multicall3",
+    "solidity-linked-list": "^6.5.0",
     "wait-on": "^7.2.0",
     "web3": "^1.7.4"
   }

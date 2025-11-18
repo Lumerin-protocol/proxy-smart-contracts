@@ -69,7 +69,8 @@ type Position @entity(immutable: false) {
   id: Bytes!
   seller: Participant!
   buyer: Participant!
-  pricePerDay: BigInt!
+  sellPricePerDay: BigInt!
+  buyPricePerDay: BigInt!
   deliveryAt: BigInt!
   timestamp: BigInt!
   blockNumber: BigInt!

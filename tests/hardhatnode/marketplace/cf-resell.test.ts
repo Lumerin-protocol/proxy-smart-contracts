@@ -201,7 +201,7 @@ it("should auto close and resolve payments to everyone", async () => {
   expect(buyer2BalanceAfter).to.be.equal(buyer2Balance - priceWithProfit1);
 });
 
-it.only("should track resell chain", async () => {
+it("should track resell chain", async () => {
   const { accounts, contracts, config } = await loadFixture(deployLocalFixture);
   const { cloneFactory, usdcMock, lumerinToken } = contracts;
   const { buyer, seller, buyer2, pc } = accounts;

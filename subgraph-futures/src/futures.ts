@@ -181,7 +181,8 @@ export function handlePositionCreated(event: PositionCreated): void {
   position.id = event.params.positionId;
   position.seller = seller.id;
   position.buyer = buyer.id;
-  position.pricePerDay = event.params.pricePerDay;
+  position.sellPricePerDay = event.params.sellPricePerDay;
+  position.buyPricePerDay = event.params.buyPricePerDay;
   position.deliveryAt = event.params.deliveryAt;
   position.timestamp = event.block.timestamp;
   position.blockNumber = event.block.number;
