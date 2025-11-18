@@ -14,9 +14,7 @@ import { StructuredLinkedList } from "solidity-linked-list/contracts/StructuredL
 // import { console } from "hardhat/console.sol";
 
 // TODO:
-// 3. Write tests for offseting order/positions
 // 6. Do we need to batch same price and delivery date orders/positions so it is a single entry?
-// 7. What if i create sell and buy orders for the different prices and both of them eventually are matched? I should exit
 
 contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     using SafeERC20 for IERC20;
@@ -69,15 +67,14 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         uint256 createdAt; // timestamp of the creation of the order
     }
 
-    /// @notice Represents an active futures contract between seller and buyer
+    /// @notice Represents a couple of matched counterparty orders with bindings, active futures contract between seller and buyer
     /// @dev Created when two opposing orders are matched
     struct Position {
         address seller; // party obligated to deliver
         address buyer; // party entitled to receive delivery
         string destURL;
-        // TODO: retrieve the price difference at the delivery
-        uint256 initialPricePerDay; // initial price (captures the difference between the entry and exit price)
-        uint256 pricePerDay; // price of the hashrate in tokens for one day
+        uint256 sellPricePerDay;
+        uint256 buyPricePerDay;
         uint256 deliveryAt; // start of the delivery
         uint256 createdAt; // timestamp of the creation of the position
         bool paid; // true if the delivery payment is paid, false if not
@@ -98,7 +95,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         bytes32 indexed positionId,
         address indexed seller,
         address indexed buyer,
-        uint256 pricePerDay,
+        uint256 sellPricePerDay,
+        uint256 buyPricePerDay,
         uint256 deliveryAt,
         string destURL,
         bytes32 orderId
@@ -321,30 +319,28 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             _temp.seller = order.participant;
             _temp.destURL = _destURL;
         }
-        _temp.initialPricePerDay = order.pricePerDay;
+        _temp.sellPricePerDay = order.pricePerDay;
+        _temp.buyPricePerDay = order.pricePerDay;
 
         EnumerableSet.Bytes32Set storage participantDeliveryDatePositionIds =
             participantDeliveryDatePositionIdsIndex[order.participant][order.deliveryAt];
         if (participantDeliveryDatePositionIds.length() > 0) {
             bytes32 existingPositionId = participantDeliveryDatePositionIds.at(0);
             Position memory existingPosition = positions[existingPositionId];
-            _temp.initialPricePerDay = existingPosition.pricePerDay;
 
             int256 pnlPerDay = 0; // negative is profit, positive is loss
             if (existingPosition.buyer == order.participant && !order.isBuy) {
-                pnlPerDay = int256(existingPosition.pricePerDay) - int256(order.pricePerDay);
+                pnlPerDay = int256(existingPosition.buyPricePerDay) - int256(order.pricePerDay);
                 _temp.seller = existingPosition.seller;
                 _temp.buyer = _otherParticipant;
-                _removePosition(existingPositionId, existingPosition.seller, existingPosition.buyer);
-                emit PositionClosed(existingPositionId);
-                participantDeliveryDatePositionIds.remove(existingPositionId);
+                _temp.sellPricePerDay = existingPosition.sellPricePerDay;
+                _removePosition(existingPositionId, existingPosition);
             } else if (existingPosition.seller == order.participant && order.isBuy) {
-                pnlPerDay = int256(order.pricePerDay) - int256(existingPosition.pricePerDay);
+                pnlPerDay = int256(order.pricePerDay) - int256(existingPosition.sellPricePerDay);
                 _temp.seller = _otherParticipant;
                 _temp.buyer = existingPosition.buyer;
-                _removePosition(existingPositionId, existingPosition.seller, existingPosition.buyer);
-                emit PositionClosed(existingPositionId);
-                participantDeliveryDatePositionIds.remove(existingPositionId);
+                _temp.buyPricePerDay = existingPosition.buyPricePerDay;
+                _removePosition(existingPositionId, existingPosition);
             }
             int256 pnl = pnlPerDay * int256(uint256(deliveryDurationDays));
 
@@ -361,8 +357,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         positions[positionId] = Position({
             seller: _temp.seller,
             buyer: _temp.buyer,
-            initialPricePerDay: _temp.initialPricePerDay,
-            pricePerDay: order.pricePerDay,
+            sellPricePerDay: _temp.sellPricePerDay,
+            buyPricePerDay: _temp.buyPricePerDay,
             deliveryAt: order.deliveryAt,
             createdAt: block.timestamp,
             destURL: _temp.destURL,
@@ -373,7 +369,14 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         participantDeliveryDatePositionIdsIndex[_temp.seller][order.deliveryAt].add(positionId);
         participantDeliveryDatePositionIdsIndex[_temp.buyer][order.deliveryAt].add(positionId);
         emit PositionCreated(
-            positionId, _temp.seller, _temp.buyer, order.pricePerDay, order.deliveryAt, _temp.destURL, orderId
+            positionId,
+            _temp.seller,
+            _temp.buyer,
+            _temp.sellPricePerDay,
+            _temp.buyPricePerDay,
+            order.deliveryAt,
+            _temp.destURL,
+            orderId
         );
     }
 
@@ -466,6 +469,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             (int256(marketPricePerDay) - int256(_entryPricePerDay)) * int256(uint256(deliveryDurationDays)) * _qty;
         uint256 maintenanceMargin = getMaintenanceMarginForPosition(_entryPricePerDay, _qty);
         int256 effectiveMargin = int256(maintenanceMargin) - pnl;
+
         return effectiveMargin;
     }
 
@@ -498,7 +502,9 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
                 continue;
             }
             int256 qty = position.buyer == _participant ? int256(1) : int256(-1);
-            int256 _margin = getMinMarginForPosition(position.pricePerDay, qty);
+            uint256 entryPricePerDay =
+                position.buyer == _participant ? position.buyPricePerDay : position.sellPricePerDay;
+            int256 _margin = getMinMarginForPosition(entryPricePerDay, qty);
             effectiveMargin += _margin;
         }
         return effectiveMargin;
@@ -602,13 +608,18 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         private
     {
         // calculate and pay breach penalty
-        uint256 breachPenalty = _calculateBreachPenalty(
-            position.pricePerDay * deliveryDurationDays,
-            position.deliveryAt + deliveryDurationSeconds() - block.timestamp
-        );
+
         if (_blameSeller) {
+            uint256 breachPenalty = _calculateBreachPenalty(
+                position.sellPricePerDay * deliveryDurationDays,
+                position.deliveryAt + deliveryDurationSeconds() - block.timestamp
+            );
             _transfer(position.seller, position.buyer, breachPenalty);
         } else {
+            uint256 breachPenalty = _calculateBreachPenalty(
+                position.buyPricePerDay * deliveryDurationDays,
+                position.deliveryAt + deliveryDurationSeconds() - block.timestamp
+            );
             _transfer(position.buyer, position.seller, breachPenalty);
         }
         _closeAndCashSettleDelivery(_positionId, position);
@@ -635,35 +646,48 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         // if the position is not started yet, then use the current price
         uint256 currentPrice = _getMarketPrice(hashesForToken);
 
-        uint256 deliveredPayment =
-            position.pricePerDay * deliveryDurationDays * positionElapsedTime / deliveryDurationSeconds();
-        _transfer(position.buyer, position.seller, deliveredPayment);
-
-        int256 priceDifference = int256(currentPrice) - int256(position.pricePerDay * deliveryDurationDays);
-        uint256 pnl = abs(priceDifference) * positionRemainingTime / deliveryDurationSeconds();
+        int256 priceDifference = int256(position.sellPricePerDay) - int256(position.buyPricePerDay);
         if (priceDifference > 0) {
-            _transfer(position.seller, position.buyer, pnl);
+            uint256 buyerPaysToSeller =
+                position.buyPricePerDay * deliveryDurationDays * positionElapsedTime / deliveryDurationSeconds();
+            uint256 contractPaysToSeller =
+                uint256(priceDifference) * deliveryDurationDays * positionElapsedTime / deliveryDurationSeconds();
+            _transfer(address(this), position.seller, contractPaysToSeller);
+            _transfer(position.buyer, position.seller, buyerPaysToSeller);
+        } else if (priceDifference < 0) {
+            uint256 buyerPaysToSeller =
+                position.sellPricePerDay * deliveryDurationDays * positionElapsedTime / deliveryDurationSeconds();
+            uint256 buyerPaysToContract =
+                uint256(-priceDifference) * deliveryDurationDays * positionElapsedTime / deliveryDurationSeconds();
+            _transfer(address(this), position.buyer, buyerPaysToContract);
+            _transfer(position.buyer, position.seller, buyerPaysToSeller);
         } else {
-            _transfer(position.buyer, position.seller, pnl);
+            uint256 buyerPaysToSeller =
+                position.buyPricePerDay * deliveryDurationDays * positionElapsedTime / deliveryDurationSeconds();
+            _transfer(position.buyer, position.seller, buyerPaysToSeller);
         }
 
-        // Collect or credit the difference between initialPricePerDay and pricePerDay
-        // This represents the price change that occurred when the position was offset
-        int256 initialPriceDifference = int256(position.initialPricePerDay) - int256(position.pricePerDay);
-        if (initialPriceDifference != 0) {
-            uint256 priceDiffAmount =
-                abs(initialPriceDifference) * deliveryDurationDays * positionRemainingTime / deliveryDurationSeconds();
-            if (initialPriceDifference > 0) {
-                // Buyer originally paid more, so buyer gets refund from seller
-                _transfer(position.seller, position.buyer, priceDiffAmount);
-            } else {
-                // Buyer originally paid less, so buyer pays more to seller
-                _transfer(position.buyer, position.seller, priceDiffAmount);
-            }
+        // Calculate PnL based on market price vs buyer's entry price for remaining time
+        uint256 mult = uint256(deliveryDurationDays) * positionRemainingTime / uint256(deliveryDurationSeconds());
+
+        int256 sellerPnl = (int256(position.sellPricePerDay) - int256(currentPrice)) * int256(mult);
+        int256 buyerPnl = (int256(currentPrice) - int256(position.buyPricePerDay)) * int256(mult);
+
+        if (sellerPnl < 0) {
+            _transfer(position.seller, address(this), uint256(-sellerPnl));
+        }
+        if (buyerPnl < 0) {
+            _transfer(position.buyer, address(this), uint256(-buyerPnl));
+        }
+        if (sellerPnl > 0) {
+            _transfer(address(this), position.seller, uint256(sellerPnl));
+        }
+        if (buyerPnl > 0) {
+            _transfer(address(this), position.buyer, uint256(buyerPnl));
         }
 
         // remove position
-        _removePosition(_positionId, position.seller, position.buyer);
+        _removePosition(_positionId, position);
     }
 
     function _calculateBreachPenalty(uint256 _price, uint256 remainingTime) private view returns (uint256) {
@@ -679,49 +703,33 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         private
         returns (int256)
     {
-        uint256 marketPricePerDay = getMarketPrice();
-        int256 entryPricePerDay = int256(position.pricePerDay);
-
-        // Calculate PnL for buyer (qty = +1)
-        int256 buyerPnL = (int256(marketPricePerDay) - entryPricePerDay) * int256(uint256(deliveryDurationDays));
-
-        // Transfer PnL: if buyerPnL > 0, buyer profits (seller pays), if buyerPnL < 0, buyer loses (seller gains)
-        if (buyerPnL > 0) {
-            // Buyer profits, seller pays
-            _transfer(position.seller, position.buyer, uint256(buyerPnL));
-        } else if (buyerPnL < 0) {
-            // Buyer loses, seller gains
-            _transfer(position.buyer, position.seller, uint256(-buyerPnL));
-        }
-
         // Create order from a counterparty position
         address counterparty = position.seller == _participant ? position.buyer : position.seller;
         bool isBuy = position.buyer == counterparty;
+        uint256 orderPricePerDay = isBuy ? position.buyPricePerDay : position.sellPricePerDay;
         _createOrMatchSingleOrder(
-            _deliveryDatePriceOrderIds(position.deliveryAt, position.pricePerDay, isBuy),
-            _deliveryDatePriceOrderIds(position.deliveryAt, position.pricePerDay, !isBuy),
-            participantDeliveryDatePriceOrderIdsIndex[counterparty][position.deliveryAt][position.pricePerDay],
+            _deliveryDatePriceOrderIds(position.deliveryAt, orderPricePerDay, isBuy),
+            _deliveryDatePriceOrderIds(position.deliveryAt, orderPricePerDay, !isBuy),
+            participantDeliveryDatePriceOrderIdsIndex[counterparty][position.deliveryAt][orderPricePerDay],
             counterparty,
-            position.pricePerDay,
+            orderPricePerDay,
             position.deliveryAt,
             position.destURL,
             isBuy
         );
 
-        // Remove old position from all indexes
-        _removePosition(_positionId, position.seller, position.buyer);
-        participantDeliveryDatePositionIdsIndex[position.seller][position.deliveryAt].remove(_positionId);
-        participantDeliveryDatePositionIdsIndex[position.buyer][position.deliveryAt].remove(_positionId);
+        _closeAndCashSettleDelivery(_positionId, position);
 
-        emit PositionClosed(_positionId);
-
-        return buyerPnL;
+        return 0;
     }
 
-    function _removePosition(bytes32 _positionId, address _seller, address _buyer) private {
+    function _removePosition(bytes32 _positionId, Position memory position) private {
+        participantDeliveryDatePositionIdsIndex[position.seller][position.deliveryAt].remove(_positionId);
+        participantDeliveryDatePositionIdsIndex[position.buyer][position.deliveryAt].remove(_positionId);
+        participantPositionIdsIndex[position.seller].remove(_positionId);
+        participantPositionIdsIndex[position.buyer].remove(_positionId);
         delete positions[_positionId];
-        participantPositionIdsIndex[_seller].remove(_positionId);
-        participantPositionIdsIndex[_buyer].remove(_positionId);
+        emit PositionClosed(_positionId);
     }
 
     function getMarketPrice() public view returns (uint256) {
@@ -756,7 +764,13 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     }
 
     // Delivery deposit functions
-    function depositDeliveryPayment(uint256 _amount, uint256 _deliveryDate) public {
+    /**
+     * @notice Deposits delivery payment for a position
+     * @param _amount The amount of delivery payment to deposit
+     * @param _deliveryDate The delivery date to deposit payment for
+     * @return true if all positions for the delivery date were paid, false if not all positions were paid
+     */
+    function depositDeliveryPayment(uint256 _amount, uint256 _deliveryDate) public returns (bool) {
         if (block.timestamp > _deliveryDate) {
             revert DeliveryDateExpired();
         }
@@ -768,9 +782,9 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             bytes32 positionId = _positions.at(i);
             Position storage position = positions[positionId];
             if (position.buyer == _msgSender()) {
-                uint256 totalPayment = position.pricePerDay * deliveryDurationDays;
+                uint256 totalPayment = position.buyPricePerDay * deliveryDurationDays;
                 if (totalPayment > _amount) {
-                    break;
+                    return false;
                 }
                 _amount -= totalPayment;
                 // TODO: make sure it is not withdrawable by owner
@@ -778,6 +792,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
                 position.paid = true;
             }
         }
+        return true;
     }
 
     function withdrawDeliveryPayment(uint256 _deliveryDate) public {
@@ -792,7 +807,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             bytes32 positionId = _positions.at(i);
             Position storage position = positions[positionId];
             if (position.seller == _msgSender() && position.paid) {
-                uint256 totalPayment = position.pricePerDay * deliveryDurationDays;
+                uint256 totalPayment = position.sellPricePerDay * deliveryDurationDays;
                 _transfer(address(this), position.seller, totalPayment);
                 position.paid = false;
             }

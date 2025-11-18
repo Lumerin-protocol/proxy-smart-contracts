@@ -43,7 +43,8 @@ describe("Futures - createOrder - Order Matching and Position Creation", functio
     for (const orderEvent of events) {
       expect(getAddress(orderEvent.args.seller)).to.equal(getAddress(seller.account.address));
       expect(getAddress(orderEvent.args.buyer)).to.equal(getAddress(buyer.account.address));
-      expect(orderEvent.args.pricePerDay).to.equal(price);
+      expect(orderEvent.args.sellPricePerDay).to.equal(price);
+      expect(orderEvent.args.buyPricePerDay).to.equal(price);
       expect(orderEvent.args.deliveryAt).to.equal(BigInt(deliveryDate));
     }
   });
@@ -86,7 +87,8 @@ describe("Futures - createOrder - Order Matching and Position Creation", functio
     for (const event of events) {
       expect(getAddress(event.args.seller)).to.equal(getAddress(seller.account.address));
       expect(getAddress(event.args.buyer)).to.equal(getAddress(buyer.account.address));
-      expect(event.args.pricePerDay).to.equal(price);
+      expect(event.args.sellPricePerDay).to.equal(price);
+      expect(event.args.buyPricePerDay).to.equal(price);
       expect(event.args.deliveryAt).to.equal(BigInt(deliveryDate));
     }
   });
@@ -176,7 +178,8 @@ describe("Futures - createOrder - Order Matching and Position Creation", functio
     expect(getAddress(newPositionCreatedEvent.args.buyer)).to.equal(
       getAddress(account3.account.address)
     );
-    expect(newPositionCreatedEvent.args.pricePerDay).to.equal(exitPrice);
+    expect(newPositionCreatedEvent.args.sellPricePerDay).to.equal(price);
+    expect(newPositionCreatedEvent.args.buyPricePerDay).to.equal(exitPrice);
     expect(newPositionCreatedEvent.args.deliveryAt).to.equal(BigInt(deliveryDate));
 
     // Verify account2's profit
@@ -281,7 +284,8 @@ describe("Futures - createOrder - Order Matching and Position Creation", functio
     expect(getAddress(newPositionCreatedEvent.args.buyer)).to.equal(
       getAddress(account3.account.address)
     );
-    expect(newPositionCreatedEvent.args.pricePerDay).to.equal(exitPrice);
+    expect(newPositionCreatedEvent.args.sellPricePerDay).to.equal(price);
+    expect(newPositionCreatedEvent.args.buyPricePerDay).to.equal(exitPrice);
     expect(newPositionCreatedEvent.args.deliveryAt).to.equal(BigInt(deliveryDate));
 
     // Verify account2's loss
@@ -302,5 +306,74 @@ describe("Futures - createOrder - Order Matching and Position Creation", functio
     // Note: account2's exit order fee is already included in contractBalanceBefore
     const expectedContractBalanceChange = expectedLoss + orderFee; // Only account3's order fee is new
     expect(contractBalanceAfter - contractBalanceBefore).to.equal(expectedContractBalanceChange);
+  });
+
+  it("should handle exiting positions", async function () {
+    const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+    const { futures } = contracts;
+    const { seller, buyer, buyer2, pc } = accounts;
+
+    const price = parseUnits("100", 6);
+    const margin = parseUnits("10000", 6);
+    const deliveryDate = config.deliveryDates[0];
+
+    // setup margin for all participants
+    await futures.write.addMargin([margin], { account: seller.account });
+    await futures.write.addMargin([margin], { account: buyer.account });
+    await futures.write.addMargin([margin], { account: buyer2.account });
+
+    // Create matching orders, to create position
+    await futures.write.createOrder([price, deliveryDate, "", -1], {
+      account: seller.account,
+    });
+    const txHash = await futures.write.createOrder([price, deliveryDate, "", 1], {
+      account: buyer.account,
+    });
+
+    const receipt = await pc.waitForTransactionReceipt({ hash: txHash });
+    const [createdEvent] = parseEventLogs({
+      logs: receipt.logs,
+      abi: futures.abi,
+      eventName: "PositionCreated",
+    });
+
+    // create another order, to exit position
+    const newPrice = price * 2n;
+    const createOrderTxHash = await futures.write.createOrder([newPrice, deliveryDate, "", -1], {
+      account: buyer.account,
+    });
+    const createOrderReceipt = await pc.waitForTransactionReceipt({ hash: createOrderTxHash });
+    const [order2CreatedEvent] = parseEventLogs({
+      logs: createOrderReceipt.logs,
+      abi: futures.abi,
+      eventName: "OrderCreated",
+    });
+    // match order by buyer2 thus exiting position for buyer
+    const txHash2 = await futures.write.createOrder([newPrice, deliveryDate, "", 1], {
+      account: buyer2.account,
+    });
+
+    const receipt2 = await pc.waitForTransactionReceipt({ hash: txHash2 });
+
+    // old position closed event
+    const [closedEvent] = parseEventLogs({
+      logs: receipt2.logs,
+      abi: futures.abi,
+      eventName: "PositionClosed",
+    });
+    expect(closedEvent.args.positionId).to.equal(createdEvent.args.positionId);
+
+    // new position created event
+    const [createdEvent2] = parseEventLogs({
+      logs: receipt2.logs,
+      abi: futures.abi,
+      eventName: "PositionCreated",
+    });
+    expect(createdEvent2.args.seller).to.equal(getAddress(seller.account.address));
+    expect(createdEvent2.args.buyer).to.equal(getAddress(buyer2.account.address));
+    expect(createdEvent2.args.sellPricePerDay).to.equal(price);
+    expect(createdEvent2.args.buyPricePerDay).to.equal(newPrice);
+    expect(createdEvent2.args.deliveryAt).to.equal(deliveryDate);
+    expect(createdEvent2.args.orderId).to.equal(order2CreatedEvent.args.orderId);
   });
 });

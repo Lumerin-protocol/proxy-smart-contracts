@@ -444,7 +444,7 @@ describe("Futures - Liquidation", function () {
       const position = await futures.read.getPositionById([positionId!]);
       expect(position.seller).to.equal(getAddress(seller.account.address));
       expect(position.buyer).to.equal(getAddress(buyer.account.address));
-      const positionPrice = position.pricePerDay;
+      const positionPrice = position.sellPricePerDay;
       const positionDeliveryDate = position.deliveryAt;
       const positionDestURL = position.destURL;
 
@@ -505,7 +505,7 @@ describe("Futures - Liquidation", function () {
       const position = await futures.read.getPositionById([positionId!]);
       expect(position.seller).to.equal(getAddress(seller.account.address));
       expect(position.buyer).to.equal(getAddress(buyer.account.address));
-      const positionPrice = position.pricePerDay;
+      const positionPrice = position.sellPricePerDay;
       const positionDeliveryDate = position.deliveryAt;
       const positionDestURL = position.destURL;
 

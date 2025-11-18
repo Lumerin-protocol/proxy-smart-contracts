@@ -201,8 +201,6 @@ describe("Order Creation", function () {
     const initialSellerBalance = await futures.read.balanceOf([seller.account.address]);
     const initialContractBalance = await futures.read.balanceOf([futures.address]);
     const initialOwnerUsdcBalance = await usdcMock.read.balanceOf([owner.account.address]);
-    console.log("initialOwnerUsdcBalance \t", initialOwnerUsdcBalance);
-    console.log("config.orderFee \t", config.orderFee);
 
     // Create order - this should collect the order fee
     const txHash = await futures.write.createOrder([price, deliveryDate, "", 5], {
@@ -594,5 +592,113 @@ describe("Order Creation", function () {
     });
     expect(newOrderEvents.length).to.equal(1);
     expect(newOrderEvents[0].args.deliveryAt).to.equal(newDeliveryDate);
+  });
+
+  it("should allow order owner to close their order", async function () {
+    const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+    const { futures } = contracts;
+    const { seller, pc } = accounts;
+
+    const price = parseUnits("100", 6);
+    const margin = parseUnits("10000", 6);
+    const deliveryDate = config.deliveryDates[0];
+
+    // Create position
+    await futures.write.addMargin([margin], {
+      account: seller.account,
+    });
+
+    const createTxHash = await futures.write.createOrder([price, deliveryDate, "", 1], {
+      account: seller.account,
+    });
+
+    const createReceipt = await pc.waitForTransactionReceipt({ hash: createTxHash });
+    const [createEvent] = parseEventLogs({
+      logs: createReceipt.logs,
+      abi: futures.abi,
+      eventName: "OrderCreated",
+    });
+
+    const orderId = createEvent.args.orderId;
+
+    // Close order
+    const closeTxHash = await futures.write.closeOrder([orderId], {
+      account: seller.account,
+    });
+
+    const closeReceipt = await pc.waitForTransactionReceipt({ hash: closeTxHash });
+    const [closeEvent] = parseEventLogs({
+      logs: closeReceipt.logs,
+      abi: futures.abi,
+      eventName: "OrderClosed",
+    });
+
+    expect(closeEvent.args.orderId).to.equal(orderId);
+    expect(getAddress(closeEvent.args.participant)).to.equal(getAddress(seller.account.address));
+  });
+
+  it("should reject closing order by non-owner", async function () {
+    const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+    const { futures } = contracts;
+    const { seller, buyer, pc } = accounts;
+
+    const price = parseUnits("100", 6);
+    const margin = parseUnits("10000", 6);
+    const deliveryDate = config.deliveryDates[0];
+
+    await futures.write.addMargin([margin], {
+      account: seller.account,
+    });
+
+    const createTxHash = await futures.write.createOrder([price, deliveryDate, "", 1], {
+      account: seller.account,
+    });
+
+    const createReceipt = await pc.waitForTransactionReceipt({ hash: createTxHash });
+    const [createEvent] = parseEventLogs({
+      logs: createReceipt.logs,
+      abi: futures.abi,
+      eventName: "OrderCreated",
+    });
+
+    const orderId = createEvent.args.orderId;
+
+    // Try to close order with different account
+    await catchError(futures.abi, "OrderNotBelongToSender", async () => {
+      await futures.write.closeOrder([orderId], {
+        account: buyer.account,
+      });
+    });
+  });
+
+  it("should enforce maximum orders per participant", async function () {
+    const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+    const { futures } = contracts;
+    const { seller } = accounts;
+
+    const numOrders = await futures.read.MAX_ORDERS_PER_PARTICIPANT();
+    const price = await futures.read.getMarketPrice();
+    const margin = price * BigInt(config.deliveryDurationDays) * BigInt(numOrders);
+    const deliveryDate = config.deliveryDates[0];
+
+    // Add margin
+    await futures.write.addMargin([margin], {
+      account: seller.account,
+    });
+
+    // Create maximum number of positions (50)
+    for (let i = 0; i < numOrders; i++) {
+      await futures.write.createOrder(
+        [price + BigInt(i) * config.priceLadderStep, deliveryDate, "", 1],
+        { account: seller.account }
+      );
+    }
+
+    // Try to create one more position
+    await catchError(futures.abi, "MaxOrdersPerParticipantReached", async () => {
+      await futures.write.createOrder([price + 50n * config.priceLadderStep, deliveryDate, "", 1], {
+        account: seller.account,
+      });
+    });
   });
 });

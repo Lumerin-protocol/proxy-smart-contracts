@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
-import { getAddress, parseEventLogs } from "viem";
+import { getAddress, parseEventLogs, parseUnits, zeroAddress } from "viem";
 import { deployFuturesFixture } from "./fixtures";
 import { catchError } from "../../lib";
 
@@ -213,5 +213,248 @@ describe("Futures - getMinMargin", function () {
     expect(order.participant).to.equal(getAddress(buyer.account.address));
 
     expect(order.deliveryAt === futureDeliveryDate).to.be.true;
+  });
+
+  it("should calculate minimum margin for orders", async function () {
+    const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+    const { futures } = contracts;
+    const { seller } = accounts;
+
+    const price = await futures.read.getMarketPrice();
+    const [date1, date2] = config.deliveryDates;
+    const marginAmount = price * BigInt(config.deliveryDurationDays);
+
+    // Add margin first
+    await futures.write.addMargin([marginAmount], {
+      account: seller.account,
+    });
+
+    // Create buy order
+    await futures.write.createOrder([price, date1, "", 1], {
+      account: seller.account,
+    });
+
+    const minMargin = await futures.read.getMinMargin([seller.account.address]);
+    expect(minMargin > 0n).to.be.true;
+
+    // Create a sell order
+    await futures.write.createOrder([price, date2, "", -1], {
+      account: seller.account,
+    });
+
+    const minMarginAfterShort = await futures.read.getMinMargin([seller.account.address]);
+    expect(minMarginAfterShort > minMargin).to.be.true;
+  });
+
+  it("should calculate minimum margin for positions", async function () {
+    const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+    const { futures } = contracts;
+    const { seller, buyer } = accounts;
+
+    const price = await futures.read.getMarketPrice();
+    const deliveryDate = config.deliveryDates[0];
+    const marginAmount = price * BigInt(config.deliveryDurationDays);
+
+    // Add margin for both participants
+    await futures.write.addMargin([marginAmount], {
+      account: seller.account,
+    });
+    await futures.write.addMargin([marginAmount], {
+      account: buyer.account,
+    });
+
+    // Create matching orders to form an position
+    await futures.write.createOrder([price, deliveryDate, "", -1], {
+      account: seller.account,
+    });
+    await futures.write.createOrder([price, deliveryDate, "", 1], {
+      account: buyer.account,
+    });
+
+    const sellerMinMargin = await futures.read.getMinMargin([seller.account.address]);
+    const buyerMinMargin = await futures.read.getMinMargin([buyer.account.address]);
+
+    expect(sellerMinMargin > 0n).to.be.true;
+    expect(buyerMinMargin > 0n).to.be.true;
+  });
+});
+
+describe("Futures - margin management", function () {
+  it("should allow adding margin", async function () {
+    const { contracts, accounts } = await loadFixture(deployFuturesFixture);
+    const { futures, usdcMock } = contracts;
+    const { seller, pc } = accounts;
+
+    const sellerBalance1 = await futures.read.balanceOf([seller.account.address]);
+    const futuresUsdcBalance1 = await usdcMock.read.balanceOf([futures.address]);
+
+    const marginAmount = parseUnits("1000", 6); // $1000
+
+    const txHash = await futures.write.addMargin([marginAmount], {
+      account: seller.account,
+    });
+
+    const receipt = await pc.waitForTransactionReceipt({ hash: txHash });
+    expect(receipt.status).to.equal("success");
+
+    // Check balance
+    const sellerBalance2 = await futures.read.balanceOf([seller.account.address]);
+    expect(sellerBalance2).to.equal(sellerBalance1 + marginAmount);
+
+    // Check USDC balance of futures contract
+    const futuresUsdcBalance2 = await usdcMock.read.balanceOf([futures.address]);
+    expect(futuresUsdcBalance2).to.equal(futuresUsdcBalance1 + marginAmount);
+  });
+
+  it("should allow removing margin when sufficient balance", async function () {
+    const { contracts, accounts } = await loadFixture(deployFuturesFixture);
+    const { futures } = contracts;
+    const { seller, pc } = accounts;
+
+    const marginAmount = parseUnits("1000", 6);
+    const removeAmount = parseUnits("500", 6);
+
+    // Add margin first
+    await futures.write.addMargin([marginAmount], {
+      account: seller.account,
+    });
+
+    // Remove margin
+    const txHash = await futures.write.removeMargin([removeAmount], {
+      account: seller.account,
+    });
+
+    const receipt = await pc.waitForTransactionReceipt({ hash: txHash });
+    expect(receipt.status).to.equal("success");
+
+    // Check balance
+    const balance = await futures.read.balanceOf([seller.account.address]);
+    expect(balance).to.equal(marginAmount - removeAmount);
+  });
+
+  it("should reject removing margin when insufficient balance", async function () {
+    const { contracts, accounts } = await loadFixture(deployFuturesFixture);
+    const { futures } = contracts;
+    const { seller } = accounts;
+
+    const marginAmount = parseUnits("1000", 6);
+    const removeAmount = parseUnits("1500", 6);
+
+    // Add margin first
+    await futures.write.addMargin([marginAmount], {
+      account: seller.account,
+    });
+
+    // Try to remove more than balance
+    await catchError(futures.abi, "ERC20InsufficientBalance", async () => {
+      await futures.write.removeMargin([removeAmount], {
+        account: seller.account,
+      });
+    });
+  });
+
+  it("should reject removing margin when below minimum required", async function () {
+    const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+    const { futures } = contracts;
+    const { seller } = accounts;
+
+    const price = await futures.read.getMarketPrice();
+    const minMargin = await futures.read.getMinMarginForPosition([price, 1n]);
+    const deliveryDate = config.deliveryDates[0];
+
+    // Add margin
+    await futures.write.addMargin([minMargin], {
+      account: seller.account,
+    });
+
+    // Create order to require minimum margin
+    await futures.write.createOrder([price, deliveryDate, "", -1], {
+      account: seller.account,
+    });
+
+    // Try to remove too much margin
+    const removeAmount = 1n;
+    await catchError(futures.abi, "InsufficientMarginBalance", async () => {
+      await futures.write.removeMargin([removeAmount], {
+        account: seller.account,
+      });
+    });
+  });
+});
+
+describe("Futures - margin call", function () {
+  it("should perform margin call when margin is insufficient", async function () {
+    const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+    const { futures, btcPriceOracleMock } = contracts;
+    const { seller, validator, pc } = accounts;
+
+    const price = await futures.read.getMarketPrice();
+    const minMargin = await futures.read.getMinMarginForPosition([price, 1n]);
+    const deliveryDate = config.deliveryDates[0];
+
+    // Add small margin
+    await futures.write.addMargin([minMargin], {
+      account: seller.account,
+    });
+
+    // Create order that requires more margin
+    const tx = await futures.write.createOrder([price, deliveryDate, "", 1], {
+      account: seller.account,
+    });
+    const rec = await pc.waitForTransactionReceipt({ hash: tx });
+    const [createdEvent] = parseEventLogs({
+      logs: rec.logs,
+      abi: futures.abi,
+      eventName: "OrderCreated",
+    });
+    const { orderId } = createdEvent.args;
+
+    // Decrease bitcoin price
+    await btcPriceOracleMock.write.setPrice([config.oracle.btcPrice / 2n, 8]);
+
+    // Perform margin call
+    const txHash = await futures.write.marginCall([seller.account.address], {
+      account: validator.account,
+    });
+
+    const receipt = await pc.waitForTransactionReceipt({ hash: txHash });
+    expect(receipt.status).to.equal("success");
+
+    // Check for order closed event
+    const [closedEvent] = parseEventLogs({
+      logs: receipt.logs,
+      abi: futures.abi,
+      eventName: "OrderClosed",
+    });
+    expect(closedEvent.args.orderId).to.equal(orderId);
+
+    // Check that order was closed
+    const order = await futures.read.getOrderById([orderId]);
+    expect(order.participant).to.equal(zeroAddress);
+  });
+
+  it("should reject margin call by non-validator", async function () {
+    const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+    const { futures } = contracts;
+    const { seller } = accounts;
+
+    const price = parseUnits("100", 6);
+    const margin = parseUnits("10000", 6);
+    const deliveryDate = config.deliveryDates[0];
+
+    // Create position
+    await futures.write.addMargin([margin], {
+      account: seller.account,
+    });
+    await futures.write.createOrder([price, deliveryDate, "", 1], {
+      account: seller.account,
+    });
+
+    // Try to perform margin call as non-validator
+    await catchError(futures.abi, "OnlyValidator", async () => {
+      await futures.write.marginCall([seller.account.address], {
+        account: seller.account,
+      });
+    });
   });
 });
