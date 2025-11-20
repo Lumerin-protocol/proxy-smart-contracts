@@ -19,7 +19,6 @@ export class RewardCalculator {
     const hashrate = 10 ** 15;
     const secondsPerDay = 60 * 60 * 24;
     const averageTxFees = await this.getAverageFee(nblocks, lastBlock.blocks);
-    console.log(`Average TX Fees: `, averageTxFees);
     const blockStats = await this.getBlockDataCached(lastBlock.blocks);
     const blocksPerDay =
       (hashrate * secondsPerDay) / lastBlock.difficulty / Number(DIFFICULTY_TO_HASHRATE_FACTOR);

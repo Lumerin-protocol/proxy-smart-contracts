@@ -9,7 +9,6 @@ const schema = Type.Object({
   BITCOIN_RPC_URL: Type.String(),
   PRIVATE_KEY: Type.String(),
   CACHE_PARAMETER_NAME: Type.Optional(Type.String()),
-  AWS_REGION: Type.Optional(Type.String()),
   LOG_LEVEL: Type.Union(
     [
       Type.Literal("trace"),
@@ -21,6 +20,7 @@ const schema = Type.Object({
     ],
     { default: "info" }
   ),
+  BTCUSD_ORACLE_ADDRESS: Type.Optional(Type.String()),
 });
 
 const ajv = new Ajv({ coerceTypes: true, allErrors: true });
