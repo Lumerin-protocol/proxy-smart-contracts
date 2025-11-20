@@ -22,6 +22,13 @@ export class BitcoinClient {
     return await this.request<GetBlockHeaderRes>("getblockheader", [blockHash]);
   }
 
+  async getBlockStats(blockHashOrHeight: string | number) {
+    return await this.request<{
+      subsidy: number;
+      totalfee: number;
+    }>("getblockstats", [blockHashOrHeight, ["subsidy", "totalfee"]]);
+  }
+
   async getBlockchainInfo(): Promise<GetBlockchainInfoRes> {
     return await this.request<GetBlockchainInfoRes>("getblockchaininfo", []);
   }

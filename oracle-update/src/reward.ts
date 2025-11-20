@@ -1,36 +1,80 @@
 import { parseUnits } from "viem/utils";
 import { BitcoinClient } from "./bitcoin";
+import { FileCache } from "./cache";
+import type { Logger } from "pino";
 
 const DIFFICULTY_TO_HASHRATE_FACTOR = 2n ** 32n;
 
 export class RewardCalculator {
   private readonly bitcoinClient: BitcoinClient;
+  private readonly cache: FileCache;
 
-  constructor(bitcoinClient: BitcoinClient) {
+  constructor(bitcoinClient: BitcoinClient, cache: FileCache) {
     this.bitcoinClient = bitcoinClient;
+    this.cache = cache;
   }
 
-  async getLastBlockData(): Promise<BlockData> {
-    const blockchainInfo = await this.bitcoinClient.getBlockchainInfo();
-    const block = await this.bitcoinClient.getBlock(blockchainInfo.bestblockhash);
-    // const networkHPS = //call current network hashrate;
-    const coinbaseTx = block.tx[0];
-    const coinbaseTxData = await this.bitcoinClient.getRawTransaction(coinbaseTx);
-    let totalReward = 0n;
-    for (const vout of coinbaseTxData.vout) {
-      // convert js float to bigint to avoid precision loss
-      totalReward += parseUnits(vout.value.toString(), 8);
-    }
+  async getIndex(): Promise<number> {
+    const lastBlock = await this.bitcoinClient.getBlockchainInfo();
+    const hashrate = 10 ** 15;
+    const secondsPerDay = 60 * 60 * 24;
+    const averageTxFees = await this.getAverageFee(144, lastBlock.blocks);
+    console.log(`Average TX Fees: `, averageTxFees);
+    const blockStats = await this.getBlockDataCached(lastBlock.blocks);
+    const blocksPerDay =
+      (hashrate * secondsPerDay) / lastBlock.difficulty / Number(DIFFICULTY_TO_HASHRATE_FACTOR);
+    const btcPerDay = (blocksPerDay * (Number(averageTxFees) + blockStats.subsidy)) / 10 ** 8;
+    const usdPerDay = btcPerDay * 91740;
+    console.log(`Index BTC: `, btcPerDay);
+    console.log(`Index USD:`, usdPerDay);
+    return btcPerDay;
+  }
 
-    const hashesPerBlock = await this.calculateAvgHashesPerBlock(144);
-    const hashesForBTC = hashesPerBlock / totalReward;
-
+  async getLastIndexData(nblocks = 144) {
+    const lastBlock = await this.bitcoinClient.getBlockchainInfo();
+    const averageTxFees = await this.getAverageFee(nblocks, lastBlock.blocks);
+    const lastBlockData = await this.getBlockDataCached(lastBlock.blocks);
+    const hashesPerBlock = BigInt(
+      Math.round(lastBlock.difficulty * Number(DIFFICULTY_TO_HASHRATE_FACTOR))
+    );
+    const hashesForBTC = hashesPerBlock / (averageTxFees + BigInt(lastBlockData.subsidy));
     return {
-      blockNumber: blockchainInfo.blocks,
-      blockHash: blockchainInfo.bestblockhash,
-      reward: totalReward,
-      difficulty: BigInt(Math.round(blockchainInfo.difficulty)),
+      blockNumber: lastBlock.blocks,
+      subsidy: lastBlockData.subsidy,
+      totalfee: lastBlockData.totalfee,
+      difficulty: lastBlock.difficulty,
+      averageTxFees,
+      hashesPerBlock,
       hashesForBTC,
+    };
+  }
+
+  async getAverageFee(nblocks = 144, lastBlockNumber: number): Promise<bigint> {
+    let totalFee = 0n;
+    for (let i = 0; i < nblocks; i++) {
+      const blockNumber = lastBlockNumber - i;
+      const blockData = await this.getBlockDataCached(blockNumber);
+      totalFee += BigInt(blockData.totalfee);
+    }
+    return totalFee / BigInt(nblocks);
+  }
+
+  async getBlockDataCached(height: number) {
+    const data = this.cache.get(height.toString());
+    if (data) {
+      const [subsidy, totalfee] = data;
+      return {
+        height,
+        subsidy,
+        totalfee,
+      };
+    }
+    const blockStats = await this.bitcoinClient.getBlockStats(height);
+    this.cache.set(height.toString(), [blockStats.subsidy, blockStats.totalfee]);
+    return {
+      blockNumber: height,
+      subsidy: blockStats.subsidy,
+      totalfee: blockStats.totalfee,
     };
   }
 
@@ -53,11 +97,6 @@ export class RewardCalculator {
       Number(DIFFICULTY_TO_HASHRATE_FACTOR) *
       (targetBlockTime / avgBlockTime);
 
-    // const hashesPerLastBlock = lastBlock.difficulty * Number(DIFFICULTY_TO_HASHRATE_FACTOR);
-
-    // console.log("hashesPerLastBlock", hashesPerLastBlock);
-    // console.log("avgHashesPerBlock", avgHashesPerBlock);
-
     return BigInt(Math.round(avgHashesPerBlock));
   }
 
@@ -76,10 +115,8 @@ export class RewardCalculator {
   }
 }
 
-type BlockData = {
+type BlockStats = {
   blockNumber: number;
-  blockHash: string;
-  reward: bigint;
-  difficulty: bigint;
-  hashesForBTC: bigint;
+  subsidy: number;
+  totalfee: number;
 };

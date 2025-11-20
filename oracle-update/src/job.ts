@@ -6,6 +6,7 @@ import pino from "pino";
 import { privateKeyToAccount } from "viem/accounts";
 import { BitcoinClient } from "./bitcoin";
 import { RewardCalculator } from "./reward";
+import { FileCache } from "./cache";
 
 export async function main() {
   const log = pino({
@@ -26,24 +27,31 @@ export async function main() {
     client: createClient({ transport, chain, account }),
   });
 
+  const cache = new FileCache(500, {
+    parameterName: env.CACHE_PARAMETER_NAME,
+    useParameterStore: env.CACHE_PARAMETER_NAME !== undefined,
+    logger: log,
+  });
   const bitcoinClient = new BitcoinClient(env.BITCOIN_RPC_URL);
-  const rewardCalculator = new RewardCalculator(bitcoinClient);
+  const rewardCalculator = new RewardCalculator(bitcoinClient, cache);
 
   try {
-    const latest = await rewardCalculator.getLastBlockData();
+    const index = await rewardCalculator.getIndex();
+    log.info("Index: %s BTC/PH/day", index);
+    const latest = await rewardCalculator.getLastIndexData();
     log.info(
-      "Latest data: blockHash: %s, blockNumber: %s, reward: %s, difficulty: %s, hashesForBTC: %s",
-      latest.blockHash,
+      "Latest data: latest block Number: %s, latest subsidy: %s, difficulty: %s, average TX fees: %s, hashes per block: %s, hashes per BTC: %s",
       latest.blockNumber,
-      latest.reward.toString(),
-      latest.difficulty.toString(),
-      latest.hashesForBTC.toString()
+      latest.subsidy,
+      latest.difficulty,
+      latest.averageTxFees,
+      latest.hashesPerBlock,
+      latest.hashesForBTC
     );
     const oldHashesForBTC = await oracleContract.read.getHashesForBTC();
 
     log.info("Old hashes for BTC: %s", oldHashesForBTC.value);
     log.info("New hashes for BTC: %s", latest.hashesForBTC);
-
     if (latest.hashesForBTC !== oldHashesForBTC.value) {
       const hash = await oracleContract.write.setHashesForBTC([latest.hashesForBTC]);
       await pc.waitForTransactionReceipt({ hash });
