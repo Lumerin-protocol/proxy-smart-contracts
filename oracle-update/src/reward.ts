@@ -14,19 +14,16 @@ export class RewardCalculator {
     this.cache = cache;
   }
 
-  async getIndex(): Promise<number> {
+  async getIndex(nblocks = 144): Promise<number> {
     const lastBlock = await this.bitcoinClient.getBlockchainInfo();
     const hashrate = 10 ** 15;
     const secondsPerDay = 60 * 60 * 24;
-    const averageTxFees = await this.getAverageFee(144, lastBlock.blocks);
+    const averageTxFees = await this.getAverageFee(nblocks, lastBlock.blocks);
     console.log(`Average TX Fees: `, averageTxFees);
     const blockStats = await this.getBlockDataCached(lastBlock.blocks);
     const blocksPerDay =
       (hashrate * secondsPerDay) / lastBlock.difficulty / Number(DIFFICULTY_TO_HASHRATE_FACTOR);
     const btcPerDay = (blocksPerDay * (Number(averageTxFees) + blockStats.subsidy)) / 10 ** 8;
-    const usdPerDay = btcPerDay * 91740;
-    console.log(`Index BTC: `, btcPerDay);
-    console.log(`Index USD:`, usdPerDay);
     return btcPerDay;
   }
 

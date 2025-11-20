@@ -27,7 +27,9 @@ export async function main() {
     client: createClient({ transport, chain, account }),
   });
 
-  const cache = new FileCache(500, {
+  const SMA_PERIOD = 144;
+
+  const cache = new FileCache(SMA_PERIOD, {
     parameterName: env.CACHE_PARAMETER_NAME,
     useParameterStore: env.CACHE_PARAMETER_NAME !== undefined,
     logger: log,
@@ -38,7 +40,7 @@ export async function main() {
   try {
     const index = await rewardCalculator.getIndex();
     log.info("Index: %s BTC/PH/day", index);
-    const latest = await rewardCalculator.getLastIndexData();
+    const latest = await rewardCalculator.getLastIndexData(SMA_PERIOD);
     log.info(
       "Latest data: latest block Number: %s, latest subsidy: %s, difficulty: %s, average TX fees: %s, hashes per block: %s, hashes per BTC: %s",
       latest.blockNumber,
