@@ -8,6 +8,8 @@ const schema = Type.Object({
   ETHEREUM_RPC_URL: Type.String(),
   BITCOIN_RPC_URL: Type.String(),
   PRIVATE_KEY: Type.String(),
+  CACHE_PARAMETER_NAME: Type.Optional(Type.String()),
+  AWS_REGION: Type.Optional(Type.String()),
   LOG_LEVEL: Type.Union(
     [
       Type.Literal("trace"),
