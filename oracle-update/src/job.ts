@@ -43,7 +43,7 @@ export async function main() {
     // Wait for cache to be loaded
     await cache.ready();
 
-    const index = await rewardCalculator.getIndex();
+    const index = await rewardCalculator.getIndex(SMA_PERIOD);
     log.info("Index: %s BTC/PH/day", index);
     const latest = await rewardCalculator.getLastIndexData(SMA_PERIOD);
 
@@ -64,9 +64,9 @@ export async function main() {
     log.info("Old hashes for BTC: %s", oldHashesForBTC.value);
     log.info("New hashes for BTC: %s", latest.hashesForBTC);
     if (latest.hashesForBTC !== oldHashesForBTC.value) {
-      // const hash = await oracleContract.write.setHashesForBTC([latest.hashesForBTC]);
-      // await pc.waitForTransactionReceipt({ hash });
-      // log.info("Hashes for BTC updated onchain: %s", hash);
+      const hash = await oracleContract.write.setHashesForBTC([latest.hashesForBTC]);
+      await pc.waitForTransactionReceipt({ hash });
+      log.info("Hashes for BTC updated onchain: %s", hash);
     } else {
       log.info("Hashes for BTC update skipped");
     }
@@ -78,7 +78,7 @@ export async function main() {
     if (env.BTCUSD_ORACLE_ADDRESS !== undefined) {
       const coingecko = new Coingecko();
       const exchangeRate = await coingecko.getBTCUSDExchangeRate();
-      console.log("Exchange rate:", exchangeRate);
+      log.info("Exchange rate: %s", exchangeRate);
       const oracle = getContract({
         address: env.BTCUSD_ORACLE_ADDRESS as `0x${string}`,
         abi: priceOracleAbi,
@@ -89,15 +89,21 @@ export async function main() {
       const exchangeRateBigInt = parseUnits(exchangeRate.toString(), oracleDecimals);
 
       const latestRoundData = await oracle.read.latestRoundData();
-      console.log("Latest round data:", latestRoundData);
+      log.info("Latest round data: %s", latestRoundData);
 
       if (latestRoundData[1] === exchangeRateBigInt) {
-        console.log("Exchange rate is up to date");
+        log.info("Exchange rate is up to date");
         return;
       }
 
       const tx = await oracle.write.setPrice([exchangeRateBigInt, oracleDecimals]);
-      console.log("Transaction hash:", tx);
+      log.info("Transaction hash: %s", tx);
+
+      await pc.waitForTransactionReceipt({ hash: tx });
+      log.info("Exchange rate updated onchain: %s", tx);
+
+      const indexUSD = index * exchangeRate;
+      log.info("Index: %s USD/PH/day", indexUSD);
     }
 
     log.info("Job completed");
