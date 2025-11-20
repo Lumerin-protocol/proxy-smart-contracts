@@ -77,7 +77,7 @@ export class FileCache {
     await this.loadPromise;
   }
 
-  private async save(): Promise<void> {
+  public async save(): Promise<void> {
     // Debounce saves to avoid excessive writes
     if (this.savePending) {
       return;
@@ -109,7 +109,6 @@ export class FileCache {
     }
 
     this.cache.set(key, value);
-    this.save();
   }
 
   delete(key: string): boolean {

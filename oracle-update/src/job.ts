@@ -1,12 +1,13 @@
 import { env } from "./env";
-import { createClient, createPublicClient, getContract, http, PublicClient } from "viem";
+import { createClient, createPublicClient, getContract, http, parseUnits } from "viem";
 import { getChain } from "./chain";
-import { hashrateOracleAbi } from "./abi";
+import { hashrateOracleAbi, priceOracleAbi } from "./abi";
 import pino from "pino";
 import { privateKeyToAccount } from "viem/accounts";
 import { BitcoinClient } from "./bitcoin";
 import { RewardCalculator } from "./reward";
 import { FileCache } from "./cache";
+import { Coingecko } from "./coingecko";
 
 export async function main() {
   const log = pino({
@@ -20,11 +21,12 @@ export async function main() {
   const chain = getChain(env.CHAIN_ID);
 
   const pc = createPublicClient({ transport, chain });
+  const client = createClient({ transport, chain, account });
 
   const oracleContract = getContract({
     address: env.HASHRATE_ORACLE_ADDRESS as `0x${string}`,
     abi: hashrateOracleAbi,
-    client: createClient({ transport, chain, account }),
+    client,
   });
 
   const SMA_PERIOD = 144;
@@ -38,9 +40,16 @@ export async function main() {
   const rewardCalculator = new RewardCalculator(bitcoinClient, cache);
 
   try {
+    // Wait for cache to be loaded
+    await cache.ready();
+
     const index = await rewardCalculator.getIndex();
     log.info("Index: %s BTC/PH/day", index);
     const latest = await rewardCalculator.getLastIndexData(SMA_PERIOD);
+
+    // Excplicity save cache
+    await cache.save();
+
     log.info(
       "Latest data: latest block Number: %s, latest subsidy: %s, difficulty: %s, average TX fees: %s, hashes per block: %s, hashes per BTC: %s",
       latest.blockNumber,
@@ -55,11 +64,40 @@ export async function main() {
     log.info("Old hashes for BTC: %s", oldHashesForBTC.value);
     log.info("New hashes for BTC: %s", latest.hashesForBTC);
     if (latest.hashesForBTC !== oldHashesForBTC.value) {
-      const hash = await oracleContract.write.setHashesForBTC([latest.hashesForBTC]);
-      await pc.waitForTransactionReceipt({ hash });
-      log.info("Hashes for BTC updated onchain: %s", hash);
+      // const hash = await oracleContract.write.setHashesForBTC([latest.hashesForBTC]);
+      // await pc.waitForTransactionReceipt({ hash });
+      // log.info("Hashes for BTC updated onchain: %s", hash);
     } else {
       log.info("Hashes for BTC update skipped");
+    }
+
+    //
+    // Update BTC/USD price oracle on dev
+    //
+
+    if (env.BTCUSD_ORACLE_ADDRESS !== undefined) {
+      const coingecko = new Coingecko();
+      const exchangeRate = await coingecko.getBTCUSDExchangeRate();
+      console.log("Exchange rate:", exchangeRate);
+      const oracle = getContract({
+        address: env.BTCUSD_ORACLE_ADDRESS as `0x${string}`,
+        abi: priceOracleAbi,
+        client,
+      });
+
+      const oracleDecimals = await oracle.read.decimals();
+      const exchangeRateBigInt = parseUnits(exchangeRate.toString(), oracleDecimals);
+
+      const latestRoundData = await oracle.read.latestRoundData();
+      console.log("Latest round data:", latestRoundData);
+
+      if (latestRoundData[1] === exchangeRateBigInt) {
+        console.log("Exchange rate is up to date");
+        return;
+      }
+
+      const tx = await oracle.write.setPrice([exchangeRateBigInt, oracleDecimals]);
+      console.log("Transaction hash:", tx);
     }
 
     log.info("Job completed");

@@ -83,6 +83,7 @@ const config: HardhatUserConfig = {
       "Multicall3",
       "HashrateOracle",
       "Futures",
+      "BTCPriceOracleMock",
     ],
   },
   mocha: {},
