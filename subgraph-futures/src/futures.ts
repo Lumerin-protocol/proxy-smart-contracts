@@ -9,6 +9,8 @@ import {
   Futures as FuturesContract,
   PositionDeliveryClosed,
   OrderFeeUpdated,
+  PositionPaid,
+  PositionPaymentReceived,
 } from "../generated/Futures/Futures";
 import { Futures, Participant, Position, Order } from "../generated/schema";
 import { log, Address, dataSource } from "@graphprotocol/graph-ts";
@@ -190,6 +192,7 @@ export function handlePositionCreated(event: PositionCreated): void {
   position.isActive = true;
   position.orderId = event.params.orderId;
   position.destURL = event.params.destURL;
+  position.isPaid = false;
   position.save();
 
   // Update Seller
@@ -333,4 +336,32 @@ export function handleOrderFeeUpdated(event: OrderFeeUpdated): void {
     futures.orderFee = event.params.orderFee;
     futures.save();
   }
+}
+
+export function handlePositionPaid(event: PositionPaid): void {
+  log.info("Position paid: {}", [event.params.positionId.toHexString()]);
+
+  const position = Position.load(event.params.positionId);
+  if (!position) {
+    log.warning("Position not found: {}", [event.params.positionId.toHexString()]);
+    return;
+  }
+
+  // Update position payment status
+  position.isPaid = true;
+  position.save();
+}
+
+export function handlePositionPaymentReceived(event: PositionPaymentReceived): void {
+  log.info("Position payment received: {}", [event.params.positionId.toHexString()]);
+
+  const position = Position.load(event.params.positionId);
+  if (!position) {
+    log.warning("Position not found: {}", [event.params.positionId.toHexString()]);
+    return;
+  }
+
+  // Update position payment status
+  position.isPaid = false;
+  position.save();
 }
