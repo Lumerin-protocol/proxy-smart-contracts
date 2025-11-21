@@ -44,6 +44,10 @@ dataSources:
           handler: handleTransfer
         - event: OrderFeeUpdated(uint256)
           handler: handleOrderFeeUpdated
+        - event: PositionPaid(indexed bytes32)
+          handler: handlePositionPaid
+        - event: PositionPaymentReceived(indexed bytes32)
+          handler: handlePositionPaymentReceived
       file: ./src/futures.ts
   - kind: ethereum
     name: HashrateOracle

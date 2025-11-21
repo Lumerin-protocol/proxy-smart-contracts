@@ -82,6 +82,7 @@ type Position @entity(immutable: false) {
   isActive: Boolean!
   closedAt: BigInt
   closedBy: Bytes
+  isPaid: Boolean!
 }
 
 type HashrateOracle @entity(immutable: false) {

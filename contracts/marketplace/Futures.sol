@@ -103,6 +103,8 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     );
     event PositionClosed(bytes32 indexed positionId);
     event PositionDeliveryClosed(bytes32 indexed positionId, address indexed closedBy);
+    event PositionPaid(bytes32 indexed positionId);
+    event PositionPaymentReceived(bytes32 indexed positionId);
 
     // errors
     error InvalidPrice();
@@ -790,6 +792,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
                 // TODO: make sure it is not withdrawable by owner
                 _transfer(position.buyer, address(this), totalPayment);
                 position.paid = true;
+                emit PositionPaid(positionId);
             }
         }
         return true;
@@ -810,6 +813,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
                 uint256 totalPayment = position.sellPricePerDay * deliveryDurationDays;
                 _transfer(address(this), position.seller, totalPayment);
                 position.paid = false;
+                emit PositionPaymentReceived(positionId);
             }
         }
     }
