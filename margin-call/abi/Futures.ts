@@ -17,12 +17,22 @@ export const FuturesABI = [
   },
   {
     inputs: [],
+    name: "DeliveryDateExpired",
+    type: "error",
+  },
+  {
+    inputs: [],
     name: "DeliveryDateNotAvailable",
     type: "error",
   },
   {
     inputs: [],
     name: "DeliveryDateShouldBeInTheFuture",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "DeliveryNotFinishedYet",
     type: "error",
   },
   {
@@ -149,17 +159,17 @@ export const FuturesABI = [
   },
   {
     inputs: [],
+    name: "InvalidQty",
+    type: "error",
+  },
+  {
+    inputs: [],
     name: "MaxOrdersPerParticipantReached",
     type: "error",
   },
   {
     inputs: [],
     name: "NotInitializing",
-    type: "error",
-  },
-  {
-    inputs: [],
-    name: "OnlyPositionSellerOrBuyer",
     type: "error",
   },
   {
@@ -287,19 +297,6 @@ export const FuturesABI = [
     inputs: [
       {
         indexed: false,
-        internalType: "uint256",
-        name: "deliveryDate",
-        type: "uint256",
-      },
-    ],
-    name: "DeliveryDateAdded",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: false,
         internalType: "uint64",
         name: "version",
         type: "uint64",
@@ -344,21 +341,21 @@ export const FuturesABI = [
       },
       {
         indexed: false,
+        internalType: "string",
+        name: "destURL",
+        type: "string",
+      },
+      {
+        indexed: false,
         internalType: "uint256",
-        name: "price",
+        name: "pricePerDay",
         type: "uint256",
       },
       {
         indexed: false,
         internalType: "uint256",
-        name: "deliveryDate",
+        name: "deliveryAt",
         type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "bytes32",
-        name: "offsetPositionId",
-        type: "bytes32",
       },
       {
         indexed: false,
@@ -368,6 +365,19 @@ export const FuturesABI = [
       },
     ],
     name: "OrderCreated",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "orderFee",
+        type: "uint256",
+      },
+    ],
+    name: "OrderFeeUpdated",
     type: "event",
   },
   {
@@ -426,14 +436,32 @@ export const FuturesABI = [
       {
         indexed: false,
         internalType: "uint256",
-        name: "price",
+        name: "sellPricePerDay",
         type: "uint256",
       },
       {
         indexed: false,
         internalType: "uint256",
-        name: "startTime",
+        name: "buyPricePerDay",
         type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "deliveryAt",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "string",
+        name: "destURL",
+        type: "string",
+      },
+      {
+        indexed: false,
+        internalType: "bytes32",
+        name: "orderId",
+        type: "bytes32",
       },
     ],
     name: "PositionCreated",
@@ -456,6 +484,32 @@ export const FuturesABI = [
       },
     ],
     name: "PositionDeliveryClosed",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "bytes32",
+        name: "positionId",
+        type: "bytes32",
+      },
+    ],
+    name: "PositionPaid",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "bytes32",
+        name: "positionId",
+        type: "bytes32",
+      },
+    ],
+    name: "PositionPaymentReceived",
     type: "event",
   },
   {
@@ -533,38 +587,6 @@ export const FuturesABI = [
       },
     ],
     stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "int256",
-        name: "_value",
-        type: "int256",
-      },
-    ],
-    name: "abs",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "pure",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "_deliveryDate",
-        type: "uint256",
-      },
-    ],
-    name: "addDeliveryDate",
-    outputs: [],
-    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -661,62 +683,6 @@ export const FuturesABI = [
     type: "function",
   },
   {
-    inputs: [],
-    name: "buyerLiquidationMarginPercent",
-    outputs: [
-      {
-        internalType: "uint8",
-        name: "",
-        type: "uint8",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "_quantity",
-        type: "uint256",
-      },
-      {
-        internalType: "bool",
-        name: "_isBuy",
-        type: "bool",
-      },
-    ],
-    name: "calculateRequiredMargin",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "int256",
-        name: "_value",
-        type: "int256",
-      },
-    ],
-    name: "clamp",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "pure",
-    type: "function",
-  },
-  {
     inputs: [
       {
         internalType: "bytes32",
@@ -750,24 +716,6 @@ export const FuturesABI = [
   {
     inputs: [
       {
-        internalType: "bytes32",
-        name: "_offsetPositionId",
-        type: "bytes32",
-      },
-      {
-        internalType: "uint256",
-        name: "_price",
-        type: "uint256",
-      },
-    ],
-    name: "createOffsetOrder",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
         internalType: "uint256",
         name: "_price",
         type: "uint256",
@@ -778,9 +726,14 @@ export const FuturesABI = [
         type: "uint256",
       },
       {
-        internalType: "bool",
-        name: "_isBuy",
-        type: "bool",
+        internalType: "string",
+        name: "_destURL",
+        type: "string",
+      },
+      {
+        internalType: "int8",
+        name: "_qty",
+        type: "int8",
       },
     ],
     name: "createOrder",
@@ -802,14 +755,71 @@ export const FuturesABI = [
     type: "function",
   },
   {
+    inputs: [],
+    name: "deliveryDurationDays",
+    outputs: [
+      {
+        internalType: "uint8",
+        name: "",
+        type: "uint8",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "deliveryIntervalDays",
+    outputs: [
+      {
+        internalType: "uint8",
+        name: "",
+        type: "uint8",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [
       {
         internalType: "uint256",
-        name: "_index",
+        name: "_amount",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_deliveryDate",
         type: "uint256",
       },
     ],
-    name: "deliveryDateByIndex",
+    name: "depositDeliveryPayment",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_amount",
+        type: "uint256",
+      },
+    ],
+    name: "depositReservePool",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "firstFutureDeliveryDate",
     outputs: [
       {
         internalType: "uint256",
@@ -822,25 +832,12 @@ export const FuturesABI = [
   },
   {
     inputs: [],
-    name: "deliveryDatesLength",
+    name: "futureDeliveryDatesCount",
     outputs: [
       {
-        internalType: "uint256",
+        internalType: "uint8",
         name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "deliveryDurationSeconds",
-    outputs: [
-      {
-        internalType: "uint32",
-        name: "",
-        type: "uint32",
+        type: "uint8",
       },
     ],
     stateMutability: "view",
@@ -866,89 +863,50 @@ export const FuturesABI = [
     type: "function",
   },
   {
-    inputs: [
+    inputs: [],
+    name: "getDeliveryDates",
+    outputs: [
       {
-        internalType: "bool",
-        name: "_isBuy",
-        type: "bool",
+        internalType: "uint256[]",
+        name: "",
+        type: "uint256[]",
       },
     ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_entryPricePerDay",
+        type: "uint256",
+      },
+      {
+        internalType: "int256",
+        name: "_qty",
+        type: "int256",
+      },
+    ],
+    name: "getMaintenanceMarginForPosition",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
     name: "getMarginPercent",
     outputs: [
       {
         internalType: "uint8",
         name: "",
         type: "uint8",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "_participant",
-        type: "address",
-      },
-    ],
-    name: "getMarginShortfall",
-    outputs: [
-      {
-        internalType: "int256",
-        name: "",
-        type: "int256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        components: [
-          {
-            internalType: "address",
-            name: "seller",
-            type: "address",
-          },
-          {
-            internalType: "address",
-            name: "buyer",
-            type: "address",
-          },
-          {
-            internalType: "uint256",
-            name: "price",
-            type: "uint256",
-          },
-          {
-            internalType: "uint256",
-            name: "startTime",
-            type: "uint256",
-          },
-          {
-            internalType: "uint256",
-            name: "timestamp",
-            type: "uint256",
-          },
-        ],
-        internalType: "struct Futures.Position",
-        name: "position",
-        type: "tuple",
-      },
-      {
-        internalType: "bool",
-        name: "_isBuy",
-        type: "bool",
-      },
-    ],
-    name: "getMarginShortfallForPosition",
-    outputs: [
-      {
-        internalType: "int256",
-        name: "",
-        type: "int256",
       },
     ],
     stateMutability: "view",
@@ -978,9 +936,33 @@ export const FuturesABI = [
     name: "getMinMargin",
     outputs: [
       {
-        internalType: "uint256",
+        internalType: "int256",
         name: "",
+        type: "int256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_entryPricePerDay",
         type: "uint256",
+      },
+      {
+        internalType: "int256",
+        name: "_qty",
+        type: "int256",
+      },
+    ],
+    name: "getMinMarginForPosition",
+    outputs: [
+      {
+        internalType: "int256",
+        name: "",
+        type: "int256",
       },
     ],
     stateMutability: "view",
@@ -999,34 +981,34 @@ export const FuturesABI = [
       {
         components: [
           {
-            internalType: "address",
-            name: "participant",
-            type: "address",
-          },
-          {
-            internalType: "uint256",
-            name: "price",
-            type: "uint256",
-          },
-          {
-            internalType: "uint256",
-            name: "deliveryDate",
-            type: "uint256",
-          },
-          {
             internalType: "bool",
             name: "isBuy",
             type: "bool",
           },
           {
+            internalType: "address",
+            name: "participant",
+            type: "address",
+          },
+          {
+            internalType: "string",
+            name: "destURL",
+            type: "string",
+          },
+          {
             internalType: "uint256",
-            name: "timestamp",
+            name: "pricePerDay",
             type: "uint256",
           },
           {
-            internalType: "bytes32",
-            name: "offsetPositionId",
-            type: "bytes32",
+            internalType: "uint256",
+            name: "deliveryAt",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "createdAt",
+            type: "uint256",
           },
         ],
         internalType: "struct Futures.Order",
@@ -1060,19 +1042,34 @@ export const FuturesABI = [
             type: "address",
           },
           {
+            internalType: "string",
+            name: "destURL",
+            type: "string",
+          },
+          {
             internalType: "uint256",
-            name: "price",
+            name: "sellPricePerDay",
             type: "uint256",
           },
           {
             internalType: "uint256",
-            name: "startTime",
+            name: "buyPricePerDay",
             type: "uint256",
           },
           {
             internalType: "uint256",
-            name: "timestamp",
+            name: "deliveryAt",
             type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "createdAt",
+            type: "uint256",
+          },
+          {
+            internalType: "bool",
+            name: "paid",
+            type: "bool",
           },
         ],
         internalType: "struct Futures.Position",
@@ -1115,12 +1112,7 @@ export const FuturesABI = [
       },
       {
         internalType: "uint8",
-        name: "_sellerLiquidationMarginPercent",
-        type: "uint8",
-      },
-      {
-        internalType: "uint8",
-        name: "_buyerLiquidationMarginPercent",
+        name: "_liquidationMarginPercent",
         type: "uint8",
       },
       {
@@ -1129,19 +1121,47 @@ export const FuturesABI = [
         type: "uint256",
       },
       {
-        internalType: "uint32",
-        name: "_deliveryDurationSeconds",
-        type: "uint32",
+        internalType: "uint256",
+        name: "_minimumPriceIncrement",
+        type: "uint256",
+      },
+      {
+        internalType: "uint8",
+        name: "_deliveryDurationDays",
+        type: "uint8",
+      },
+      {
+        internalType: "uint8",
+        name: "_deliveryIntervalDays",
+        type: "uint8",
+      },
+      {
+        internalType: "uint8",
+        name: "_futureDeliveryDatesCount",
+        type: "uint8",
       },
       {
         internalType: "uint256",
-        name: "_priceLadderStep",
+        name: "_firstFutureDeliveryDate",
         type: "uint256",
       },
     ],
     name: "initialize",
     outputs: [],
     stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "liquidationMarginPercent",
+    outputs: [
+      {
+        internalType: "uint8",
+        name: "",
+        type: "uint8",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -1159,6 +1179,19 @@ export const FuturesABI = [
   },
   {
     inputs: [],
+    name: "minimumPriceIncrement",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
     name: "name",
     outputs: [
       {
@@ -1172,12 +1205,12 @@ export const FuturesABI = [
   },
   {
     inputs: [],
-    name: "owner",
+    name: "orderFee",
     outputs: [
       {
-        internalType: "address",
+        internalType: "uint256",
         name: "",
-        type: "address",
+        type: "uint256",
       },
     ],
     stateMutability: "view",
@@ -1185,12 +1218,12 @@ export const FuturesABI = [
   },
   {
     inputs: [],
-    name: "priceLadderStep",
+    name: "owner",
     outputs: [
       {
-        internalType: "uint256",
+        internalType: "address",
         name: "",
-        type: "uint256",
+        type: "address",
       },
     ],
     stateMutability: "view",
@@ -1223,23 +1256,29 @@ export const FuturesABI = [
     type: "function",
   },
   {
-    inputs: [],
-    name: "renounceOwnership",
-    outputs: [],
+    inputs: [
+      {
+        internalType: "address",
+        name: "_participant",
+        type: "address",
+      },
+    ],
+    name: "removeOutdatedOrdersForParticipant",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "count",
+        type: "uint256",
+      },
+    ],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
     inputs: [],
-    name: "sellerLiquidationMarginPercent",
-    outputs: [
-      {
-        internalType: "uint8",
-        name: "",
-        type: "uint8",
-      },
-    ],
-    stateMutability: "view",
+    name: "renounceOwnership",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -1251,6 +1290,45 @@ export const FuturesABI = [
       },
     ],
     name: "setBreachPenaltyRatePerDay",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint8",
+        name: "_futureDeliveryDatesCount",
+        type: "uint8",
+      },
+    ],
+    name: "setFutureDeliveryDatesCount",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint8",
+        name: "_liquidationMarginPercent",
+        type: "uint8",
+      },
+    ],
+    name: "setLiquidationMarginPercent",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_orderFee",
+        type: "uint256",
+      },
+    ],
+    name: "setOrderFee",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -1402,6 +1480,32 @@ export const FuturesABI = [
       },
     ],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_deliveryDate",
+        type: "uint256",
+      },
+    ],
+    name: "withdrawDeliveryPayment",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_amount",
+        type: "uint256",
+      },
+    ],
+    name: "withdrawReservePool",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
 ] as const;
