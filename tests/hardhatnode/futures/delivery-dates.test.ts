@@ -194,4 +194,66 @@ describe.only("Delivery Date Management", function () {
       expect(deliveryDates[i]).to.equal(expectedDate);
     }
   });
+
+  it("should validate delivery date correctly", async function () {
+    const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+    const { futures } = contracts;
+    const { tc, seller } = accounts;
+
+    const price = await futures.read.getMarketPrice();
+    await futures.write.addMargin([price * 100n], { account: seller.account });
+
+    await tc.setNextBlockTimestamp({ timestamp: config.firstFutureDeliveryDate + 1n });
+    await tc.mine({ blocks: 1 });
+
+    // in the past
+    await catchError(futures.abi, "DeliveryDateShouldBeInTheFuture", async () => {
+      await futures.write.createOrder([price, config.firstFutureDeliveryDate, "", 1], {
+        account: seller.account,
+      });
+    });
+
+    // in the past and not aligned with interval
+    await catchError(futures.abi, "DeliveryDateShouldBeInTheFuture", async () => {
+      await futures.write.createOrder([price, config.firstFutureDeliveryDate + 1n, "", 1], {
+        account: seller.account,
+      });
+    });
+
+    // within available range but not aligned with interval
+    const dateWithinRangeNotAligned =
+      config.firstFutureDeliveryDate + BigInt(config.deliveryDurationSeconds) + 1n;
+    await catchError(futures.abi, "DeliveryDateNotAvailable", async () => {
+      await futures.write.createOrder([price, dateWithinRangeNotAligned, "", 1], {
+        account: seller.account,
+      });
+    });
+
+    // out of available range
+    const dateOutOfRange =
+      config.firstFutureDeliveryDate +
+      BigInt(config.deliveryDurationSeconds) * BigInt(config.futureDeliveryDatesCount + 1);
+    await catchError(futures.abi, "DeliveryDateNotAvailable", async () => {
+      await futures.write.createOrder([price, dateOutOfRange, "", 1], {
+        account: seller.account,
+      });
+    });
+
+    // out of available range and not aligned with interval
+    const dateOutOfRangeNotAligned = dateOutOfRange + 1n;
+    await catchError(futures.abi, "DeliveryDateNotAvailable", async () => {
+      await futures.write.createOrder([price, dateOutOfRangeNotAligned, "", 1], {
+        account: seller.account,
+      });
+    });
+
+    // all valid dates
+    for (let i = 0; i < config.futureDeliveryDatesCount; i++) {
+      const date =
+        config.firstFutureDeliveryDate + BigInt(config.deliveryDurationSeconds) * BigInt(i + 1);
+      await futures.write.createOrder([price, date, "", 1], {
+        account: seller.account,
+      });
+    }
+  });
 });

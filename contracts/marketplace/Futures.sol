@@ -758,10 +758,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     }
 
     function getDeliveryDates() public view returns (uint256[] memory) {
-        uint256 currentDeliveryDateIndex = 0;
-        if (block.timestamp > firstFutureDeliveryDate) {
-            currentDeliveryDateIndex = (block.timestamp - firstFutureDeliveryDate) / deliveryIntervalSeconds() + 1;
-        }
+        uint256 currentDeliveryDateIndex = _getCurrentDeliveryDateIndex();
 
         uint256[] memory deliveryDatesArray = new uint256[](futureDeliveryDatesCount);
         for (uint256 i = 0; i < futureDeliveryDatesCount; i++) {
@@ -769,6 +766,14 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         }
 
         return deliveryDatesArray;
+    }
+
+    /// @dev Returns the index of the current (closest available in the future) delivery date relative to the first future delivery date
+    function _getCurrentDeliveryDateIndex() private view returns (uint256) {
+        if (block.timestamp > firstFutureDeliveryDate) {
+            return (block.timestamp - firstFutureDeliveryDate) / deliveryIntervalSeconds() + 1;
+        }
+        return 0;
     }
 
     // Delivery deposit functions
@@ -897,11 +902,12 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         if (_deliveryDate < firstFutureDeliveryDate) {
             revert DeliveryDateNotAvailable();
         }
-        uint256 elapsedFromFirstDeliveryDate = _deliveryDate - firstFutureDeliveryDate;
-        if (elapsedFromFirstDeliveryDate % deliveryIntervalSeconds() != 0) {
+        uint256 elapsedFromFirst = _deliveryDate - firstFutureDeliveryDate;
+        if (elapsedFromFirst % deliveryIntervalSeconds() != 0) {
             revert DeliveryDateNotAvailable();
         }
-        if (elapsedFromFirstDeliveryDate > (futureDeliveryDatesCount - 1) * deliveryIntervalSeconds()) {
+        uint256 currentIndex = _getCurrentDeliveryDateIndex();
+        if (elapsedFromFirst > (futureDeliveryDatesCount - 1 + currentIndex) * deliveryIntervalSeconds()) {
             revert DeliveryDateNotAvailable();
         }
     }

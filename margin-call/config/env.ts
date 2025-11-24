@@ -9,7 +9,6 @@ const TypeEthAddress = (opt?: StringOptions) =>
 const schema = Type.Object({
   FUTURES_ADDRESS: TypeEthAddress(),
   ETH_NODE_URL: Type.String({ format: "uri" }),
-  HASHRATE_ORACLE_ADDRESS: TypeEthAddress(),
   LOG_LEVEL: Type.Union(
     [
       Type.Literal("trace"),

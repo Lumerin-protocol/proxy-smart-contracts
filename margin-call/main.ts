@@ -8,7 +8,7 @@ import { sendDeficitAlerts } from "./gateway/marginAlert";
 import { executeMarginCalls } from "./gateway/marginCall";
 import { BalanceEntry } from "./gateway/balanceEntry";
 
-async function main() {
+async function main(executeMarginCall = false) {
   const ethClient = viem.createClient({
     transport: viem.http(config.ETH_NODE_URL),
     chain: {
@@ -76,13 +76,15 @@ async function main() {
     config.MARGIN_UTILIZATION_WARNING_PERCENT,
     log
   );
-  await executeMarginCalls(addressesForMarginCall, ethClient, log);
+  if (executeMarginCall) {
+    await executeMarginCalls(addressesForMarginCall, ethClient, log);
+  }
 }
 
 // Lambda handler export
 export const handler = async (event: any, context: any) => {
   try {
-    await main();
+    await main(event?.executeMarginCall);
     return {
       statusCode: 200,
       body: JSON.stringify({ message: "Margin call check completed successfully" }),
