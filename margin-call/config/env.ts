@@ -21,11 +21,11 @@ const schema = Type.Object({
     ],
     { default: "info" }
   ),
-  MARGIN_ALERT_THRESHOLD: Type.Number({ minimum: 0, maximum: 1, default: 0.1 }),
+  MARGIN_UTILIZATION_WARNING_PERCENT: Type.Number({ minimum: 0, maximum: 100, default: 80 }),
   NOTIFICATIONS_SERVICE_URL: Type.String({ format: "uri" }),
   MULTICALL_ADDRESS: TypeEthAddress(),
   SUBGRAPH_URL: Type.String({ format: "uri" }),
-  SUBGRAPH_API_KEY: Type.String({ minLength: 1 }),
+  SUBGRAPH_API_KEY: Type.Optional(Type.String()),
 });
 
 export type Config = Static<typeof schema>;

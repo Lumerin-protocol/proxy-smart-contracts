@@ -3,7 +3,7 @@ import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { deployFuturesFixture } from "./fixtures";
 import { catchError } from "../../lib";
 
-describe("Delivery Date Management", function () {
+describe.only("Delivery Date Management", function () {
   it("should return correct delivery dates array", async function () {
     const { contracts, config } = await loadFixture(deployFuturesFixture);
     const { futures } = contracts;
@@ -174,6 +174,24 @@ describe("Delivery Date Management", function () {
     for (let i = 0; i < updatedDeliveryDates.length; i++) {
       const expectedDate = firstFutureDeliveryDate + deliveryIntervalSeconds * BigInt(i);
       expect(updatedDeliveryDates[i]).to.equal(expectedDate);
+    }
+  });
+
+  it("should return correct delivery dates array when time has passed", async function () {
+    const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+    const { futures } = contracts;
+    const { tc, pc } = accounts;
+
+    await tc.setNextBlockTimestamp({ timestamp: config.firstFutureDeliveryDate + 1n });
+    await tc.mine({ blocks: 1 });
+
+    const deliveryDates = await futures.read.getDeliveryDates();
+    expect(deliveryDates.length).to.equal(config.futureDeliveryDatesCount);
+
+    for (let i = 0; i < deliveryDates.length; i++) {
+      const expectedDate =
+        config.firstFutureDeliveryDate + BigInt(config.deliveryDurationSeconds * (i + 1));
+      expect(deliveryDates[i]).to.equal(expectedDate);
     }
   });
 });

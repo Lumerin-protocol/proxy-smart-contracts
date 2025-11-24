@@ -6,7 +6,7 @@ import { config } from "./config/env";
 import { hardhat } from "viem/chains";
 import { sendDeficitAlerts } from "./gateway/marginAlert";
 import { executeMarginCalls } from "./gateway/marginCall";
-import { DeficitEntry } from "./gateway/deficitEntry";
+import { BalanceEntry } from "./gateway/balanceEntry";
 
 async function main() {
   const ethClient = viem.createClient({
@@ -40,30 +40,42 @@ async function main() {
 
   const deficits = await Promise.all(
     participants.map(async (participant) => {
-      const collateralDeficit = await futures.read.getCollateralDeficit([participant.address]);
-      const balance = BigInt(participant.balance);
+      const minMargin = await futures.read.getMinMargin([participant.address]);
+      const balance = await futures.read.balanceOf([participant.address]);
+      // const balance = BigInt(participant.balance);
+      const marginUtilizationRatio = Number(minMargin) / Number(balance);
+
+      log.debug(
+        `Participant ${participant.address} has min margin ${minMargin} and balance ${balance} and margin utilization ratio ${marginUtilizationRatio}`
+      );
+
       return {
         address: participant.address,
-        collateralDeficit,
+        minMargin: minMargin,
         balance: balance,
-        percentage: Number(collateralDeficit) / Number(balance),
+        marginUtilizationRatio: marginUtilizationRatio,
       };
     })
   );
 
-  const addressesForMarginCall: DeficitEntry[] = [];
-  const addressesForAlert: DeficitEntry[] = [];
+  const addressesForMarginCall: BalanceEntry[] = [];
+  const addressesForAlert: BalanceEntry[] = [];
 
   for (const deficit of deficits) {
-    if (deficit.collateralDeficit > 0) {
+    if (deficit.marginUtilizationRatio >= 1) {
       addressesForMarginCall.push(deficit);
     }
-    if (deficit.percentage < config.MARGIN_ALERT_THRESHOLD) {
+    if (deficit.marginUtilizationRatio > config.MARGIN_UTILIZATION_WARNING_PERCENT / 100) {
       addressesForAlert.push(deficit);
     }
   }
 
-  await sendDeficitAlerts(addressesForAlert, config.NOTIFICATIONS_SERVICE_URL, log);
+  await sendDeficitAlerts(
+    addressesForAlert,
+    config.NOTIFICATIONS_SERVICE_URL,
+    config.MARGIN_UTILIZATION_WARNING_PERCENT,
+    log
+  );
   await executeMarginCalls(addressesForMarginCall, ethClient, log);
 }
 
@@ -73,13 +85,16 @@ export const handler = async (event: any, context: any) => {
     await main();
     return {
       statusCode: 200,
-      body: JSON.stringify({ message: 'Margin call check completed successfully' })
+      body: JSON.stringify({ message: "Margin call check completed successfully" }),
     };
   } catch (error) {
-    console.error('Error in margin call handler:', error);
+    console.error("Error in margin call handler:", error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Margin call check failed', details: error instanceof Error ? error.message : String(error) })
+      body: JSON.stringify({
+        error: "Margin call check failed",
+        details: error instanceof Error ? error.message : String(error),
+      }),
     };
   }
 };

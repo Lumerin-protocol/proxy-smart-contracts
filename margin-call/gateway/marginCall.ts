@@ -5,13 +5,17 @@ import { Multicall3ABI } from "../abi/Multicall3";
 import { FuturesABI } from "../abi/Futures";
 import { config } from "../config/env";
 import { writeContract, waitForTransactionReceipt } from "viem/actions";
-import { DeficitEntry } from "./deficitEntry";
+import { BalanceEntry } from "./balanceEntry";
 
 export async function executeMarginCalls(
-  entries: DeficitEntry[],
+  entries: BalanceEntry[],
   ethClient: viem.Client,
   log: pino.Logger
 ) {
+  if (entries.length === 0) {
+    log.info("No entries to execute margin calls");
+    return;
+  }
   const multicall = viem.getContract({
     address: config.MULTICALL_ADDRESS,
     abi: Multicall3ABI,

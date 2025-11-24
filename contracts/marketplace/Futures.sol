@@ -758,10 +758,16 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     }
 
     function getDeliveryDates() public view returns (uint256[] memory) {
+        uint256 currentDeliveryDateIndex = 0;
+        if (block.timestamp > firstFutureDeliveryDate) {
+            currentDeliveryDateIndex = (block.timestamp - firstFutureDeliveryDate) / deliveryIntervalSeconds() + 1;
+        }
+
         uint256[] memory deliveryDatesArray = new uint256[](futureDeliveryDatesCount);
         for (uint256 i = 0; i < futureDeliveryDatesCount; i++) {
-            deliveryDatesArray[i] = firstFutureDeliveryDate + deliveryIntervalSeconds() * i;
+            deliveryDatesArray[i] = firstFutureDeliveryDate + deliveryIntervalSeconds() * (currentDeliveryDateIndex + i);
         }
+
         return deliveryDatesArray;
     }
 

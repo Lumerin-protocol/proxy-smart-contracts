@@ -1,15 +1,20 @@
 import pino from "pino";
-import { DeficitEntry } from "./deficitEntry";
+import { BalanceEntry } from "./balanceEntry";
 
 export async function sendDeficitAlerts(
-  entries: DeficitEntry[],
+  entries: BalanceEntry[],
   notificationServiceUrl: string,
+  MARGIN_UTILIZATION_WARNING_PERCENT: number,
   log: pino.Logger
 ) {
+  if (entries.length === 0) {
+    log.info("No entries to send margin utilization warning");
+    return;
+  }
   const entriesToSend = entries.map((entry) => ({
     walletAddress: entry.address,
     collateralBalance: entry.balance,
-    minBalance: entry.balance + entry.collateralDeficit,
+    minBalance: calcMinBalance(entry.minMargin, MARGIN_UTILIZATION_WARNING_PERCENT),
   }));
 
   log.info(`Sending deficit alerts: ${entriesToSend.length}`);
@@ -28,4 +33,8 @@ export async function sendDeficitAlerts(
   if (!res.ok) {
     log.error(`Failed to send deficit alerts: ${res.statusText}`);
   }
+}
+
+function calcMinBalance(minMargin: bigint, marginUtilizationWarningPercent: number) {
+  return (Number(minMargin) / marginUtilizationWarningPercent) * 100;
 }
