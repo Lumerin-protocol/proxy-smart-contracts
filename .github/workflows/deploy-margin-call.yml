@@ -20,6 +20,14 @@ on:
           - dev
           - test
           - main
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        default: 'deploy'
+        options:
+          - deploy
+          - invoke
 
 permissions:
   id-token: write   # Required for OIDC
@@ -32,6 +40,7 @@ jobs:
   build:
     name: 🔨 Build
     runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.action != 'invoke'
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
@@ -152,6 +161,7 @@ jobs:
     name: 🚀 Deploy
     runs-on: ubuntu-latest
     needs: build
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.action != 'invoke'
     outputs:
       lambda_version: ${{ steps.publish.outputs.lambda_version }}
     
@@ -207,6 +217,7 @@ jobs:
     name: 🔍 Verify
     runs-on: ubuntu-latest
     needs: [build, deploy]
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.action != 'invoke'
     
     steps:
       - name: Configure AWS credentials
@@ -227,11 +238,77 @@ jobs:
           
           echo "✅ Lambda function is responding"
 
+  invoke:
+    name: 🚀 Invoke Lambda
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'invoke'
+    
+    steps:
+      - name: Determine environment
+        id: env
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          echo "environment=${ENV}" >> $GITHUB_OUTPUT
+          
+          case $ENV in
+            dev)
+              echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
+              echo "lambda_function=margin-call-dev" >> $GITHUB_OUTPUT
+              ;;
+            test)
+              echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
+              echo "lambda_function=margin-call-stg" >> $GITHUB_OUTPUT
+              ;;
+            main)
+              echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
+              echo "lambda_function=margin-call-lmn" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ steps.env.outputs.environment == 'dev' && secrets.AWS_ROLE_ARN_DEV || steps.env.outputs.environment == 'test' && secrets.AWS_ROLE_ARN_STG || secrets.AWS_ROLE_ARN_LMN }}
+          aws-region: ${{ steps.env.outputs.aws_region }}
+          role-session-name: GitHubActions-MarginCall-Invoke-${{ github.run_id }}
+
+      - name: Invoke Lambda function
+        id: invoke
+        run: |
+          echo "🚀 Invoking Lambda function..."
+          echo "   Environment: ${{ steps.env.outputs.environment }}"
+          echo "   Function: ${{ steps.env.outputs.lambda_function }}"
+          
+          aws lambda invoke \
+            --function-name ${{ steps.env.outputs.lambda_function }} \
+            --region ${{ steps.env.outputs.aws_region }} \
+            response.json
+          
+          echo "✅ Lambda invoked successfully"
+          echo ""
+          echo "📋 Response:"
+          cat response.json
+          echo ""
+
+      - name: Invocation summary
+        run: |
+          echo "## 🎉 Lambda Invocation Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Service:** Margin Call Lambda" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ steps.env.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Function:** ${{ steps.env.outputs.lambda_function }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Response:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          cat response.json >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
   cleanup:
     name: 🧹 Cleanup
     runs-on: ubuntu-latest
     needs: [build, deploy, verify]
-    if: always()
+    if: always() && (github.event_name != 'workflow_dispatch' || github.event.inputs.action != 'invoke')
     
     steps:
       - name: Checkout code
