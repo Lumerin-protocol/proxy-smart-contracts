@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import { parseEventLogs, parseUnits, getAddress } from "viem";
+import { parseEventLogs, parseUnits, getAddress, maxUint256 } from "viem";
 import { deployFuturesFixture } from "./fixtures";
 import { catchError } from "../../lib";
 import { quantizePrice } from "./utils";
@@ -292,6 +292,204 @@ describe("Futures Delivery Payment", function () {
       // We can't easily check which one, but we can verify the contract balance increased
       const contractBalance = await futures.read.balanceOf([futures.address]);
       expect(contractBalance > insufficientAmount).to.be.true;
+    });
+  });
+
+  describe("depositDeliveryPayment (position ids)", function () {
+    it("should allow buyer to deposit delivery payment for specific positions", async function () {
+      const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+      const { futures } = contracts;
+      const { seller, buyer, buyer2, pc } = accounts;
+
+      const price = await futures.read.getMarketPrice();
+      const marginAmount = parseUnits("10000", 6);
+      const deliveryDate = config.deliveryDates[0];
+      const durationDays = BigInt(config.deliveryDurationDays);
+
+      await futures.write.addMargin([marginAmount], { account: seller.account });
+      await futures.write.addMargin([marginAmount], { account: buyer.account });
+      await futures.write.addMargin([marginAmount], { account: buyer2.account });
+
+      await futures.write.approve([futures.address, maxUint256], {
+        account: buyer.account,
+      });
+
+      const createPosition = async (sellerAccount: typeof seller.account, destURL: string) => {
+        await futures.write.createOrder([price, deliveryDate, "", -1], { account: sellerAccount });
+        const txHash = await futures.write.createOrder([price, deliveryDate, destURL, 1], {
+          account: buyer.account,
+        });
+        const receipt = await pc.waitForTransactionReceipt({ hash: txHash });
+        const [event] = parseEventLogs({
+          logs: receipt.logs,
+          abi: futures.abi,
+          eventName: "PositionCreated",
+        });
+        return event.args.positionId;
+      };
+
+      const positionId1 = await createPosition(seller.account, "https://dest1.com");
+      const positionId2 = await createPosition(buyer2.account, "https://dest2.com");
+
+      const paymentPerPosition = price * durationDays;
+      const totalPayment = paymentPerPosition * 2n;
+
+      const buyerBalanceBefore = await futures.read.balanceOf([buyer.account.address]);
+      const contractBalanceBefore = await futures.read.balanceOf([futures.address]);
+
+      await futures.write.depositDeliveryPayment([[positionId1, positionId2]], {
+        account: buyer.account,
+      });
+
+      const buyerBalanceAfter = await futures.read.balanceOf([buyer.account.address]);
+      const contractBalanceAfter = await futures.read.balanceOf([futures.address]);
+
+      expect(buyerBalanceAfter).to.equal(buyerBalanceBefore - totalPayment);
+      expect(contractBalanceAfter).to.equal(contractBalanceBefore + totalPayment);
+
+      const position1 = await futures.read.getPositionById([positionId1]);
+      const position2 = await futures.read.getPositionById([positionId2]);
+
+      expect(position1.paid).to.equal(true);
+      expect(position2.paid).to.equal(true);
+    });
+
+    it("should revert if delivery date already passed for a position", async function () {
+      const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+      const { futures } = contracts;
+      const { seller, buyer, pc, tc } = accounts;
+
+      const price = await futures.read.getMarketPrice();
+      const marginAmount = parseUnits("10000", 6);
+      const deliveryDate = config.deliveryDates[0];
+
+      await futures.write.addMargin([marginAmount], { account: seller.account });
+      await futures.write.addMargin([marginAmount], { account: buyer.account });
+
+      await futures.write.createOrder([price, deliveryDate, "", -1], { account: seller.account });
+      const txHash = await futures.write.createOrder([price, deliveryDate, "https://dest.com", 1], {
+        account: buyer.account,
+      });
+
+      const receipt = await pc.waitForTransactionReceipt({ hash: txHash });
+      const [positionEvent] = parseEventLogs({
+        logs: receipt.logs,
+        abi: futures.abi,
+        eventName: "PositionCreated",
+      });
+
+      await tc.setNextBlockTimestamp({ timestamp: deliveryDate + 1n });
+
+      await catchError(futures.abi, "DeliveryDateExpired", async () => {
+        await futures.write.depositDeliveryPayment([[positionEvent.args.positionId]], {
+          account: buyer.account,
+        });
+      });
+    });
+
+    it("should revert when caller is not the position buyer", async function () {
+      const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+      const { futures } = contracts;
+      const { seller, buyer, pc } = accounts;
+
+      const price = await futures.read.getMarketPrice();
+      const marginAmount = parseUnits("10000", 6);
+      const deliveryDate = config.deliveryDates[0];
+
+      await futures.write.addMargin([marginAmount], { account: seller.account });
+      await futures.write.addMargin([marginAmount], { account: buyer.account });
+
+      await futures.write.createOrder([price, deliveryDate, "", -1], { account: seller.account });
+      const txHash = await futures.write.createOrder([price, deliveryDate, "https://dest.com", 1], {
+        account: buyer.account,
+      });
+
+      const receipt = await pc.waitForTransactionReceipt({ hash: txHash });
+      const [positionEvent] = parseEventLogs({
+        logs: receipt.logs,
+        abi: futures.abi,
+        eventName: "PositionCreated",
+      });
+
+      await catchError(futures.abi, "OnlyPositionBuyer", async () => {
+        await futures.write.depositDeliveryPayment([[positionEvent.args.positionId]], {
+          account: seller.account,
+        });
+      });
+    });
+
+    it("should revert if position was already paid", async function () {
+      const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+      const { futures } = contracts;
+      const { seller, buyer, pc } = accounts;
+
+      const price = await futures.read.getMarketPrice();
+      const marginAmount = parseUnits("10000", 6);
+      const deliveryDate = config.deliveryDates[0];
+
+      await futures.write.addMargin([marginAmount], { account: seller.account });
+      await futures.write.addMargin([marginAmount], { account: buyer.account });
+
+      await futures.write.approve([futures.address, maxUint256], {
+        account: buyer.account,
+      });
+
+      await futures.write.createOrder([price, deliveryDate, "", -1], { account: seller.account });
+      const txHash = await futures.write.createOrder([price, deliveryDate, "https://dest.com", 1], {
+        account: buyer.account,
+      });
+
+      const receipt = await pc.waitForTransactionReceipt({ hash: txHash });
+      const [positionEvent] = parseEventLogs({
+        logs: receipt.logs,
+        abi: futures.abi,
+        eventName: "PositionCreated",
+      });
+
+      await futures.write.depositDeliveryPayment([[positionEvent.args.positionId]], {
+        account: buyer.account,
+      });
+
+      await catchError(futures.abi, "PositionAlreadyPaid", async () => {
+        await futures.write.depositDeliveryPayment([[positionEvent.args.positionId]], {
+          account: buyer.account,
+        });
+      });
+    });
+
+    it("should revert when position destination URL is not set", async function () {
+      const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+      const { futures } = contracts;
+      const { seller, buyer, pc } = accounts;
+
+      const price = await futures.read.getMarketPrice();
+      const marginAmount = parseUnits("10000", 6);
+      const deliveryDate = config.deliveryDates[0];
+
+      await futures.write.addMargin([marginAmount], { account: seller.account });
+      await futures.write.addMargin([marginAmount], { account: buyer.account });
+
+      await futures.write.approve([futures.address, maxUint256], {
+        account: buyer.account,
+      });
+
+      await futures.write.createOrder([price, deliveryDate, "", -1], { account: seller.account });
+      const txHash = await futures.write.createOrder([price, deliveryDate, "", 1], {
+        account: buyer.account,
+      });
+
+      const receipt = await pc.waitForTransactionReceipt({ hash: txHash });
+      const [positionEvent] = parseEventLogs({
+        logs: receipt.logs,
+        abi: futures.abi,
+        eventName: "PositionCreated",
+      });
+
+      await catchError(futures.abi, "PositionDestURLNotSet", async () => {
+        await futures.write.depositDeliveryPayment([[positionEvent.args.positionId]], {
+          account: buyer.account,
+        });
+      });
     });
   });
 

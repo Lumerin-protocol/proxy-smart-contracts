@@ -3,7 +3,7 @@ import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { deployFuturesFixture } from "./fixtures";
 import { catchError } from "../../lib";
 
-describe.only("Delivery Date Management", function () {
+describe("Delivery Date Management", function () {
   it("should return correct delivery dates array", async function () {
     const { contracts, config } = await loadFixture(deployFuturesFixture);
     const { futures } = contracts;
