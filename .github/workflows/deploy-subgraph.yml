@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - dev
-      - test
+      - stg
       - main
       - 'cicd/**'
     paths:
@@ -13,12 +13,12 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Target environment (dev=DEV, test=STG, main=LMN/PROD)'
+        description: 'Target environment (dev=DEV, stg=STG, main=LMN/PROD)'
         required: true
         type: choice
         options:
           - dev
-          - test
+          - stg
           - main
 
 permissions:
@@ -62,8 +62,8 @@ jobs:
             BRANCH="${{ github.ref_name }}"
             if [ "$BRANCH" == "main" ]; then
               ENV="main"
-            elif [ "$BRANCH" == "test" ]; then
-              ENV="test"
+            elif [ "$BRANCH" == "stg" ]; then
+              ENV="stg"
             elif [[ "$BRANCH" == cicd/* ]]; then
               ENV="dev"
               echo "🔧 CI/CD feature branch detected - deploying to DEV"
@@ -81,7 +81,7 @@ jobs:
               echo "graph_node_url=https://graphidx.dev.lumerin.io" >> $GITHUB_OUTPUT
               echo "subgraph_name=marketplace" >> $GITHUB_OUTPUT
               ;;
-            test)
+            stg)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
               echo "graph_node_url=https://graphidx.stg.lumerin.io" >> $GITHUB_OUTPUT
               echo "subgraph_name=marketplace" >> $GITHUB_OUTPUT
@@ -145,7 +145,7 @@ jobs:
             dev)
               yarn prepare-dev || yarn prepare:dev || echo "Using default config"
               ;;
-            test)
+            stg)
               yarn prepare-stg || yarn prepare-test || yarn prepare:stg || echo "Using default config"
               ;;
             main)
@@ -211,7 +211,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ needs.build.outputs.environment == 'dev' && secrets.AWS_ROLE_ARN_DEV || needs.build.outputs.environment == 'test' && secrets.AWS_ROLE_ARN_STG || secrets.AWS_ROLE_ARN_LMN }}
+          role-to-assume: ${{ needs.build.outputs.environment == 'dev' && secrets.AWS_ROLE_ARN_DEV || needs.build.outputs.environment == 'stg' && secrets.AWS_ROLE_ARN_STG || secrets.AWS_ROLE_ARN_LMN }}
           aws-region: ${{ needs.build.outputs.aws_region }}
           role-session-name: GitHubActions-Subgraph-${{ github.run_id }}
 
