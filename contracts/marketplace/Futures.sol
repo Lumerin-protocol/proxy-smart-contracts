@@ -122,6 +122,9 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     error MaxOrdersPerParticipantReached();
     error ValueOutOfRange(int256 min, int256 max);
     error DeliveryNotFinishedYet();
+    error OnlyPositionBuyer();
+    error PositionAlreadyPaid();
+    error PositionDestURLNotSet();
 
     constructor() {
         _disableInitializers();
@@ -750,6 +753,16 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         return positions[_positionId];
     }
 
+    function getPositionsByParticipantDeliveryDate(address _participant, uint256 _deliveryDate)
+        public
+        view
+        returns (bytes32[] memory)
+    {
+        EnumerableSet.Bytes32Set storage _positions =
+            participantDeliveryDatePositionIdsIndex[_participant][_deliveryDate];
+        return _positions.values();
+    }
+
     /// @notice Returns how much participant needs to add to their collateral to cover the margin shortfall
     function getCollateralDeficit(address _participant) public view returns (int256) {
         int256 effectiveMargin = getMinMargin(_participant);
@@ -807,6 +820,29 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
             }
         }
         return true;
+    }
+
+    function depositDeliveryPayment(bytes32[] memory _positionIds) public {
+        for (uint256 i = 0; i < _positionIds.length; i++) {
+            bytes32 positionId = _positionIds[i];
+            Position storage position = positions[positionId];
+            if (position.deliveryAt <= block.timestamp) {
+                revert DeliveryDateExpired();
+            }
+            if (position.buyer != _msgSender()) {
+                revert OnlyPositionBuyer();
+            }
+            if (position.paid) {
+                revert PositionAlreadyPaid();
+            }
+            if (bytes(position.destURL).length == 0) {
+                revert PositionDestURLNotSet();
+            }
+            uint256 totalPayment = position.buyPricePerDay * deliveryDurationDays;
+            _transferEnsureMarginBalance(position.buyer, address(this), totalPayment);
+            position.paid = true;
+            emit PositionPaid(positionId);
+        }
     }
 
     function withdrawDeliveryPayment(uint256 _deliveryDate) public {
@@ -945,6 +981,15 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         returns (bool)
     {
         return super.transfer(_to, _amount);
+    }
+
+    function _transferEnsureMarginBalance(address _from, address _to, uint256 _amount)
+        private
+        enoughMarginBalance(_from, _amount)
+        returns (bool)
+    {
+        _transfer(_from, _to, _amount);
+        return true;
     }
 
     function transferFrom(address _from, address _to, uint256 _amount)
