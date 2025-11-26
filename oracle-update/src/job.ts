@@ -8,6 +8,7 @@ import { BitcoinClient } from "./bitcoin";
 import { RewardCalculator } from "./reward";
 import { FileCache } from "./cache";
 import { Coingecko } from "./coingecko";
+import { getPrivateKey } from "./secrets";
 
 export async function main() {
   const log = pino({
@@ -16,7 +17,9 @@ export async function main() {
 
   log.info("Starting job");
 
-  const account = privateKeyToAccount(env.PRIVATE_KEY as `0x${string}`);
+  // Retrieve private key securely from Secrets Manager (or use env var for local dev)
+  const privateKey = await getPrivateKey(log);
+  const account = privateKeyToAccount(privateKey as `0x${string}`);
   const transport = http(env.ETHEREUM_RPC_URL);
   const chain = getChain(env.CHAIN_ID);
 

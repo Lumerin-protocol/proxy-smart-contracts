@@ -7,6 +7,9 @@ const schema = Type.Object({
   CHAIN_ID: Type.Integer(),
   ETHEREUM_RPC_URL: Type.String(),
   BITCOIN_RPC_URL: Type.String(),
+  // PRIVATE_KEY can be:
+  // - An actual private key (0x123...) for local development
+  // - A Secrets Manager ARN (arn:aws:secretsmanager:...) for Lambda - retrieved at runtime
   PRIVATE_KEY: Type.String(),
   CACHE_PARAMETER_NAME: Type.Optional(Type.String()),
   LOG_LEVEL: Type.Union(
