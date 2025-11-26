@@ -6,6 +6,8 @@
     "codegen": "graph codegen",
     "prepare-local": "mustache config/localhost.json subgraph.template.yaml > subgraph.yaml",
     "prepare-dev": "mustache config/arbitrum-sepolia.json subgraph.template.yaml > subgraph.yaml",
+    "prepare-stg": "mustache config/arbitrum.json subgraph.template.yaml > subgraph.yaml",
+    "prepare-mainnet": "mustache config/arbitrum.json subgraph.template.yaml > subgraph.yaml",
     "build": "graph build",
     "deploy": "graph deploy --node https://api.studio.thegraph.com/deploy/ hr-futures",
     "create-local": "graph create --node http://localhost:8020/ marketplace",
