@@ -14,5 +14,13 @@
     "HashrateOracle": {
       "address": "0x6f736186d2c93913721e2570c283dff2a08575e9"
     }
+  },
+  "arbitrum": {
+    "Futures": {
+      "address": "0xec76867e96d942282fc7aafe3f778de34d41a311"
+    },
+    "HashrateOracle": {
+      "address": "0xc7faf0a488ff0adf2f6226d7169d26f79db841ca"
+    }
   }
 }
