@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - dev
-      - test
+      - stg
       - main
       - 'cicd/**'
     paths:
@@ -13,12 +13,12 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Target environment (dev=DEV, test=STG, main=LMN/PROD)'
+        description: 'Target environment (dev=DEV, stg=STG, main=LMN/PROD)'
         required: true
         type: choice
         options:
           - dev
-          - test
+          - stg
           - main
 
 permissions:
@@ -58,8 +58,8 @@ jobs:
             BRANCH="${{ github.ref_name }}"
             if [ "$BRANCH" == "main" ]; then
               ENV="main"
-            elif [ "$BRANCH" == "test" ]; then
-              ENV="test"
+            elif [ "$BRANCH" == "stg" ]; then
+              ENV="stg"
             elif [[ "$BRANCH" == cicd/* ]]; then
               ENV="dev"
               echo "🔧 CI/CD feature branch detected - deploying to DEV"
@@ -75,7 +75,7 @@ jobs:
               echo "ecs_cluster=ecs-lumerin-marketplace-dev-use1" >> $GITHUB_OUTPUT
               echo "ecs_service=svc-lumerin-notifications-dev-use1" >> $GITHUB_OUTPUT
               ;;
-            test)
+            stg)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
               echo "ecs_cluster=ecs-lumerin-marketplace-stg-use1" >> $GITHUB_OUTPUT
               echo "ecs_service=svc-lumerin-notifications-stg-use1" >> $GITHUB_OUTPUT
@@ -146,7 +146,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ needs.build.outputs.environment == 'dev' && secrets.AWS_ROLE_ARN_DEV || needs.build.outputs.environment == 'test' && secrets.AWS_ROLE_ARN_STG || secrets.AWS_ROLE_ARN_LMN }}
+          role-to-assume: ${{ needs.build.outputs.environment == 'dev' && secrets.AWS_ROLE_ARN_DEV || needs.build.outputs.environment == 'stg' && secrets.AWS_ROLE_ARN_STG || secrets.AWS_ROLE_ARN_LMN }}
           aws-region: ${{ needs.build.outputs.aws_region }}
           role-session-name: GitHubActions-Notifications-${{ github.run_id }}
 
@@ -174,7 +174,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ needs.build.outputs.environment == 'dev' && secrets.AWS_ROLE_ARN_DEV || needs.build.outputs.environment == 'test' && secrets.AWS_ROLE_ARN_STG || secrets.AWS_ROLE_ARN_LMN }}
+          role-to-assume: ${{ needs.build.outputs.environment == 'dev' && secrets.AWS_ROLE_ARN_DEV || needs.build.outputs.environment == 'stg' && secrets.AWS_ROLE_ARN_STG || secrets.AWS_ROLE_ARN_LMN }}
           aws-region: ${{ needs.build.outputs.aws_region }}
           role-session-name: GitHubActions-Notifications-Verify-${{ github.run_id }}
 
