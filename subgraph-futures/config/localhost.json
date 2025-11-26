@@ -1,0 +1,8 @@
+{
+  "network": "localhost",
+  "futuresAddress": "0x84ea74d481ee0a5332c457a4d796187f6ba67feb",
+  "startBlockFutures": 0,
+  "hashrateOracleAddress": "0x959922be3caee4b8cd9a407cc3ac1c251c2007b1",
+  "startBlockHashrateOracle": 0,
+  "hashrateOraclePollingBlockInterval": 1
+}

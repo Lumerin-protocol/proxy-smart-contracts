@@ -1,0 +1,74 @@
+specVersion: 1.3.0
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: CloneFactory
+    network: "{{ network }}"
+    source:
+      address: "{{ cloneFactoryAddress }}"
+      # avoid messing mustache syntax with autoformatting
+      # prettier-ignore
+      startBlock: {{ startBlock }}
+      abi: CloneFactory
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - CloneFactory
+        - Seller
+        - Validator
+        - Buyer
+      abis:
+        - name: CloneFactory
+          file: ../abi/CloneFactory.json
+      eventHandlers:
+        - event: Initialized(uint64)
+          handler: handleInitialized
+        - event: sellerRegisteredUpdated(indexed address,uint256)
+          handler: handlesellerRegisteredUpdated
+        - event: sellerDeregistered(indexed address)
+          handler: handlesellerDeregistered
+        - event: minSellerStakeUpdated(uint256)
+          handler: handlemminSellerStakeUpdated
+        - event: contractCreatedV2(indexed address,indexed address,int8,uint256,uint256)
+          handler: handlecontractCreatedV2
+      file: ./src/clone-factory.ts
+
+templates:
+  - name: Implementation
+    kind: ethereum
+    network: "{{ network }}"
+    source:
+      abi: Implementation
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - ImplementationInitialized
+        - closedEarly
+        - contractClosedEarly
+        - contractPurchased
+        - destinationUpdated
+        - fundsClaimed
+        - ImplementationpurchaseInfoUpdated
+        - Implementation
+      abis:
+        - name: Implementation
+          file: ../abi/Implementation.json
+      eventHandlers:
+        - event: contractPurchased(indexed address,indexed address,indexed address,uint256,uint256,uint256,(bool,bool))
+          handler: handlecontractPurchased
+        - event: contractClosedEarly(indexed address,indexed address,indexed address,uint8,(bool,bool))
+          handler: handlecontractClosedEarly
+        - event: contractTermsUpdated(uint256,uint256,uint32)
+          handler: handlecontractTermsUpdated
+        - event: destinationUpdated(string,string)
+          handler: handledestinationUpdated
+        - event: fundsClaimed()
+          handler: handlefundsClaimed
+      file: ./src/implementation.ts

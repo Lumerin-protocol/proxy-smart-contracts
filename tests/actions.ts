@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { viem } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { ZERO_ADDRESS } from "./utils";
+import { mapResellTerms } from "./mappers";
 
 /** @param progress 0.0 - 1.0 early closeout contract progress */
 export async function testEarlyCloseout(
@@ -17,11 +18,15 @@ export async function testEarlyCloseout(
 
   const impl = await viem.getContractAt("Implementation", hrContractAddr);
 
-  const hrContractData = await impl.read.getPublicVariablesV2();
-  const speed = Number(hrContractData[1]._speed);
-  const length = Number(hrContractData[1]._length);
-  const version = Number(hrContractData[1]._version);
-  const seller = hrContractData[4];
+  const hrContractData = await impl.read.terms().then((t) => {
+    const [speed, length, version] = t;
+    return { speed, length, version };
+  });
+  const entry = await impl.read.resellChain([0n]).then(mapResellTerms);
+  const speed = Number(hrContractData.speed);
+  const length = Number(hrContractData.length);
+  const version = Number(hrContractData.version);
+  const seller = entry._seller;
 
   // Only assuming the oracles are not updating prices
   const [price, fee] = await impl.read.priceAndFee();
@@ -45,7 +50,16 @@ export async function testEarlyCloseout(
 
   // Purchase the contract
   const purchaseTx = await cf.write.setPurchaseRentalContractV2(
-    [hrContractAddr, validatorAddr, "encryptedValidatorURL", "encryptedDestURL", version],
+    [
+      hrContractAddr,
+      validatorAddr,
+      "encryptedValidatorURL",
+      "encryptedDestURL",
+      version,
+      true,
+      false,
+      0n,
+    ],
     { account: buyerAddr }
   );
   const purchaseReceipt = await pc.getTransactionReceipt({ hash: purchaseTx });

@@ -72,7 +72,6 @@ async function main() {
     [hashrateOracleImpl.address, encodedInitFn]
   );
   console.log("Deployed at:", proxy.address);
-  await verifyContract(proxy.address, [hashrateOracleImpl.address, encodedInitFn]);
   // Get the proxy contract instance
   const hashrateOracle = await viem.getContractAt("HashrateOracle", proxy.address);
   console.log("Version:", await hashrateOracle.read.VERSION());

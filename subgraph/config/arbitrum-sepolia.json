@@ -1,0 +1,5 @@
+{
+  "network": "arbitrum-sepolia",
+  "cloneFactoryAddress": "0x31628c64e42c276c093e721d1e840ea68fcfaef5",
+  "startBlock": 192513759
+}
