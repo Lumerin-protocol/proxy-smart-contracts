@@ -207,6 +207,30 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         _update(_msgSender(), address(this), orderFee);
     }
 
+    /// @notice Modifies an existing order by canceling the previous order and creating a new one
+    /// @param _previousPrice The price of the previous order to cancel
+    /// @param _previousQuantity The quantity of the previous order (will be negated to cancel it)
+    /// @param _newPrice The price for the new order
+    /// @param _newQuantity The quantity for the new order
+    /// @param _deliveryDate The delivery date for both orders
+    /// @param _destURL The destination URL for both orders
+    function modifyOrder(
+        uint256 _previousPrice,
+        int8 _previousQuantity,
+        uint256 _newPrice,
+        int8 _newQuantity,
+        uint256 _deliveryDate,
+        string memory _destURL
+    ) public {
+        // First, cancel the previous order by creating an opposite order
+        // If previous quantity was positive (e.g., 4), we pass -4 to cancel it
+        int8 cancelQuantity = -_previousQuantity;
+        createOrder(_previousPrice, _deliveryDate, _destURL, cancelQuantity);
+
+        // Then, create the new order with the new price and quantity
+        createOrder(_newPrice, _deliveryDate, _destURL, _newQuantity);
+    }
+
     // fn that should work with QTY field
     // function _createOrMatchOrder(
     //     int16 _qty,
