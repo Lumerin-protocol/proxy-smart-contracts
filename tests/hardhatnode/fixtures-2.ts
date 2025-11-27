@@ -102,6 +102,7 @@ export async function deployTokenOraclesAndMulticall3() {
   const hashrateOracle = await viem.getContractAt("HashrateOracle", hashrateOracleProxy.address);
 
   await hashrateOracle.write.setTTL([maxUint256, maxUint256]);
+  await hashrateOracle.write.setUpdaterAddress([owner.account.address]);
   await hashrateOracle.write.setHashesForBTC([oracle.hashesForBTC]);
 
   return {
