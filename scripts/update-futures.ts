@@ -1,6 +1,9 @@
 import { requireEnvsSet } from "../lib/utils";
 import { viem } from "hardhat";
 import { verifyContract } from "./lib/verify";
+import { encodeFunctionData } from "viem/utils";
+import { SafeWallet } from "./lib/safe";
+import { OperationType } from "@safe-global/types-kit";
 
 async function main() {
   console.log("Futures contract update script");
@@ -32,24 +35,44 @@ async function main() {
   console.log("Deployed at:", futuresImpl.address);
   await verifyContract(futuresImpl.address, []);
 
-  console.log();
-  console.log("Upgrading Futures proxy to new implementation...");
-  const tx = await futuresProxy.write.upgradeToAndCall([futuresImpl.address, "0x"]);
+  if (SAFE_OWNER_ADDRESS) {
+    console.log();
+    console.log("Proposing upgrade to Safe wallet...");
 
-  await pc.waitForTransactionReceipt({ hash: tx });
-  console.log("Upgrade transaction completed!");
+    const upgradeData = encodeFunctionData({
+      abi: futuresProxy.abi,
+      functionName: "upgradeToAndCall",
+      args: [futuresImpl.address, "0x"],
+    });
 
-  console.log();
-  console.log("Verifying upgrade...");
-  const upgradedFutures = await viem.getContractAt("Futures", env.FUTURES_ADDRESS);
+    const safe = new SafeWallet(SAFE_OWNER_ADDRESS, deployer);
+    const txHash = await safe.proposeTransaction({
+      data: upgradeData,
+      to: env.FUTURES_ADDRESS,
+      value: "0",
+      operation: OperationType.Call,
+    });
 
-  console.log("Payment token:", await upgradedFutures.read.token());
-  console.log("Hashrate oracle:", await upgradedFutures.read.hashrateOracle());
-  console.log("Validator address:", await upgradedFutures.read.validatorAddress());
-  console.log("Owner:", await upgradedFutures.read.owner());
+    console.log("Transaction proposed!");
+    console.log("Safe TX Hash:", txHash);
+    console.log("Transaction URL:", safe.getSafeUITxUrl(txHash));
+  } else {
+    console.log();
+    console.log("Upgrading Futures proxy to new implementation...");
+    const tx = await futuresProxy.write.upgradeToAndCall([futuresImpl.address, "0x"]);
 
-  // TODO: propose upgrade to owner
+    await pc.waitForTransactionReceipt({ hash: tx });
+    console.log("Upgrade transaction completed!");
 
+    console.log();
+    console.log("Verifying upgrade...");
+    const upgradedFutures = await viem.getContractAt("Futures", env.FUTURES_ADDRESS);
+
+    console.log("Payment token:", await upgradedFutures.read.token());
+    console.log("Hashrate oracle:", await upgradedFutures.read.hashrateOracle());
+    console.log("Validator address:", await upgradedFutures.read.validatorAddress());
+    console.log("Owner:", await upgradedFutures.read.owner());
+  }
   console.log();
   console.log("---");
   console.log("SUCCESS");

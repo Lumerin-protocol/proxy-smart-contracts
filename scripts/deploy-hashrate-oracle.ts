@@ -78,6 +78,10 @@ async function main() {
 
   console.log();
 
+  const safeTTL = 3n * 3600n;
+  await hashrateOracle.write.setTTL([safeTTL, safeTTL]);
+  console.log("ttl is set to", safeTTL);
+
   // Transfer ownership to the owner address
   if (SAFE_OWNER_ADDRESS) {
     console.log("Transfering ownership to:", SAFE_OWNER_ADDRESS);
