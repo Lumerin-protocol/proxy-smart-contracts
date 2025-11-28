@@ -1,6 +1,5 @@
 import { viem } from "hardhat";
 import { parseUnits, maxUint256, encodeFunctionData } from "viem";
-import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { deployTokenOraclesAndMulticall3 } from "../fixtures-2";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
@@ -113,19 +112,19 @@ export async function deployOnlyFuturesWithDummyData(
   // create positions
   let d = config.deliveryDates[0];
   const dst = "https://destination-url.com";
-  // sell positions
+  // sell orders
   await futures.write.createOrder([mp + inc, d, "", -1], {
     account: seller.account,
   });
   await futures.write.createOrder([mp + 2n * inc, d, "", -1], { account: seller.account });
   await futures.write.createOrder([mp + 3n * inc, d, "", -1], { account: seller.account });
 
-  // buy positions
+  // buy orders
   await futures.write.createOrder([mp - inc, d, dst, 1], { account: buyer.account });
   await futures.write.createOrder([mp - 2n * inc, d, dst, 1], { account: buyer.account });
   await futures.write.createOrder([mp - 3n * inc, d, dst, 1], { account: buyer.account });
 
-  // matched position => order
+  // matched orders => position
   await futures.write.createOrder([mp, d, dst, 1], { account: buyer.account });
   return _data;
 }
