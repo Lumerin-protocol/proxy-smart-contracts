@@ -91,6 +91,16 @@ type HashrateOracle @entity(immutable: false) {
   initializeTimestamp: BigInt!
 }
 
+# Delivery Date Orders - tracks buy/sell counts per price level for each delivery date
+type DeliveryDateOrder @entity(immutable: false) {
+  "ID format: {deliveryDate}-{price}"
+  id: String!
+  deliveryDate: BigInt!
+  price: BigInt!
+  buyOrdersCount: Int!
+  sellOrdersCount: Int!
+}
+
 # HashrateOracle Timeseries Entities
 type HashrateIndex @entity(immutable: true) @timeseries {
   id: Bytes!

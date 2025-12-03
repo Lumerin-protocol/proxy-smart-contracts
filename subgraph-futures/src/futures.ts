@@ -12,7 +12,7 @@ import {
   PositionPaid,
   PositionPaymentReceived,
 } from "../generated/Futures/Futures";
-import { Futures, Participant, Position, Order } from "../generated/schema";
+import { Futures, Participant, Position, Order, DeliveryDateOrder } from "../generated/schema";
 import { log, Address, dataSource } from "@graphprotocol/graph-ts";
 
 // Helper function to get or create a participant with balance tracking
@@ -84,6 +84,20 @@ function updateParticipantBalance(
   participant.save();
 }
 
+// Helper function to get or create a DeliveryDateOrder
+function getOrCreateDeliveryDateOrder(deliveryDate: BigInt, price: BigInt): DeliveryDateOrder {
+  const id = deliveryDate.toString() + "-" + price.toString();
+  let deliveryDateOrder = DeliveryDateOrder.load(id);
+  if (!deliveryDateOrder) {
+    deliveryDateOrder = new DeliveryDateOrder(id);
+    deliveryDateOrder.deliveryDate = deliveryDate;
+    deliveryDateOrder.price = price;
+    deliveryDateOrder.buyOrdersCount = 0;
+    deliveryDateOrder.sellOrdersCount = 0;
+  }
+  return deliveryDateOrder;
+}
+
 export function handleInitialized(event: Initialized): void {
   log.info("Futures contract initialized with version: {}", [event.params.version.toString()]);
   const futures = getOrCreateFutures(event);
@@ -126,6 +140,15 @@ export function handleOrderCreated(event: OrderCreated): void {
   futures.contractCount++;
   futures.contractActiveCount++;
   futures.save();
+
+  // Update DeliveryDateOrder counts
+  const deliveryDateOrder = getOrCreateDeliveryDateOrder(event.params.deliveryAt, event.params.pricePerDay);
+  if (event.params.isBuy) {
+    deliveryDateOrder.buyOrdersCount++;
+  } else {
+    deliveryDateOrder.sellOrdersCount++;
+  }
+  deliveryDateOrder.save();
 }
 
 export function handleOrderClosed(event: OrderClosed): void {
@@ -160,6 +183,15 @@ export function handleOrderClosed(event: OrderClosed): void {
     futures.closeoutCount++;
     futures.save();
   }
+
+  // Update DeliveryDateOrder counts
+  const deliveryDateOrder = getOrCreateDeliveryDateOrder(order.deliveryAt, order.pricePerDay);
+  if (order.isBuy) {
+    deliveryDateOrder.buyOrdersCount--;
+  } else {
+    deliveryDateOrder.sellOrdersCount--;
+  }
+  deliveryDateOrder.save();
 }
 
 export function handlePositionCreated(event: PositionCreated): void {
