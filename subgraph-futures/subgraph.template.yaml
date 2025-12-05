@@ -48,6 +48,8 @@ dataSources:
           handler: handlePositionPaid
         - event: PositionPaymentReceived(indexed bytes32)
           handler: handlePositionPaymentReceived
+        - event: ValidatorURLUpdated(string)
+          handler: handleValidatorURLUpdated
       file: ./src/futures.ts
   - kind: ethereum
     name: HashrateOracle

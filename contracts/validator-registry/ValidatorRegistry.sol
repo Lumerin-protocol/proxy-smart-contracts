@@ -37,7 +37,7 @@ contract ValidatorRegistry is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     error AlreadyComplained(); // the last complain was made by the same address
 
     uint8 constant hostLengthLimit = 255; // max length of url
-    string public constant VERSION = "3.0.1"; // This will be replaced during build time
+    string public constant VERSION = "3.0.3"; // This will be replaced during build time
 
     IERC20 public token; // token used for staking
     uint256 public totalStake; // total amount of all collected stakes, used to avoid withdrawing all funds by owners

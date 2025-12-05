@@ -11,6 +11,7 @@ import {
   OrderFeeUpdated,
   PositionPaid,
   PositionPaymentReceived,
+  ValidatorURLUpdated,
 } from "../generated/Futures/Futures";
 import { Futures, Participant, Position, Order } from "../generated/schema";
 import { log, Address, dataSource } from "@graphprotocol/graph-ts";
@@ -62,6 +63,8 @@ function getOrCreateFutures(event: Initialized | null = null): Futures {
   futures.validatorAddress = futuresContract.validatorAddress();
   futures.hashrateOracleAddress = futuresContract.hashrateOracle();
   futures.tokenAddress = futuresContract.token();
+  futures.futuresAddress = address;
+  futures.validatorURL = futuresContract.validatorURL();
   futures.orderFee = futuresContract.orderFee();
   return futures;
 }
@@ -364,4 +367,13 @@ export function handlePositionPaymentReceived(event: PositionPaymentReceived): v
   // Update position payment status
   position.isPaid = false;
   position.save();
+}
+
+export function handleValidatorURLUpdated(event: ValidatorURLUpdated): void {
+  log.info("Validator URL updated: {}", [event.params.validatorURL]);
+  const futures = Futures.load(0);
+  if (futures) {
+    futures.validatorURL = event.params.validatorURL;
+    futures.save();
+  }
 }
