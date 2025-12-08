@@ -13,7 +13,7 @@ async function main() {
 
   const SAFE_OWNER_ADDRESS = process.env.SAFE_OWNER_ADDRESS as `0x${string}` | undefined;
 
-  const [deployer] = await viem.getWalletClients();
+  const [deployer, proposer] = await viem.getWalletClients();
   const pc = await viem.getPublicClient();
   console.log("Deployer:", deployer.account.address);
   console.log("Safe owner address:", SAFE_OWNER_ADDRESS);
@@ -30,10 +30,14 @@ async function main() {
   console.log("Validator address:", await futuresProxy.read.validatorAddress());
   console.log();
 
-  console.log("Deploying new Futures implementation...");
-  const futuresImpl = await viem.deployContract("contracts/marketplace/Futures.sol:Futures", []);
-  console.log("Deployed at:", futuresImpl.address);
-  await verifyContract(futuresImpl.address, []);
+  // console.log("Deploying new Futures implementation...");
+  // const futuresImpl = await viem.deployContract("contracts/marketplace/Futures.sol:Futures", []);
+  // console.log("Deployed at:", futuresImpl.address);
+  // await verifyContract(futuresImpl.address, []);
+  const futuresImpl = await viem.getContractAt(
+    "Futures",
+    "0x080f8eab214a56d16b16035788bdfe92552c480f"
+  );
 
   if (SAFE_OWNER_ADDRESS) {
     console.log();
@@ -45,7 +49,7 @@ async function main() {
       args: [futuresImpl.address, "0x"],
     });
 
-    const safe = new SafeWallet(SAFE_OWNER_ADDRESS, deployer);
+    const safe = new SafeWallet(SAFE_OWNER_ADDRESS, proposer);
     const txHash = await safe.proposeTransaction({
       data: upgradeData,
       to: env.FUTURES_ADDRESS,

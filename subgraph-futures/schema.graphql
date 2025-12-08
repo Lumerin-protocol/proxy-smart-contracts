@@ -18,6 +18,8 @@ type Futures @entity(immutable: false) {
   validatorAddress: Bytes!
   hashrateOracleAddress: Bytes!
   tokenAddress: Bytes!
+  futuresAddress: Bytes!
+  validatorURL: String!
 
   "Number of contracts including archived"
   contractCount: Int!

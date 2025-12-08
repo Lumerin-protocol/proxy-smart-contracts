@@ -33,7 +33,7 @@ contract Implementation is Versionable, ContextUpgradeable {
     ResellTerms[] public resellChain; // terms keep the tip of the resell chain
 
     uint8 public constant VALIDATOR_FEE_DECIMALS = 18;
-    string public constant VERSION = "3.0.1"; // This will be replaced during build time
+    string public constant VERSION = "3.0.3"; // This will be replaced during build time
 
     // shared between all contract instances, and updated altogether with the implementation
     HashrateOracle public immutable hashrateOracle;

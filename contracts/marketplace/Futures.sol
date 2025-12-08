@@ -50,6 +50,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
     uint8 public futureDeliveryDatesCount; // number of future delivery dates to be available for orders
     uint8 public liquidationMarginPercent;
     uint8 private _decimals; // decimals of the wrapped token
+    string public validatorURL;
 
     // constants
     uint8 public constant MAX_ORDERS_PER_PARTICIPANT = 50;
@@ -106,6 +107,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
     event PositionDeliveryClosed(bytes32 indexed positionId, address indexed closedBy);
     event PositionPaid(bytes32 indexed positionId);
     event PositionPaymentReceived(bytes32 indexed positionId);
+    event ValidatorURLUpdated(string validatorURL);
 
     // errors
     error InvalidPrice();
@@ -126,6 +128,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
     error OnlyPositionBuyer();
     error PositionAlreadyPaid();
     error PositionDestURLNotSet();
+    error NothingToWithdraw();
 
     constructor() {
         _disableInitializers();
@@ -451,6 +454,13 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
 
     function setOracle(address addr) external onlyOwner {
         hashrateOracle = HashrateOracle(addr);
+    }
+
+    /// @notice Sets the validator URL
+    /// @param _validatorURL the validator endpoint, you can omit protocol prefix and use host.com:port
+    function setValidatorURL(string memory _validatorURL) external onlyOwner {
+        validatorURL = _validatorURL;
+        emit ValidatorURLUpdated(_validatorURL);
     }
 
     /// @notice Gets the maintenance margin of a position, the minimum amount of effective margin that is required to avoid a margin call
@@ -840,6 +850,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
         if (block.timestamp < _deliveryDate + deliveryDurationSeconds()) {
             revert DeliveryNotFinishedYet();
         }
+        bool withdrew = false;
 
         // get all user positions for the delivery date
         EnumerableSet.Bytes32Set storage _positions =
@@ -851,8 +862,12 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
                 uint256 totalPayment = position.sellPricePerDay * deliveryDurationDays;
                 _transfer(address(this), position.seller, totalPayment);
                 position.paid = false;
+                withdrew = true;
                 emit PositionPaymentReceived(positionId);
             }
+        }
+        if (!withdrew) {
+            revert NothingToWithdraw();
         }
     }
 

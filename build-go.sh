@@ -13,6 +13,7 @@ mkdir -p "$PTH/implementation"
 mkdir -p "$PTH/multicall3"
 mkdir -p "$PTH/validatorregistry"
 mkdir -p "$PTH/futures"
+mkdir -p "$PTH/multicallembedded"
 
 abigen --abi=./abi/AggregatorV3Interface.json --pkg=aggregatorv3interface --out=./$PTH/aggregatorv3interface/aggregatorv3interface.go
 abigen --abi=./abi/CloneFactory.json --pkg=clonefactory --out=./$PTH/clonefactory/clonefactory.go
@@ -23,6 +24,7 @@ abigen --abi=./abi/Implementation.json --pkg=implementation --out=./$PTH/impleme
 abigen --abi=./abi/Multicall3.json --pkg=multicall3 --out=./$PTH/multicall3/multicall3.go
 abigen --abi=./abi/ValidatorRegistry.json --pkg=validatorregistry --out=./$PTH/validatorregistry/validatorregistry.go
 abigen --abi=./abi/Futures.json --pkg=futures --out=./$PTH/futures/futures.go
+abigen --abi=./abi/IMulticallEmbedded.json --pkg=multicallembedded --out=./$PTH/multicallembedded/multicallembedded.go
 
 
 MAJOR_VERSION=$(cut -d. -f1 VERSION)
