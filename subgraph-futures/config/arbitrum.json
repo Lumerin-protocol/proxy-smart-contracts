@@ -1,8 +1,8 @@
 {
   "network": "arbitrum",
-  "futuresAddress": "0xec76867e96d942282fc7aafe3f778de34d41a311",
+  "futuresAddress": "0xe11594879beb6c28c67bc251aa5e26ce126b82ba",
   "startBlockFutures": 404348114,
-  "hashrateOracleAddress": "0xc7faf0a488ff0adf2f6226d7169d26f79db841ca",
-  "startBlockHashrateOracle": 402818793,
+  "hashrateOracleAddress": "0x2c1DB79D2F3dF568275C940Dac81Ad251871faF4",
+  "startBlockHashrateOracle": 406354970,
   "hashrateOraclePollingBlockInterval": 2400
 }
