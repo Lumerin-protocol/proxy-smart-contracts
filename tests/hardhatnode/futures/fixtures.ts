@@ -1,6 +1,5 @@
 import { viem } from "hardhat";
-import { parseUnits, maxUint256, encodeFunctionData } from "viem";
-import { time } from "@nomicfoundation/hardhat-network-helpers";
+import { parseUnits, maxUint256, encodeFunctionData, formatUnits } from "viem";
 import { deployTokenOraclesAndMulticall3 } from "../fixtures-2";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
@@ -25,9 +24,10 @@ export async function deployOnlyFuturesFixture(
   const priceLadderStep = parseUnits("0.01", 6); // 0.01 USDC
   const orderFee = parseUnits("1", 6); // 1 USDC
   const { timestamp: now } = await pc.getBlock({ blockTag: "latest" });
-  const futureDeliveryDatesCount = 3;
+  const futureDeliveryDatesCount = 10;
   const firstFutureDeliveryDate = now + BigInt(deliveryDurationSeconds);
   const collateralAmount = parseUnits("10000", 6);
+  const validatorURL = "//shev8.validator:anything@stratum.braiins.com:3333";
 
   // Deploy Futures contract
   const futuresImpl = await viem.deployContract("contracts/marketplace/Futures.sol:Futures", []);
@@ -52,6 +52,7 @@ export async function deployOnlyFuturesFixture(
   ]);
   const futures = await viem.getContractAt("Futures", futuresProxy.address);
   await futures.write.setOrderFee([orderFee], { account: owner.account });
+  await futures.write.setValidatorURL([validatorURL], { account: owner.account });
   const deliveryDates = await futures.read.getDeliveryDates();
   // Approve futures contract to spend USDC for all accounts
   await usdcMock.write.approve([futures.address, maxUint256], { account: seller.account });
@@ -112,20 +113,29 @@ export async function deployOnlyFuturesWithDummyData(
 
   // create positions
   let d = config.deliveryDates[0];
-  const dst = "https://destination-url.com";
-  // sell positions
-  await futures.write.createOrder([mp + inc, d, "", -1], {
-    account: seller.account,
-  });
+  const dst = "//shev8.contract:anything@stratum.braiins.com:3333";
+  // sell orders
+  await futures.write.createOrder([mp + inc, d, "", -1], { account: seller.account });
   await futures.write.createOrder([mp + 2n * inc, d, "", -1], { account: seller.account });
   await futures.write.createOrder([mp + 3n * inc, d, "", -1], { account: seller.account });
 
-  // buy positions
+  // buy orders
   await futures.write.createOrder([mp - inc, d, dst, 1], { account: buyer.account });
   await futures.write.createOrder([mp - 2n * inc, d, dst, 1], { account: buyer.account });
   await futures.write.createOrder([mp - 3n * inc, d, dst, 1], { account: buyer.account });
 
-  // matched position => order
+  // matched orders => position
+  await futures.write.createOrder([mp, d, dst, -1], { account: seller.account });
   await futures.write.createOrder([mp, d, dst, 1], { account: buyer.account });
+
+  const totalPayment = mp * BigInt(config.deliveryDurationDays);
+
+  const buyerBalance = await contracts.usdcMock.read.balanceOf([buyer.account.address]);
+  console.log("buyer balance:", formatUnits(buyerBalance, 6));
+  console.log("total payment", formatUnits(totalPayment, 6));
+
+  // pay for the order
+  await futures.write.addMargin([totalPayment], { account: buyer.account });
+  await futures.write.depositDeliveryPayment([totalPayment, d], { account: buyer.account });
   return _data;
 }

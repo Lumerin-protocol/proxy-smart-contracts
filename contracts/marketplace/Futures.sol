@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { MulticallUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/MulticallUpgradeable.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -16,7 +17,7 @@ import { StructuredLinkedList } from "solidity-linked-list/contracts/StructuredL
 // TODO:
 // 6. Do we need to batch same price and delivery date orders/positions so it is a single entry?
 
-contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
+contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, MulticallUpgradeable {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.Bytes32Set;
@@ -49,6 +50,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     uint8 public futureDeliveryDatesCount; // number of future delivery dates to be available for orders
     uint8 public liquidationMarginPercent;
     uint8 private _decimals; // decimals of the wrapped token
+    string public validatorURL;
 
     // constants
     uint8 public constant MAX_ORDERS_PER_PARTICIPANT = 50;
@@ -105,6 +107,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     event PositionDeliveryClosed(bytes32 indexed positionId, address indexed closedBy);
     event PositionPaid(bytes32 indexed positionId);
     event PositionPaymentReceived(bytes32 indexed positionId);
+    event ValidatorURLUpdated(string validatorURL);
 
     // errors
     error InvalidPrice();
@@ -125,6 +128,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
     error OnlyPositionBuyer();
     error PositionAlreadyPaid();
     error PositionDestURLNotSet();
+    error NothingToWithdraw();
 
     constructor() {
         _disableInitializers();
@@ -167,7 +171,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         // Only the owner can upgrade the contract
     }
 
-    function createOrder(uint256 _price, uint256 _deliveryDate, string memory _destURL, int8 _qty) public {
+    function createOrder(uint256 _price, uint256 _deliveryDate, string memory _destURL, int8 _qty) external {
         // Remove outdated orders to keep state clean and ensure accurate limit checks
         removeOutdatedOrdersForParticipant(_msgSender());
 
@@ -206,20 +210,6 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         // order fee
         _update(_msgSender(), address(this), orderFee);
     }
-
-    // fn that should work with QTY field
-    // function _createOrMatchOrder(
-    //     int16 _qty,
-    //     uint256 _price,
-    //     uint256 _deliveryDate,
-    //     string memory _destURL,
-    //     address _participant
-    // ) private {
-    //     EnumerableSet.Bytes32Set storage orderIndex = _deliveryDatePriceOrderIds(_deliveryDate, _price, _isBuy);
-    //     EnumerableSet.Bytes32Set storage oppositeOrderIndex = _deliveryDatePriceOrderIds(_deliveryDate, _price, !_isBuy);
-    //     EnumerableSet.Bytes32Set storage participantPriceOrderIds =
-    //         participantDeliveryDatePriceOrderIdsIndex[_msgSender()][_deliveryDate][_price];
-    // }
 
     function _createOrMatchSingleOrder(
         StructuredLinkedList.List storage orderIndexId,
@@ -385,7 +375,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         );
     }
 
-    function closeOrder(bytes32 _orderId) public {
+    function closeOrder(bytes32 _orderId) external {
         Order memory order = orders[_orderId];
         if (order.participant != _msgSender()) {
             revert OrderNotBelongToSender();
@@ -427,26 +417,26 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         emit OrderClosed(orderId, order.participant);
     }
 
-    function addMargin(uint256 _amount) public {
+    function addMargin(uint256 _amount) external {
         _mint(_msgSender(), _amount);
         token.safeTransferFrom(_msgSender(), address(this), _amount);
     }
 
-    function removeMargin(uint256 _amount) public enoughMarginBalance(_msgSender(), _amount) {
+    function removeMargin(uint256 _amount) external enoughMarginBalance(_msgSender(), _amount) {
         _burn(_msgSender(), _amount);
         token.safeTransfer(_msgSender(), _amount);
     }
 
     // Admin functions
 
-    function setBreachPenaltyRatePerDay(uint256 _breachPenaltyRatePerDay) public onlyOwner {
+    function setBreachPenaltyRatePerDay(uint256 _breachPenaltyRatePerDay) external onlyOwner {
         if (_breachPenaltyRatePerDay > MAX_BREACH_PENALTY_RATE_PER_DAY) {
             revert ValueOutOfRange(0, int256(MAX_BREACH_PENALTY_RATE_PER_DAY));
         }
         breachPenaltyRatePerDay = _breachPenaltyRatePerDay;
     }
 
-    function setLiquidationMarginPercent(uint8 _liquidationMarginPercent) public onlyOwner {
+    function setLiquidationMarginPercent(uint8 _liquidationMarginPercent) external onlyOwner {
         liquidationMarginPercent = _liquidationMarginPercent;
     }
 
@@ -457,13 +447,24 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         futureDeliveryDatesCount = _futureDeliveryDatesCount;
     }
 
-    function setOrderFee(uint256 _orderFee) public onlyOwner {
+    function setOrderFee(uint256 _orderFee) external onlyOwner {
         orderFee = _orderFee;
         emit OrderFeeUpdated(_orderFee);
     }
 
+    function setOracle(address addr) external onlyOwner {
+        hashrateOracle = HashrateOracle(addr);
+    }
+
+    /// @notice Sets the validator URL
+    /// @param _validatorURL the validator endpoint, you can omit protocol prefix and use host.com:port
+    function setValidatorURL(string memory _validatorURL) external onlyOwner {
+        validatorURL = _validatorURL;
+        emit ValidatorURLUpdated(_validatorURL);
+    }
+
     /// @notice Gets the maintenance margin of a position, the minimum amount of effective margin that is required to avoid a margin call
-    function getMaintenanceMarginForPosition(uint256 _entryPricePerDay, int256 _qty) public view returns (uint256) {
+    function getMaintenanceMarginForPosition(uint256 _entryPricePerDay, int256 _qty) private view returns (uint256) {
         return _entryPricePerDay * deliveryDurationDays * abs(_qty) * getMarginPercent() / 100;
     }
 
@@ -515,7 +516,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         return effectiveMargin;
     }
 
-    function getMarginPercent() public view returns (uint8) {
+    function getMarginPercent() private view returns (uint8) {
         uint8 breachPenaltyMarginPercent =
             uint8(breachPenaltyRatePerDay * deliveryDurationSeconds() / 10 ** (BREACH_PENALTY_DECIMALS - 2));
         return liquidationMarginPercent + breachPenaltyMarginPercent;
@@ -578,7 +579,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
      * @param _positionId The id of the position to close the delivery of
      * @param _blameSeller Whether the seller is blamed, ignored if called by buyer or seller
      */
-    function closeDelivery(bytes32 _positionId, bool _blameSeller) public {
+    function closeDelivery(bytes32 _positionId, bool _blameSeller) external {
         // if validator closes the position then it is not delivered
         Position storage position = positions[_positionId];
         if (position.seller == address(0)) {
@@ -745,16 +746,16 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         return _roundToNearest(SECONDS_PER_DAY * speedHps / _hashesForToken, minimumPriceIncrement);
     }
 
-    function getOrderById(bytes32 _orderId) public view returns (Order memory) {
+    function getOrderById(bytes32 _orderId) external view returns (Order memory) {
         return orders[_orderId];
     }
 
-    function getPositionById(bytes32 _positionId) public view returns (Position memory) {
+    function getPositionById(bytes32 _positionId) external view returns (Position memory) {
         return positions[_positionId];
     }
 
     function getPositionsByParticipantDeliveryDate(address _participant, uint256 _deliveryDate)
-        public
+        external
         view
         returns (bytes32[] memory)
     {
@@ -770,7 +771,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         return int256(effectiveMargin) - int256(balance);
     }
 
-    function getDeliveryDates() public view returns (uint256[] memory) {
+    function getDeliveryDates() external view returns (uint256[] memory) {
         uint256 currentDeliveryDateIndex = _getCurrentDeliveryDateIndex();
 
         uint256[] memory deliveryDatesArray = new uint256[](futureDeliveryDatesCount);
@@ -796,7 +797,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
      * @param _deliveryDate The delivery date to deposit payment for
      * @return true if all positions for the delivery date were paid, false if not all positions were paid
      */
-    function depositDeliveryPayment(uint256 _amount, uint256 _deliveryDate) public returns (bool) {
+    function depositDeliveryPayment(uint256 _amount, uint256 _deliveryDate) external returns (bool) {
         if (block.timestamp > _deliveryDate) {
             revert DeliveryDateExpired();
         }
@@ -822,7 +823,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         return true;
     }
 
-    function depositDeliveryPayment(bytes32[] memory _positionIds) public {
+    function depositDeliveryPayment(bytes32[] memory _positionIds) external {
         for (uint256 i = 0; i < _positionIds.length; i++) {
             bytes32 positionId = _positionIds[i];
             Position storage position = positions[positionId];
@@ -845,10 +846,11 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
         }
     }
 
-    function withdrawDeliveryPayment(uint256 _deliveryDate) public {
+    function withdrawDeliveryPayment(uint256 _deliveryDate) external {
         if (block.timestamp < _deliveryDate + deliveryDurationSeconds()) {
             revert DeliveryNotFinishedYet();
         }
+        bool withdrew = false;
 
         // get all user positions for the delivery date
         EnumerableSet.Bytes32Set storage _positions =
@@ -860,8 +862,12 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable {
                 uint256 totalPayment = position.sellPricePerDay * deliveryDurationDays;
                 _transfer(address(this), position.seller, totalPayment);
                 position.paid = false;
+                withdrew = true;
                 emit PositionPaymentReceived(positionId);
             }
+        }
+        if (!withdrew) {
+            revert NothingToWithdraw();
         }
     }
 

@@ -1,6 +1,7 @@
 import { BigInt } from "@graphprotocol/graph-ts/common/numbers";
 import {
   Initialized,
+  Upgraded,
   PositionCreated,
   PositionClosed,
   OrderCreated,
@@ -11,8 +12,9 @@ import {
   OrderFeeUpdated,
   PositionPaid,
   PositionPaymentReceived,
+  ValidatorURLUpdated,
 } from "../generated/Futures/Futures";
-import { Futures, Participant, Position, Order } from "../generated/schema";
+import { Futures, Participant, Position, Order, DeliveryDateOrder } from "../generated/schema";
 import { log, Address, dataSource } from "@graphprotocol/graph-ts";
 
 // Helper function to get or create a participant with balance tracking
@@ -62,6 +64,8 @@ function getOrCreateFutures(event: Initialized | null = null): Futures {
   futures.validatorAddress = futuresContract.validatorAddress();
   futures.hashrateOracleAddress = futuresContract.hashrateOracle();
   futures.tokenAddress = futuresContract.token();
+  futures.futuresAddress = address;
+  futures.validatorURL = futuresContract.validatorURL();
   futures.orderFee = futuresContract.orderFee();
   return futures;
 }
@@ -84,9 +88,29 @@ function updateParticipantBalance(
   participant.save();
 }
 
+// Helper function to get or create a DeliveryDateOrder
+function getOrCreateDeliveryDateOrder(deliveryDate: BigInt, price: BigInt): DeliveryDateOrder {
+  const id = deliveryDate.toString() + "-" + price.toString();
+  let deliveryDateOrder = DeliveryDateOrder.load(id);
+  if (!deliveryDateOrder) {
+    deliveryDateOrder = new DeliveryDateOrder(id);
+    deliveryDateOrder.deliveryDate = deliveryDate;
+    deliveryDateOrder.price = price;
+    deliveryDateOrder.buyOrdersCount = 0;
+    deliveryDateOrder.sellOrdersCount = 0;
+  }
+  return deliveryDateOrder;
+}
+
 export function handleInitialized(event: Initialized): void {
   log.info("Futures contract initialized with version: {}", [event.params.version.toString()]);
   const futures = getOrCreateFutures(event);
+  futures.save();
+}
+
+export function handleUpgraded(event: Upgraded): void {
+  log.info("Futures contract upgraded to: {}", [event.params.implementation.toHexString()]);
+  const futures = getOrCreateFutures();
   futures.save();
 }
 
@@ -126,6 +150,15 @@ export function handleOrderCreated(event: OrderCreated): void {
   futures.contractCount++;
   futures.contractActiveCount++;
   futures.save();
+
+  // Update DeliveryDateOrder counts
+  const deliveryDateOrder = getOrCreateDeliveryDateOrder(event.params.deliveryAt, event.params.pricePerDay);
+  if (event.params.isBuy) {
+    deliveryDateOrder.buyOrdersCount++;
+  } else {
+    deliveryDateOrder.sellOrdersCount++;
+  }
+  deliveryDateOrder.save();
 }
 
 export function handleOrderClosed(event: OrderClosed): void {
@@ -160,6 +193,15 @@ export function handleOrderClosed(event: OrderClosed): void {
     futures.closeoutCount++;
     futures.save();
   }
+
+  // Update DeliveryDateOrder counts
+  const deliveryDateOrder = getOrCreateDeliveryDateOrder(order.deliveryAt, order.pricePerDay);
+  if (order.isBuy) {
+    deliveryDateOrder.buyOrdersCount--;
+  } else {
+    deliveryDateOrder.sellOrdersCount--;
+  }
+  deliveryDateOrder.save();
 }
 
 export function handlePositionCreated(event: PositionCreated): void {
@@ -331,11 +373,9 @@ export function handleTransfer(event: Transfer): void {
 
 export function handleOrderFeeUpdated(event: OrderFeeUpdated): void {
   log.info("Order fee updated: {}", [event.params.orderFee.toString()]);
-  const futures = Futures.load(0);
-  if (futures) {
-    futures.orderFee = event.params.orderFee;
-    futures.save();
-  }
+  const futures = getOrCreateFutures();
+  futures.orderFee = event.params.orderFee;
+  futures.save();
 }
 
 export function handlePositionPaid(event: PositionPaid): void {
@@ -364,4 +404,11 @@ export function handlePositionPaymentReceived(event: PositionPaymentReceived): v
   // Update position payment status
   position.isPaid = false;
   position.save();
+}
+
+export function handleValidatorURLUpdated(event: ValidatorURLUpdated): void {
+  log.info("Validator URL updated: {}", [event.params.validatorURL]);
+  const futures = getOrCreateFutures();
+  futures.validatorURL = event.params.validatorURL;
+  futures.save();
 }

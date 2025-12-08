@@ -19,7 +19,8 @@ async function main() {
     "MINIMUM_PRICE_INCREMENT",
     "DELIVERY_DURATION_DAYS",
     "DELIVERY_INTERVAL_DAYS",
-    "FUTURE_DELIVERY_DATES_COUNT"
+    "FUTURE_DELIVERY_DATES_COUNT",
+    "VALIDATOR_URL"
   );
   const SAFE_OWNER_ADDRESS = process.env.SAFE_OWNER_ADDRESS as `0x${string}` | undefined;
 
@@ -98,6 +99,8 @@ async function main() {
   const futures = await viem.getContractAt("Futures", futuresProxy.address);
 
   console.log();
+  await futures.write.setValidatorURL([env.VALIDATOR_URL]);
+  console.log("Validator URL set:", await futures.read.validatorURL());
 
   if (SAFE_OWNER_ADDRESS) {
     console.log("Transferring ownership of Futures to owner:", SAFE_OWNER_ADDRESS);

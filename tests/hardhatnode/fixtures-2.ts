@@ -6,6 +6,7 @@ import {
   maxUint32,
   encodeFunctionData,
   zeroAddress,
+  formatUnits,
 } from "viem";
 import { hoursToSeconds } from "../../lib/utils";
 import { THPStoHPS } from "../../lib/utils";
@@ -37,6 +38,7 @@ export async function deployTokenOraclesAndMulticall3() {
   const pc = await viem.getPublicClient();
   const tc = await viem.getTestClient();
   const topUpBalance = parseUnits("1000", 8);
+  const topUpBalanceUSDC = parseUnits("10000", 6);
 
   const multicall3 = await viem.deployContract("Multicall3", []);
 
@@ -55,15 +57,16 @@ export async function deployTokenOraclesAndMulticall3() {
   );
 
   // Top up buyer with tokens
-  await usdcMock.write.transfer([buyer.account.address, topUpBalance]);
+
+  await usdcMock.write.transfer([buyer.account.address, topUpBalanceUSDC]);
   await lumerinToken.write.transfer([buyer.account.address, topUpBalance]);
-  await usdcMock.write.transfer([buyer2.account.address, topUpBalance]);
+  await usdcMock.write.transfer([buyer2.account.address, topUpBalanceUSDC]);
   await lumerinToken.write.transfer([buyer2.account.address, topUpBalance]);
-  await usdcMock.write.transfer([seller.account.address, topUpBalance]);
+  await usdcMock.write.transfer([seller.account.address, topUpBalanceUSDC]);
   await lumerinToken.write.transfer([seller.account.address, topUpBalance]);
-  await usdcMock.write.transfer([defaultBuyer.account.address, topUpBalance]);
+  await usdcMock.write.transfer([defaultBuyer.account.address, topUpBalanceUSDC]);
   await lumerinToken.write.transfer([defaultBuyer.account.address, topUpBalance]);
-  await usdcMock.write.transfer([unregistered.account.address, topUpBalance]);
+  await usdcMock.write.transfer([unregistered.account.address, topUpBalanceUSDC]);
   await lumerinToken.write.transfer([unregistered.account.address, topUpBalance]);
 
   const oracle = (() => {
@@ -102,6 +105,7 @@ export async function deployTokenOraclesAndMulticall3() {
   const hashrateOracle = await viem.getContractAt("HashrateOracle", hashrateOracleProxy.address);
 
   await hashrateOracle.write.setTTL([maxUint256, maxUint256]);
+  await hashrateOracle.write.setUpdaterAddress([owner.account.address]);
   await hashrateOracle.write.setHashesForBTC([oracle.hashesForBTC]);
 
   return {

@@ -18,6 +18,8 @@ type Futures @entity(immutable: false) {
   validatorAddress: Bytes!
   hashrateOracleAddress: Bytes!
   tokenAddress: Bytes!
+  futuresAddress: Bytes!
+  validatorURL: String!
 
   "Number of contracts including archived"
   contractCount: Int!
@@ -89,6 +91,16 @@ type HashrateOracle @entity(immutable: false) {
   id: Int8!
   initializedBlockNumber: BigInt!
   initializeTimestamp: BigInt!
+}
+
+# Delivery Date Orders - tracks buy/sell counts per price level for each delivery date
+type DeliveryDateOrder @entity(immutable: false) {
+  "ID format: {deliveryDate}-{price}"
+  id: String!
+  deliveryDate: BigInt!
+  price: BigInt!
+  buyOrdersCount: Int!
+  sellOrdersCount: Int!
 }
 
 # HashrateOracle Timeseries Entities

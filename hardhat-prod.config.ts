@@ -21,7 +21,10 @@ const config: HardhatUserConfig = {
     ...base.networks,
     default: {
       url: process.env.ETH_NODE_ADDRESS,
-      accounts: [process.env.OWNER_PRIVATEKEY],
+      accounts: [
+        process.env.OWNER_PRIVATEKEY!,
+        ...(process.env.PROPOSER_PRIVATEKEY ? [process.env.PROPOSER_PRIVATEKEY] : []),
+      ],
       gasPrice: "auto",
       gas: "auto",
     },

@@ -44,7 +44,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     int8 private defaultBuyerProfitTarget;
 
     uint8 public constant VALIDATOR_FEE_DECIMALS = 18;
-    string public constant VERSION = "2.0.9"; // This will be replaced during build time
+    string public constant VERSION = "3.0.3"; // This will be replaced during build time
 
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;

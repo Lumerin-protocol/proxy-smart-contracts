@@ -30,6 +30,8 @@ dataSources:
       eventHandlers:
         - event: Initialized(uint64)
           handler: handleInitialized
+        - event: Upgraded(indexed address)
+          handler: handleUpgraded
         - event: PositionCreated(indexed bytes32,indexed address,indexed address,uint256,uint256,uint256,string,bytes32)
           handler: handlePositionCreated
         - event: PositionClosed(indexed bytes32)
@@ -48,6 +50,8 @@ dataSources:
           handler: handlePositionPaid
         - event: PositionPaymentReceived(indexed bytes32)
           handler: handlePositionPaymentReceived
+        - event: ValidatorURLUpdated(string)
+          handler: handleValidatorURLUpdated
       file: ./src/futures.ts
   - kind: ethereum
     name: HashrateOracle
