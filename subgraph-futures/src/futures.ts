@@ -1,6 +1,7 @@
 import { BigInt } from "@graphprotocol/graph-ts/common/numbers";
 import {
   Initialized,
+  Upgraded,
   PositionCreated,
   PositionClosed,
   OrderCreated,
@@ -90,6 +91,12 @@ function updateParticipantBalance(
 export function handleInitialized(event: Initialized): void {
   log.info("Futures contract initialized with version: {}", [event.params.version.toString()]);
   const futures = getOrCreateFutures(event);
+  futures.save();
+}
+
+export function handleUpgraded(event: Upgraded): void {
+  log.info("Futures contract upgraded to: {}", [event.params.implementation.toHexString()]);
+  const futures = getOrCreateFutures();
   futures.save();
 }
 
@@ -334,11 +341,9 @@ export function handleTransfer(event: Transfer): void {
 
 export function handleOrderFeeUpdated(event: OrderFeeUpdated): void {
   log.info("Order fee updated: {}", [event.params.orderFee.toString()]);
-  const futures = Futures.load(0);
-  if (futures) {
-    futures.orderFee = event.params.orderFee;
-    futures.save();
-  }
+  const futures = getOrCreateFutures();
+  futures.orderFee = event.params.orderFee;
+  futures.save();
 }
 
 export function handlePositionPaid(event: PositionPaid): void {
@@ -371,9 +376,7 @@ export function handlePositionPaymentReceived(event: PositionPaymentReceived): v
 
 export function handleValidatorURLUpdated(event: ValidatorURLUpdated): void {
   log.info("Validator URL updated: {}", [event.params.validatorURL]);
-  const futures = Futures.load(0);
-  if (futures) {
-    futures.validatorURL = event.params.validatorURL;
-    futures.save();
-  }
+  const futures = getOrCreateFutures();
+  futures.validatorURL = event.params.validatorURL;
+  futures.save();
 }
