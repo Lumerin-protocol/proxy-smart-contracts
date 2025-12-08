@@ -30,14 +30,14 @@ async function main() {
   console.log("Validator address:", await futuresProxy.read.validatorAddress());
   console.log();
 
-  // console.log("Deploying new Futures implementation...");
-  // const futuresImpl = await viem.deployContract("contracts/marketplace/Futures.sol:Futures", []);
-  // console.log("Deployed at:", futuresImpl.address);
-  // await verifyContract(futuresImpl.address, []);
-  const futuresImpl = await viem.getContractAt(
-    "Futures",
-    "0x080f8eab214a56d16b16035788bdfe92552c480f"
-  );
+  console.log("Deploying new Futures implementation...");
+  const futuresImpl = await viem.deployContract("contracts/marketplace/Futures.sol:Futures", []);
+  console.log("Deployed at:", futuresImpl.address);
+  await verifyContract(futuresImpl.address, []);
+  // const futuresImpl = await viem.getContractAt(
+  //   "Futures",
+  //   "0x080f8eab214a56d16b16035788bdfe92552c480f"
+  // );
 
   if (SAFE_OWNER_ADDRESS) {
     console.log();
