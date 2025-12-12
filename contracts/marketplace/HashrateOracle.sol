@@ -11,7 +11,7 @@ import { Versionable } from "../util/versionable.sol";
 /// @notice Contract for managing hashrate and mining difficulty calculations
 /// @dev This contract provides functions to calculate hashrate requirements based on BTC price and mining difficulty
 contract HashrateOracle is UUPSUpgradeable, OwnableUpgradeable, Versionable {
-    AggregatorV3Interface private immutable btcTokenOracle;
+    AggregatorV3Interface public immutable btcTokenOracle;
     uint8 private immutable oracleDecimals;
     uint8 private immutable tokenDecimals;
 
