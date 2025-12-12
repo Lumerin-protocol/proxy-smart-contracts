@@ -24,7 +24,6 @@ test-upgrade:
 	yarn hardhat --network localhost test --bail tests/upgrades/*.ts 
 
 compile:
-	yarn ts-node ./scripts/replace-version.ts
 	yarn hardhat compile
 
 deploy-lumerin:
