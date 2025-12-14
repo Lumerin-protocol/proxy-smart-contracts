@@ -2,7 +2,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { Subgraph } from "./subgraph.ts";
 import pino from "pino";
 import { FuturesContract } from "./contract.ts";
-import { NowSeconds, mult, wait, clamp, abs } from "./lib.ts";
+import { NowSeconds, mult, wait, clamp, abs, roundToNearest } from "./lib.ts";
 import {
   resampleHourlyClose,
   realizedVolatility,
@@ -26,20 +26,22 @@ export async function main() {
   const contract = new FuturesContract(
     config.FUTURES_ADDRESS,
     config.ETH_NODE_URL,
-    config.PRIVATE_KEY
+    config.PRIVATE_KEY,
+    config.CHAIN_ID
   );
   log.info(`Wallet address: ${contract.getWalletAddress()}`);
-  const volatilityDurationSeconds = 7 * 24 * 3600;
+  const volatilityDurationSeconds = 30 * 24 * 3600;
   const nowSeconds = NowSeconds();
   const historicalPrices = await subgraph.getHistoricalPrices(
     nowSeconds - volatilityDurationSeconds,
     nowSeconds
   );
+  console.log(`Historical prices: `, historicalPrices);
   const resampledPrices = resampleHourlyClose(historicalPrices, 3600);
+  console.log(`Resampled prices: `, resampledPrices);
   const { sigmaPerStep: volatilityPerHour } = realizedVolatility(resampledPrices);
   log.info(`Volatility per hour: ${volatilityPerHour}`);
-  const riskAversion = 0.1;
-  log.info(`Risk aversion: ${riskAversion}`);
+  log.info(`Risk aversion: ${config.RISK_AVERSION}`);
   const contractMultiplier = BigInt(await contract.getContractMultiplier());
   log.info(`Contract multiplier: ${contractMultiplier}`);
   const tickSize = await contract.getTickSize();
@@ -58,6 +60,7 @@ export async function main() {
 
   if (futuresAccountBalance < config.FLOAT_AMOUNT) {
     const depositAmount = config.FLOAT_AMOUNT - futuresAccountBalance;
+    await contract.approve(depositAmount);
     const { blockNumber } = await contract.deposit(depositAmount);
     log.info(
       `Deposited ${formatUnits(depositAmount, 6)} to margin account, block number: ${blockNumber}`
@@ -69,6 +72,9 @@ export async function main() {
     // main loop
     // 1. Observe the market
     // 	•	Continuously read the best bid, best ask, and last traded price for the gold futures you care about.
+    const marginAccountBalance = await contract.getBalance();
+    log.info(`Margin account balance: $${formatUnits(marginAccountBalance, 6)}`);
+
     const indexPrice = await contract.getIndexPrice();
     log.info(`Index price: ${indexPrice}`);
 
@@ -80,23 +86,29 @@ export async function main() {
       contract.getWalletAddress()
     );
     log.info(`Current position: ${currentPosition.position}`);
-    log.info(`Current average price: ${currentPosition.averagePrice}`);
+    log.info(`Current average price: $${formatUnits(currentPosition.averagePrice, 6)}`);
 
     const unrealizedPnL = currentPosition.position * (indexPrice - currentPosition.averagePrice);
-    log.info(`Unrealized P&L: ${unrealizedPnL}`);
+    log.info(`Unrealized P&L: $${formatUnits(unrealizedPnL, 6)}`);
 
     // 	•	Optionally estimate a “fair” mid price (for example, midpoint of bid/ask) and some measure of recent volatility to know how “calm” or “wild” the market is.
     // const fairPrice = (price.bestBid + price.bestAsk) / 2n;
     const remainingTimeHours = (deliveryDate - NowSeconds()) / 3600;
-    const reservationPrice = calculateReservationPrice(
+    log.info(`Remaining time hours: ${remainingTimeHours}`);
+    log.info(`Volatility per hour: ${volatilityPerHour}`);
+    log.info(`Risk aversion: ${config.RISK_AVERSION}`);
+    log.info(`Current position: ${currentPosition.position}`);
+    log.info(`Index price: ${indexPrice}`);
+    let reservationPrice = calculateReservationPrice(
       indexPrice,
-      currentPosition.position,
-      riskAversion,
+      currentPosition.position * contractMultiplier,
+      config.RISK_AVERSION,
       volatilityPerHour,
       remainingTimeHours
     );
-    log.info(`Reservation price: ${reservationPrice}`);
-    log.info("Delta %s", reservationPrice - indexPrice);
+    reservationPrice = roundToNearest(reservationPrice, tickSize);
+    log.info(`Rounded reservation price: ${reservationPrice}`);
+    log.info("Price shift: %s", reservationPrice - indexPrice);
 
     // inventory skew shifts the middle price up or down based on the current position
     // const inventorySkew = (currentPosition.position * config.SPREAD_AMOUNT) / config.MAX_POSITION;

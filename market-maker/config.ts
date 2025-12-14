@@ -10,18 +10,20 @@ const TypePrivateKey = (opt?: StringOptions) =>
   Type.String({ ...opt, pattern: "^0x[a-fA-F0-9]{64}$" }) as TUnsafe<`0x${string}`>;
 
 const schema = Type.Object({
-  SUBGRAPH_URL: Type.String({ format: "uri" }),
-  SUBGRAPH_API_KEY: Type.String(),
-  FLOAT_AMOUNT: Type.Number({ minimum: 0, multipleOf: 1 }),
-  SPREAD_AMOUNT: Type.Number({ minimum: 0, multipleOf: 1 }),
-  GRID_LEVELS: Type.Number({ minimum: 0, multipleOf: 1 }),
   ACTIVE_QUOTING_AMOUNT_RATIO: Type.Number({ minimum: 0, maximum: 1 }),
-  FUTURES_ADDRESS: TypeEthAddress(),
+  CHAIN_ID: Type.Number({ minimum: 0, multipleOf: 1 }),
   ETH_NODE_URL: Type.String({ format: "uri" }),
-  PRIVATE_KEY: TypePrivateKey(),
+  FLOAT_AMOUNT: Type.Number({ minimum: 0, multipleOf: 1 }),
+  FUTURES_ADDRESS: TypeEthAddress(),
+  GRID_LEVELS: Type.Number({ minimum: 0, multipleOf: 1 }),
+  LOG_LEVEL: Type.String(),
   LOOP_INTERVAL_MS: Type.Number({ minimum: 0, multipleOf: 1 }),
   MAX_POSITION: Type.Number({ minimum: 0, multipleOf: 1 }),
-  LOG_LEVEL: Type.String(),
+  PRIVATE_KEY: TypePrivateKey(),
+  RISK_AVERSION: Type.Number({ minimum: 0, multipleOf: 1 }),
+  SPREAD_AMOUNT: Type.Number({ minimum: 0, multipleOf: 1 }),
+  SUBGRAPH_API_KEY: Type.String(),
+  SUBGRAPH_URL: Type.String({ format: "uri" }),
 });
 
 export type Config = Static<typeof schema>;
@@ -46,6 +48,7 @@ export const getConfig = () => {
 
   return {
     ...config,
+    RISK_AVERSION: BigInt(config.RISK_AVERSION),
     FLOAT_AMOUNT: BigInt(config.FLOAT_AMOUNT),
     SPREAD_AMOUNT: BigInt(config.SPREAD_AMOUNT),
     GRID_LEVELS: BigInt(config.GRID_LEVELS),

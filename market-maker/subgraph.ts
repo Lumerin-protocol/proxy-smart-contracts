@@ -16,9 +16,10 @@ export class Subgraph {
       from: startSeconds,
       to: endSeconds,
     });
+
     return res.hashrateIndexes.map((item) => ({
       date: Number(item.updatedAt),
-      price: BigInt(item.hashesForToken),
+      price: hashesForTokenToPrice(BigInt(item.hashesForToken)),
     }));
   }
 
@@ -78,7 +79,7 @@ export const HistoricalPricesQuery = gql`
     hashrateIndexes(
       orderBy: updatedAt
       orderDirection: asc
-      where: { updatedAt_in: [$from, $to] }
+      where: { updatedAt_gt: $from, updatedAt_lte: $to }
     ) {
       id
       hashesForToken
@@ -114,7 +115,12 @@ type MarketPriceRes = {
 export const CurrentPositionQuery = gql`
   query CurrentPosition($addr: String, $deliveryAt: BigInt) {
     positions(
-      where: { and: [{ deliveryAt: $deliveryAt }, { or: [{ buyer: $addr }, { seller: $addr }] }] }
+      where: {
+        and: [
+          { deliveryAt: $deliveryAt, isActive: true, closedAt: null }
+          { or: [{ buyer: $addr }, { seller: $addr }] }
+        ]
+      }
     ) {
       id
       seller {
@@ -162,3 +168,9 @@ type CurrentOrdersRes = {
     isActive: boolean;
   }[];
 };
+
+const SECONDS_PER_DAY = 3600n * 24n;
+
+function hashesForTokenToPrice(hashesForToken: bigint) {
+  return (SECONDS_PER_DAY * 100n * 10n ** 12n) / hashesForToken;
+}

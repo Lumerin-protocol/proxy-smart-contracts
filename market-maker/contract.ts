@@ -2,31 +2,32 @@ import { createPublicClient, createWalletClient, encodeFunctionData, http } from
 import { FuturesABI } from "./abi/Futures.ts";
 import { privateKeyToAccount } from "viem/accounts";
 import { hardhat } from "viem/chains";
+import { getChain } from "./chainId.ts";
 
-function makeClient(url: string) {
+function makeClient(url: string, chainId: number) {
   return createPublicClient({
     transport: http(url),
-    chain: hardhat,
+    chain: getChain(chainId),
   });
 }
 
-function makeWalletClient(url: string, privateKey: `0x${string}`) {
+function makeWalletClient(url: string, privateKey: `0x${string}`, chainId: number) {
   return createWalletClient({
     transport: http(url),
     account: privateKeyToAccount(privateKey),
-    chain: hardhat,
+    chain: getChain(chainId),
   });
 }
 
 export class FuturesContract {
-  private address: string;
+  private address: `0x${string}`;
   private pc: ReturnType<typeof makeClient>;
   private wc: ReturnType<typeof makeWalletClient>;
 
-  constructor(address: string, url: string, privateKey: `0x${string}`) {
+  constructor(address: `0x${string}`, url: string, privateKey: `0x${string}`, chainId: number) {
     this.address = address;
-    this.pc = makeClient(url);
-    this.wc = makeWalletClient(url, privateKey);
+    this.pc = makeClient(url, chainId);
+    this.wc = makeWalletClient(url, privateKey, chainId);
   }
 
   getWalletAddress(): `0x${string}` {
@@ -41,6 +42,26 @@ export class FuturesContract {
       args: [this.wc.account.address],
       authorizationList: undefined,
     });
+  }
+
+  async approve(amount: bigint): Promise<TxResult> {
+    const tokenAddress = await this.pc.readContract({
+      address: this.address as `0x${string}`,
+      abi: FuturesABI,
+      functionName: "token",
+      authorizationList: undefined,
+    });
+
+    const tx = await this.pc.simulateContract({
+      address: tokenAddress,
+      abi: FuturesABI,
+      functionName: "approve",
+      args: [this.address, amount],
+      account: this.wc.account,
+      chain: this.wc.chain,
+    });
+    const hash = await this.wc.writeContract(tx.request);
+    return await this.pc.waitForTransactionReceipt({ hash });
   }
 
   async deposit(amount: bigint): Promise<TxResult> {

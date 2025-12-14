@@ -120,12 +120,15 @@ export function currencyToNotionalAllocations(
 
 export function calculateReservationPrice(
   marketPrice: bigint,
-  currentPosition: bigint,
-  riskAversion: number,
+  quantityOfTheBaseAsset: bigint,
+  riskAversion: bigint,
   volatility: number,
   remainingTime: number
 ) {
-  const inventoryAdjustment = mult(currentPosition, volatility * remainingTime * riskAversion);
+  const inventoryAdjustment = mult(
+    quantityOfTheBaseAsset * riskAversion,
+    volatility ** 2 * remainingTime
+  );
   return marketPrice + inventoryAdjustment;
 }
 

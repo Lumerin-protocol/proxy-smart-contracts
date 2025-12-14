@@ -22,3 +22,7 @@ export function clamp(x: number, lo: number | null, hi: number | null): number {
 export function abs(x: bigint): bigint {
   return x < 0n ? -x : x;
 }
+
+export function roundToNearest(value: bigint, increment: bigint): bigint {
+  return ((value + increment / 2n) / increment) * increment;
+}
