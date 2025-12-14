@@ -118,6 +118,10 @@ export function currencyToNotionalAllocations(
   return { result, remainder: totalRemainder };
 }
 
+/**
+ * Calculate the reservation price (price adjusted for inventory and volatility) using Avellaneda-Stoikov model
+ * https://hummingbot.org/blog/guide-to-the-avellaneda--stoikov-strategy
+ */
 export function calculateReservationPrice(
   marketPrice: bigint,
   quantityOfTheBaseAsset: bigint,
