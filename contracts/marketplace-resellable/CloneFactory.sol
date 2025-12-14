@@ -6,7 +6,7 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { BeaconProxy } from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
-import { Implementation } from "./Implementation.sol";
+import { ImplementationV2 } from "./Implementation.sol";
 import { Versionable } from "../util/versionable.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { Paginator } from "@solarity/solidity-lib/libs/arrays/Paginator.sol";
@@ -22,7 +22,7 @@ import { ResellFlags } from "./lib.sol";
 ///      - Handling contract purchases and payments
 /// @dev The contract uses UUPS upgradeable pattern and is owned by a designated address.
 /// @dev All rental contracts are created as beacon proxies pointing to a common implementation.
-contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
+contract CloneFactoryV2 is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     IERC20 public paymentToken;
     IERC20 public feeToken;
     address public baseImplementation; // This is now the beacon address
@@ -130,7 +130,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         enforceContractDuration(_length);
 
         bytes memory data = abi.encodeWithSelector(
-            Implementation(address(0)).initialize.selector, _msgSender(), _pubKey, _speed, _length, _profitTarget
+            ImplementationV2(address(0)).initialize.selector, _msgSender(), _pubKey, _speed, _length, _profitTarget
         );
 
         BeaconProxy beaconProxy = new BeaconProxy(baseImplementation, data);
@@ -159,11 +159,11 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         uint256 _resellPrice
     ) external payable {
         // Validation block - variables scoped to reduce stack depth
-        Implementation(_contractAddress).claimFunds();
+        ImplementationV2(_contractAddress).claimFunds();
         validatePurchase(_contractAddress, termsVersion, _isResellable);
         emit clonefactoryContractPurchased(_contractAddress, _validatorAddress);
         _handlePurchase(
-            Implementation(_contractAddress),
+            ImplementationV2(_contractAddress),
             _encrValidatorURL,
             _encrDestURL,
             _validatorAddress,
@@ -173,7 +173,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     }
 
     function validatePurchase(address _contractAddress, uint32 termsVersion, bool _isResellable) internal view {
-        Implementation targetContract = Implementation(_contractAddress);
+        ImplementationV2 targetContract = ImplementationV2(_contractAddress);
         require(rentalContractsMap[_contractAddress], "unknown contract address");
         require(!targetContract.isDeleted(), "cannot purchase deleted contract");
         require(targetContract.seller() != _msgSender(), "cannot purchase your own contract");
@@ -193,7 +193,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     }
 
     function _handlePurchase(
-        Implementation targetContract,
+        ImplementationV2 targetContract,
         string calldata _encrValidatorURL,
         string calldata _encrDestURL,
         address _validatorAddress,
@@ -224,7 +224,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
 
     function purchaseAsDefaultBuyer(address _contractAddress) external {
         require(_msgSender() == defaultBuyer.addr, "you are not the default buyer");
-        Implementation targetContract = Implementation(_contractAddress);
+        ImplementationV2 targetContract = ImplementationV2(_contractAddress);
         require(
             targetContract.getLatestResell()._isResellToDefaultBuyer, "contract is not resellable to the default buyer"
         );
@@ -269,7 +269,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
             address _contractAddress = _contractAddresses[i];
             require(rentalContractsMap[_contractAddress], "unknown contract address");
 
-            Implementation _contract = Implementation(_contractAddress);
+            ImplementationV2 _contract = ImplementationV2(_contractAddress);
             require(_msgSender() == _contract.owner() || _msgSender() == owner(), "you are not authorized");
 
             emit contractDeleteUpdated(_contractAddress, _isDeleted);
@@ -290,7 +290,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         address _contractAddress = rentalContracts[_index];
         require(_contractAddress == _address, "contract address mismatch");
 
-        Implementation _contract = Implementation(_contractAddress);
+        ImplementationV2 _contract = ImplementationV2(_contractAddress);
         address _seller = _contract.seller();
         require(_msgSender() == _seller || _msgSender() == owner(), "you are not authorized");
 
@@ -313,11 +313,11 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
         enforceContractDuration(_length);
 
         require(rentalContractsMap[_contractAddress], "unknown contract address");
-        Implementation _contract = Implementation(_contractAddress);
+        ImplementationV2 _contract = ImplementationV2(_contractAddress);
         require(_msgSender() == _contract.owner(), "you are not authorized");
 
         emit purchaseInfoUpdated(_contractAddress);
-        Implementation(_contractAddress).setTerms(_speed, _length);
+        ImplementationV2(_contractAddress).setTerms(_speed, _length);
     }
 
     function sellerByAddress(address _seller)

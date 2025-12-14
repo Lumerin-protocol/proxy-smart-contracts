@@ -5,7 +5,7 @@ import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable
 import { ContextUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { CloneFactory } from "./CloneFactory.sol";
+import { CloneFactoryV2 } from "./CloneFactory.sol";
 import { HashrateOracle } from "../marketplace/HashrateOracle.sol";
 import { Versionable } from "../util/versionable.sol";
 import { ResellFlags } from "./lib.sol";
@@ -20,7 +20,7 @@ import { ResellFlags } from "./lib.sol";
 ///      - Dynamic pricing based on hashrate oracle
 ///      - Contract terms management and updates
 ///      - Historical record keeping
-contract Implementation is Versionable, ContextUpgradeable {
+contract ImplementationV2 is Versionable, ContextUpgradeable {
     Terms public terms; // the terms of the contract
     Terms public futureTerms; // the terms of the contract to be applied after the current contract is closed
     bool public isDeleted; // used to track if the contract is deleted
@@ -37,7 +37,7 @@ contract Implementation is Versionable, ContextUpgradeable {
 
     // shared between all contract instances, and updated altogether with the implementation
     HashrateOracle public immutable hashrateOracle;
-    CloneFactory public immutable cloneFactory;
+    CloneFactoryV2 public immutable cloneFactory;
     IERC20 public immutable feeToken;
     IERC20 public immutable paymentToken;
 
@@ -114,7 +114,7 @@ contract Implementation is Versionable, ContextUpgradeable {
     /// @param _feeToken Address of the payment token to pay the validator
     constructor(address _cloneFactory, address _hashrateOracle, address _paymentToken, address _feeToken) {
         _disableInitializers();
-        cloneFactory = CloneFactory(_cloneFactory);
+        cloneFactory = CloneFactoryV2(_cloneFactory);
         hashrateOracle = HashrateOracle(_hashrateOracle);
         paymentToken = IERC20(_paymentToken);
         feeToken = IERC20(_feeToken);
