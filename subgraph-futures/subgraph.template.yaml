@@ -1,4 +1,5 @@
 # Use subgraph.template.yaml to add changes to the subgraph.yaml file
+# Variables are substituted via envsubst from environment variables
 specVersion: 1.3.0
 indexerHints:
   prune: auto
@@ -7,13 +8,10 @@ schema:
 dataSources:
   - kind: ethereum
     name: Futures
-    network: "{{network}}"
+    network: "${NETWORK}"
     source:
-      # prettier-ignore
-      address: "{{futuresAddress}}"
-      # avoid messing mustache syntax with autoformatting
-      # prettier-ignore
-      startBlock: {{startBlockFutures}}
+      address: "${FUTURES_ADDRESS}"
+      startBlock: ${START_BLOCK_FUTURES}
       abi: Futures
     mapping:
       kind: ethereum/events
@@ -55,12 +53,10 @@ dataSources:
       file: ./src/futures.ts
   - kind: ethereum
     name: HashrateOracle
-    network: "{{ network }}"
+    network: "${NETWORK}"
     source:
-      address: "{{ hashrateOracleAddress }}"
-      # avoid messing mustache syntax with autoformatting
-      # prettier-ignore
-      startBlock: {{ startBlockHashrateOracle }}
+      address: "${HASHRATE_ORACLE_ADDRESS}"
+      startBlock: ${START_BLOCK_HASHRATE_ORACLE}
       abi: HashrateOracle
     mapping:
       kind: ethereum/events
@@ -78,8 +74,7 @@ dataSources:
         - handler: handleBlock
           filter:
             kind: polling
-            # prettier-ignore
-            every: {{ hashrateOraclePollingBlockInterval }}
+            every: ${HASHRATE_ORACLE_POLLING_BLOCK_INTERVAL}
       file: ./src/hashrate-oracle.ts
 # features:
 #   - grafting

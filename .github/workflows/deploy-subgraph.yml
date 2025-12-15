@@ -29,30 +29,13 @@ env:
   SERVICE_NAME: subgraph-futures
 
 jobs:
-  build:
-    name: 🔨 Build
+  # First job to determine environment (needed before we can use GitHub Environments)
+  setup:
+    name: 🔧 Setup
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version.outputs.version }}
-      tag: ${{ steps.version.outputs.tag }}
       environment: ${{ steps.env.outputs.environment }}
-      graph_node_url: ${{ steps.env.outputs.graph_node_url }}
-      subgraph_name: ${{ steps.env.outputs.subgraph_name }}
-      aws_region: ${{ steps.env.outputs.aws_region }}
-    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'yarn'
-          cache-dependency-path: subgraph-futures/yarn.lock
-
       - name: Determine environment
         id: env
         run: |
@@ -72,6 +55,38 @@ jobs:
             fi
           fi
           echo "environment=${ENV}" >> $GITHUB_OUTPUT
+          echo "🎯 Target environment: ${ENV}"
+
+  build:
+    name: 🔨 Build
+    runs-on: ubuntu-latest
+    needs: setup
+    environment: ${{ needs.setup.outputs.environment }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      environment: ${{ needs.setup.outputs.environment }}
+      graph_node_url: ${{ steps.env.outputs.graph_node_url }}
+      subgraph_name: ${{ steps.env.outputs.subgraph_name }}
+      aws_region: ${{ steps.env.outputs.aws_region }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: subgraph-futures/yarn.lock
+
+      - name: Set environment outputs
+        id: env
+        run: |
+          ENV="${{ needs.setup.outputs.environment }}"
           
           # Map to endpoints
           # Note: Graph Node handles IPFS internally via admin API
@@ -107,7 +122,7 @@ jobs:
             VERSION="${MAJOR}.${MINOR}.${PATCH}"
           fi
           
-          ENV=${{ steps.env.outputs.environment }}
+          ENV="${{ needs.setup.outputs.environment }}"
           if [ "$ENV" != "main" ]; then
             FULL_VERSION="v${VERSION}-${ENV}"
           else
@@ -138,22 +153,27 @@ jobs:
 
       - name: Prepare subgraph configuration
         working-directory: ./subgraph-futures
+        env:
+          NETWORK: ${{ vars.NETWORK }}
+          FUTURES_ADDRESS: ${{ vars.FUTURES_ADDRESS }}
+          START_BLOCK_FUTURES: ${{ vars.START_BLOCK_FUTURES }}
+          HASHRATE_ORACLE_ADDRESS: ${{ vars.HASHRATE_ORACLE_ADDRESS }}
+          START_BLOCK_HASHRATE_ORACLE: ${{ vars.START_BLOCK_HASHRATE_ORACLE }}
+          HASHRATE_ORACLE_POLLING_BLOCK_INTERVAL: ${{ vars.HASHRATE_ORACLE_POLLING_BLOCK_INTERVAL }}
         run: |
-          echo "⚙️ Preparing subgraph for ${{ steps.env.outputs.environment }}..."
+          echo "⚙️ Preparing subgraph for ${{ needs.setup.outputs.environment }}..."
+          echo "   Network: ${NETWORK}"
+          echo "   Futures Address: ${FUTURES_ADDRESS}"
+          echo "   Start Block Futures: ${START_BLOCK_FUTURES}"
+          echo "   Hashrate Oracle Address: ${HASHRATE_ORACLE_ADDRESS}"
+          echo "   Start Block Hashrate Oracle: ${START_BLOCK_HASHRATE_ORACLE}"
+          echo "   Polling Block Interval: ${HASHRATE_ORACLE_POLLING_BLOCK_INTERVAL}"
           
-          case "${{ steps.env.outputs.environment }}" in
-            dev)
-              yarn prepare-dev || yarn prepare:dev || echo "Using default config"
-              ;;
-            stg)
-              yarn prepare-stg || yarn prepare-test || yarn prepare:stg || echo "Using default config"
-              ;;
-            main)
-              yarn prepare-mainnet || yarn prepare:mainnet || echo "Using default config"
-              ;;
-          esac
+          yarn prepare:env
           
           echo "✅ Subgraph configuration ready"
+          echo "📄 Generated subgraph.yaml:"
+          cat subgraph.yaml
 
       - name: Generate code
         working-directory: ./subgraph-futures
@@ -215,16 +235,12 @@ jobs:
           aws-region: ${{ needs.build.outputs.aws_region }}
           role-session-name: GitHubActions-Subgraph-${{ github.run_id }}
 
-      - name: Install Graph CLI
-        run: |
-          npm install -g @graphprotocol/graph-cli
-
       - name: Create subgraph (if not exists)
         working-directory: ./subgraph-futures
         continue-on-error: true
         run: |
           echo "📝 Creating subgraph in Graph Node..."
-          graph create --node ${{ needs.build.outputs.graph_node_url }}:8020 \
+          npx graph create --node ${{ needs.build.outputs.graph_node_url }}:8020 \
             ${{ needs.build.outputs.subgraph_name }} || echo "Subgraph already exists"
 
       - name: Deploy subgraph
@@ -250,8 +266,9 @@ jobs:
             echo "================================================"
             
             # Graph Node handles IPFS internally - no need to specify --ipfs
+            # Use npx to run the local graph-cli version from package.json
             set +e  # Don't exit on error, capture it
-            graph deploy --node ${{ needs.build.outputs.graph_node_url }}:8020 \
+            npx graph deploy --node ${{ needs.build.outputs.graph_node_url }}:8020 \
               --version-label ${{ needs.build.outputs.version }} \
               ${{ needs.build.outputs.subgraph_name }}
             DEPLOY_EXIT_CODE=$?
