@@ -23,7 +23,7 @@ on:
 
 permissions:
   id-token: write   # Required for OIDC
-  contents: read
+  contents: write   # Required for creating git tags
 
 env:
   SERVICE_NAME: subgraph-futures
@@ -88,7 +88,7 @@ jobs:
               ;;
             main)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
-              echo "graph_node_url=https://graphidx.lumerin.io" >> $GITHUB_OUTPUT
+              echo "graph_node_url=https://graphidx.lmn.lumerin.io" >> $GITHUB_OUTPUT
               echo "subgraph_name=marketplace" >> $GITHUB_OUTPUT
               ;;
           esac
