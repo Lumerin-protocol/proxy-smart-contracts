@@ -4,7 +4,7 @@ rm -rf "$PTH"
 mkdir -p "$PTH"
 
 # Replace version in contract
-yarn ts-node scripts/replace-version.ts
+# yarn ts-node scripts/replace-version.ts
 
 # copy project template
 cp -R "./templates/js/." "$PTH"
