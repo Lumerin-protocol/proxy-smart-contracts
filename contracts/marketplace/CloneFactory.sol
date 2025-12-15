@@ -38,7 +38,7 @@ contract CloneFactory is UUPSUpgradeable, OwnableUpgradeable, Versionable {
     /// @dev  validatorFeeRateScaled = 10 * 10**8 / 100 * 10**6 * 10**18 = 10 * 10**18
     uint256 public validatorFeeRateScaled;
     uint8 public constant VALIDATOR_FEE_DECIMALS = 18;
-    string public constant VERSION = "2.0.8"; // This will be replaced during build time
+    string public constant VERSION = "2.0.8";
     uint32 private minContractDuration;
     uint32 private maxContractDuration;
 

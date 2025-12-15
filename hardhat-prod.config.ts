@@ -21,13 +21,31 @@ const config: HardhatUserConfig = {
     ...base.networks,
     default: {
       url: process.env.ETH_NODE_ADDRESS,
-      accounts: [process.env.OWNER_PRIVATEKEY],
+      accounts: [
+        process.env.OWNER_PRIVATEKEY!,
+        ...(process.env.PROPOSER_PRIVATEKEY ? [process.env.PROPOSER_PRIVATEKEY] : []),
+      ],
       gasPrice: "auto",
       gas: "auto",
     },
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY,
+    apiKey: process.env.ETHERSCAN_API_KEY!,
+    // FOR BLOCKSCOUT
+    //
+    // apiKey: {
+    //   default: process.env.ETHERSCAN_API_KEY!,
+    // },
+    // customChains: [
+    //   {
+    //     network: "default",
+    //     chainId: 421614,
+    //     urls: {
+    //       apiURL: "https://arbitrum-sepolia.blockscout.com/api",
+    //       browserURL: "https://arbitrum-sepolia.blockscout.com/",
+    //     },
+    //   },
+    // ],
   },
 };
 

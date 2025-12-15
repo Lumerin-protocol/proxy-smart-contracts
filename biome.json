@@ -1,5 +1,25 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.5.3/schema.json",
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "overrides": [
+    {
+      "include": [
+        "subgraph/src"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noForEach": "off",
+          },
+          "style": {
+            "useImportType": "off"
+          },
+          "suspicious": {
+            "noShadowRestrictedNames": "off"
+          }
+        }
+      }
+    }
+  ],
   "organizeImports": {
     "enabled": true
   },
@@ -11,7 +31,8 @@
         "noExplicitAny": "warn"
       },
       "style": {
-        "noNonNullAssertion": "warn"
+        "noNonNullAssertion": "warn",
+        "useImportType": "warn"
       },
       "complexity": {
         "useArrowFunction": "off"

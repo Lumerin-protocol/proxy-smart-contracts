@@ -1,0 +1,309 @@
+"CloneFactory is the root entity for the marketplace"
+type CloneFactory @entity(immutable: false) {
+  "Use id=0"
+  id: Int8!
+  initializedBlockNumber: BigInt!
+  initializeTimestamp: BigInt!
+  minSellerStake: BigInt!
+
+  "Number of contracts including archived"
+  contractCount: Int!
+  "Number of not archived contracts"
+  contractActiveCount: Int!
+  "Number of archived contracts"
+  contractArchivedCount: Int!
+
+  "Number of contracts offered for sale now including resellable ones. Might be not up-do-date due to auto-closeout"
+  contractAvailableCount: Int!
+  "Number of available resellable contracts. Might be not up-do-date due to auto-closeout"
+  contractAvailableResellableCount: Int!
+  "Number of contracts that are running. Might be not up-do-date due to auto-closeout"
+  contractRunningCount: Int!
+
+  # market participants
+  sellerCount: Int!
+  buyerCount: Int!
+  validatorCount: Int!
+
+  # purchase stats
+  purchaseCount: Int!
+  resellCount: Int!
+  closeoutCount: Int!
+
+  # hashrate stats
+  "Total amount of hashrate sold in hashes"
+  hashesSold: BigInt!
+  "Amount of hashrate available for sale"
+  hashrateAvailable: BigInt!
+  "Amount of hashrate running"
+  hashrateRunning: BigInt!
+  "Amount of hashrate total"
+  hashrateTotal: BigInt!
+
+  "Total value of transactions in USDC"
+  transactionValueUSDC: BigInt!
+  "Total value of transactions in LMR"
+  transactionValueLMR: BigInt!
+}
+
+type Seller @entity(immutable: false) {
+  id: Bytes!
+  address: Bytes!
+  stake: BigInt!
+  registeredTimestamp: BigInt!
+  registeredBlockNumber: BigInt!
+  contracts: [Implementation!]!
+
+  # contracts
+  contractCount: Int!
+  contractActiveCount: Int!
+  contractArchivedCount: Int!
+
+  contractAvailableCount: Int!
+  contractRunningCount: Int!
+
+  # earnings
+  earningsUSDC: BigInt!
+
+  # hashrate stats
+  "Total amount of hashrate sold in hashes"
+  hashesSold: BigInt!
+  "Amount of hashrate available for sale in H/s"
+  hashrateAvailable: BigInt!
+  "Amount of hashrate running in H/s"
+  hashrateRunning: BigInt!
+  "Amount of hashrate total in H/s"
+  hashrateTotal: BigInt!
+
+  # purchase stats
+  "Number of contracts sold including resale"
+  saleCount: Int!
+  "Number of contracts resold"
+  resaleCount: Int!
+  "Number of contracts closed early"
+  earlyCloseoutCount: Int!
+}
+
+type Validator @entity(immutable: false) {
+  id: Bytes!
+  address: Bytes!
+  stake: BigInt!
+  registeredTimestamp: BigInt!
+  registeredBlockNumber: BigInt!
+
+  # contracts
+  "Number of contracts validating now"
+  contractsValidatingCount: Int!
+  "Number of contracts ran till completion"
+  contractsSuccessCount: Int!
+  "Number of contracts closed early"
+  contractsClosedEarlyCount: Int!
+  "Number of contracts validated"
+  contractsValidatedCount: Int!
+
+  # earnings
+  "Total value of transactions "
+  earningsLMR: BigInt!
+
+  # hashrate
+  "Hashrate that is validating now in H/s"
+  hashrateValidatingNow: BigInt!
+  "total validated hashes in hashes"
+  hashesValidated: BigInt!
+}
+
+type Buyer @entity(immutable: false) {
+  id: Bytes!
+  address: Bytes!
+  purchases: [Purchase!]!
+
+  # stats
+  purchaseCount: Int!
+  resellCount: Int!
+  earlyCloseoutCount: Int!
+
+  # hashrate
+  hashratePurchased: BigInt!
+  hashrateResold: BigInt!
+
+  hashesPurchased: BigInt!
+  hashesResold: BigInt!
+}
+
+type Implementation @entity(immutable: false) {
+  id: Bytes!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+
+  _address: Bytes!
+  _terms: Terms!
+  endTime: BigInt!
+  owner: Seller!
+  isResellable: Boolean!
+  isDeleted: Boolean!
+
+  resellChain: [ResellTerms!]!
+  history: [HistoryEvent!]!
+
+  # Stats
+  "Total number of purchases including resells"
+  purchasesCount: Int!
+  "Total number of resells"
+  resellsCount: Int!
+  "Total number of early closeouts"
+  earlyCloseoutsCount: Int!
+}
+
+type Purchase @entity(immutable: false) {
+  id: Bytes!
+  seller: Seller!
+  buyer: Buyer!
+  validator: Validator
+  price: BigInt!
+  fee: BigInt!
+  resellProfitTarget: Int!
+  resellPrice: BigInt!
+  isResell: Boolean!
+  startTime: BigInt!
+}
+
+type Terms @entity(immutable: true) {
+  id: Bytes!
+  _contractAddress: Bytes!
+  _updatedTimestamp: BigInt!
+  _updatedBlockNumber: BigInt!
+  _speed: BigInt!
+  _length: BigInt!
+  _version: BigInt!
+}
+
+type ResellTerms @entity(immutable: false) {
+  id: Bytes!
+  _account: Bytes!
+  _validator: Bytes!
+  _price: BigInt!
+  _fee: BigInt!
+  _startTime: BigInt!
+  _lastSettlementTime: BigInt!
+  _seller: Bytes!
+  _resellPrice: BigInt!
+  _resellProfitTarget: Int!
+  _isResellable: Boolean!
+  _isResellToDefaultBuyer: Boolean!
+}
+
+interface HistoryEvent {
+  id: Bytes!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+  contractAddress: Bytes!
+}
+
+type EventCreated implements HistoryEvent @entity(immutable: true) {
+  id: Bytes!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+  contractAddress: Bytes!
+  _seller: Bytes!
+  _profitTarget: Int!
+  _speed: BigInt!
+  _length: BigInt!
+  _version: BigInt!
+}
+
+type EventArchived implements HistoryEvent @entity(immutable: true) {
+  id: Bytes!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+  contractAddress: Bytes!
+  _seller: Bytes!
+}
+
+type EventUnarchived implements HistoryEvent @entity(immutable: true) {
+  id: Bytes!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+  contractAddress: Bytes!
+  _seller: Bytes!
+}
+
+type EventHardDeleted implements HistoryEvent @entity(immutable: true) {
+  id: Bytes!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+  contractAddress: Bytes!
+  _seller: Bytes!
+}
+
+type EventPurchased implements HistoryEvent @entity(immutable: true) {
+  id: Bytes!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+  contractAddress: Bytes!
+  _buyer: Bytes!
+  _validator: Bytes!
+  _seller: Bytes!
+  _price: BigInt!
+  _fee: BigInt!
+  _isResell: Boolean!
+  _isResellToDefaultBuyer: Boolean!
+  _isResellable: Boolean!
+  _resellProfitTarget: Int!
+  _resellPrice: BigInt!
+}
+
+type EventCloseout implements HistoryEvent @entity(immutable: true) {
+  id: Bytes!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+  contractAddress: Bytes!
+  _buyer: Bytes!
+  _validator: Bytes!
+  _seller: Bytes!
+  _reason: Int!
+}
+
+type EventProfitTargetUpdated implements HistoryEvent @entity(immutable: true) {
+  id: Bytes!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+  contractAddress: Bytes!
+  _profitTarget: Int!
+}
+
+type EventTermsUpdated implements HistoryEvent @entity(immutable: true) {
+  id: Bytes!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+  contractAddress: Bytes!
+  _speed: BigInt!
+  _length: BigInt!
+  _version: BigInt!
+}
+
+type EventDestinationUpdated implements HistoryEvent @entity(immutable: true) {
+  id: Bytes!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+  contractAddress: Bytes!
+  _validatorURL: String!
+  _destURL: String!
+}
+
+type EventFundsClaimed implements HistoryEvent @entity(immutable: true) {
+  id: Bytes!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+  contractAddress: Bytes!
+}

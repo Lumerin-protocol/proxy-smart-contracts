@@ -36,19 +36,33 @@ export class SafeWallet {
   async proposeTransaction(data: MetaTransactionData): Promise<string> {
     const signer = await this.initSigner();
     const safeTransaction = await signer.createTransaction({
-      transactions: [data],
+      transactions: [
+        {
+          ...data,
+          ...(data.to ? { to: getAddress(data.to) } : {}),
+        },
+      ],
     });
 
     const safeTxHash = await signer.getTransactionHash(safeTransaction);
     const signature = await signer.signHash(safeTxHash);
 
-    await this.safeApiKit.proposeTransaction({
-      safeAddress: this.safeAddr,
+    console.log("Proposing transaction to Safe...");
+    console.log({
+      safeAddress: getAddress(this.safeAddr),
       safeTransactionData: safeTransaction.data,
       safeTxHash,
       senderAddress: getAddress(this.wallet.account.address),
       senderSignature: signature.data,
-      origin: "0x",
+    });
+
+    await this.safeApiKit.proposeTransaction({
+      safeAddress: getAddress(this.safeAddr),
+      safeTxHash,
+      safeTransactionData: safeTransaction.data,
+      senderAddress: getAddress(this.wallet.account.address),
+      senderSignature: signature.data,
+      origin: "Lumerin deployer",
     });
 
     return safeTxHash;
@@ -66,5 +80,5 @@ export class SafeWallet {
 const chainIdSafePrefixMap = {
   [sepolia.id]: "sep",
   [mainnet.id]: "eth",
-  [arbitrum.id]: "arb",
+  [arbitrum.id]: "arb1",
 } as Record<number, string>;

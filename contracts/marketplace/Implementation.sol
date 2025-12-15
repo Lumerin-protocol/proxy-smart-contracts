@@ -44,7 +44,7 @@ contract Implementation is Versionable, ContextUpgradeable {
     uint32 private failCount;
 
     uint8 public constant VALIDATOR_FEE_DECIMALS = 18;
-    string public constant VERSION = "2.0.8"; // This will be replaced during build time
+    string public constant VERSION = "2.0.8";
 
     // shared between all contract instances, and updated altogether with the implementation
     HashrateOracle public immutable hashrateOracle;

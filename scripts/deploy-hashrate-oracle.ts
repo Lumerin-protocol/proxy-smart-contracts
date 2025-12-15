@@ -72,12 +72,15 @@ async function main() {
     [hashrateOracleImpl.address, encodedInitFn]
   );
   console.log("Deployed at:", proxy.address);
-  await verifyContract(proxy.address, [hashrateOracleImpl.address, encodedInitFn]);
   // Get the proxy contract instance
   const hashrateOracle = await viem.getContractAt("HashrateOracle", proxy.address);
   console.log("Version:", await hashrateOracle.read.VERSION());
 
   console.log();
+
+  const safeTTL = 3n * 3600n;
+  await hashrateOracle.write.setTTL([safeTTL, safeTTL]);
+  console.log("ttl is set to", safeTTL);
 
   // Transfer ownership to the owner address
   if (SAFE_OWNER_ADDRESS) {
