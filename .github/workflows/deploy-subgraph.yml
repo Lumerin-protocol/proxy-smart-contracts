@@ -169,7 +169,7 @@ jobs:
           echo "   Start Block Hashrate Oracle: ${START_BLOCK_HASHRATE_ORACLE}"
           echo "   Polling Block Interval: ${HASHRATE_ORACLE_POLLING_BLOCK_INTERVAL}"
           
-          yarn prepare
+          yarn prepare:env
           
           echo "✅ Subgraph configuration ready"
           echo "📄 Generated subgraph.yaml:"

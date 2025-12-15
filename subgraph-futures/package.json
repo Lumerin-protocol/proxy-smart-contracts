@@ -4,7 +4,7 @@
   "scripts": {
     "clean": "rm -rf data generated build",
     "codegen": "graph codegen",
-    "prepare": "envsubst < subgraph.template.yaml > subgraph.yaml",
+    "prepare:env": "envsubst < subgraph.template.yaml > subgraph.yaml",
     "prepare-local": "set -a && source .env && set +a && envsubst < subgraph.template.yaml > subgraph.yaml",
     "build": "graph build",
     "deploy": "graph deploy --node https://api.studio.thegraph.com/deploy/ hr-futures",
