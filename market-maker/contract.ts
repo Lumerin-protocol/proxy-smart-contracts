@@ -44,6 +44,10 @@ export class FuturesContract {
     });
   }
 
+  async getETHBalance(): Promise<bigint> {
+    return this.pc.getBalance({ address: this.wc.account.address });
+  }
+
   async approve(amount: bigint): Promise<TxResult> {
     const tokenAddress = await this.pc.readContract({
       address: this.address as `0x${string}`,
@@ -164,4 +168,6 @@ export class FuturesContract {
 type TxResult = {
   blockNumber: bigint;
   transactionHash: `0x${string}`;
+  gasUsed: bigint;
+  effectiveGasPrice: bigint;
 };

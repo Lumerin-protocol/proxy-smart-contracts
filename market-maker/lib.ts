@@ -26,3 +26,7 @@ export function abs(x: bigint): bigint {
 export function roundToNearest(value: bigint, increment: bigint): bigint {
   return ((value + increment / 2n) / increment) * increment;
 }
+
+export function getGasFee(tx: { gasUsed: bigint; effectiveGasPrice: bigint }): bigint {
+  return tx.gasUsed * tx.effectiveGasPrice;
+}

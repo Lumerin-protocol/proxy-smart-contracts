@@ -2,7 +2,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { Subgraph } from "./subgraph.ts";
 import pino from "pino";
 import { FuturesContract } from "./contract.ts";
-import { NowSeconds, mult, wait, clamp, abs, roundToNearest } from "./lib.ts";
+import { NowSeconds, mult, wait, clamp, abs, roundToNearest, getGasFee } from "./lib.ts";
 import {
   resampleHourlyClose,
   realizedVolatility,
@@ -36,9 +36,7 @@ export async function main() {
     nowSeconds - volatilityDurationSeconds,
     nowSeconds
   );
-  console.log(`Historical prices: `, historicalPrices);
   const resampledPrices = resampleHourlyClose(historicalPrices, 3600);
-  console.log(`Resampled prices: `, resampledPrices);
   const { sigmaPerStep: volatilityPerHour } = realizedVolatility(resampledPrices);
   log.info(`Volatility per hour: ${volatilityPerHour}`);
   log.info(`Risk aversion: ${config.RISK_AVERSION}`);
@@ -74,6 +72,8 @@ export async function main() {
     // 	•	Continuously read the best bid, best ask, and last traded price for the gold futures you care about.
     const marginAccountBalance = await contract.getBalance();
     log.info(`Margin account balance: $${formatUnits(marginAccountBalance, 6)}`);
+    const remainingGas = await contract.getETHBalance();
+    log.info(`Remaining gas: $${formatUnits(remainingGas, 18)} ETH`);
 
     const indexPrice = await contract.getIndexPrice();
     log.info(`Index price: ${indexPrice}`);
@@ -185,8 +185,17 @@ export async function main() {
       deliveryDate: BigInt(deliveryDate),
     }));
 
-    const { blockNumber } = await contract.placeOrders(ordersToPlaceWithDeliveryDate);
-    log.info(`Orders placed: Block number: ${blockNumber}`);
+    if (ordersToPlaceWithDeliveryDate.length > 0) {
+      const rec = await contract.placeOrders(ordersToPlaceWithDeliveryDate);
+      log.info(
+        `Orders placed: Block number: ${rec.blockNumber}, gas fee: ${formatUnits(
+          getGasFee(rec),
+          18
+        )} ETH`
+      );
+    } else {
+      log.info(`No orders to place, skipping...`);
+    }
 
     // 5. Wait for someone to fill the orders and create a position, or loop interval
     await Promise.race([
