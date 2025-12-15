@@ -12,6 +12,4 @@ RUN yarn install --frozen-lockfile --production
 COPY abi/ ./abi/
 COPY *.ts ./
 
-# Run the application with Node.js native TypeScript support
-# Node 24+ supports --experimental-strip-types for running .ts files directly
-CMD ["node", "--experimental-strip-types", "index.ts"]
+CMD ["node", "index.ts"]
