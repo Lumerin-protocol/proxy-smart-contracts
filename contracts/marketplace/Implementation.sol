@@ -8,8 +8,6 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { CloneFactory } from "./CloneFactory.sol";
 import { HashrateOracle } from "./HashrateOracle.sol";
 import { Versionable } from "../util/versionable.sol";
-import { ResellFlags } from "./lib.sol";
-// import { console } from "hardhat/console.sol";
 
 /// @title Implementation
 /// @author Oleksandr (Shev) Shevchuk (Lumerin)
@@ -21,19 +19,32 @@ import { ResellFlags } from "./lib.sol";
 ///      - Contract terms management and updates
 ///      - Historical record keeping
 contract Implementation is Versionable, ContextUpgradeable {
+    address private __gap1;
+    address private __gap2;
+    address private __gap3;
+    address private __gap4;
+
     Terms public terms; // the terms of the contract
     Terms public futureTerms; // the terms of the contract to be applied after the current contract is closed
+    uint256 public startingBlockTimestamp; // time of last purchase, is set to 0 when payment is resolved
+    uint256 public validatorFeeRateScaled; // the fee rate for the validator, scaled by VALIDATOR_FEE_MULT, considering decimals
+    address public buyer; // buyer of the contract
+    address public seller; // seller of the contract
+    address public validator; // validator, can close out contract early, if empty - no validator (buyer node)
+    bool private __gap5; // not used
     bool public isDeleted; // used to track if the contract is deleted
 
-    string public pubKey; // public key of the seller used to encrypt the destination URL
+    string public pubKey; // encrypted data for pool target info
+    string public encrValidatorURL; // if using own validator (buyer-node) this will be the encrypted buyer address. Encrypted with the seller's public key
+    string public encrDestURL; // where to redirect the hashrate after validation (for both third-party validator and buyer-node) If empty, then the hashrate will be redirected to the default pool of the buyer node
 
-    uint32 public successCount;
-    uint32 public failCount;
-
-    ResellTerms[] public resellChain; // terms keep the tip of the resell chain
+    uint256 private __gap6; // not used
+    HistoryEntry[] public history; // TODO: replace this struct with querying logs from a blockchain node
+    uint32 private successCount;
+    uint32 private failCount;
 
     uint8 public constant VALIDATOR_FEE_DECIMALS = 18;
-    string public constant VERSION = "3.0.3"; // This will be replaced during build time
+    string public constant VERSION = "2.0.8";
 
     // shared between all contract instances, and updated altogether with the implementation
     HashrateOracle public immutable hashrateOracle;
@@ -55,57 +66,30 @@ contract Implementation is Versionable, ContextUpgradeable {
         ShareTimeout
     }
 
-    // ResellTerms is a struct that stores the terms of the each resell of the contract
-    // Each entry has one part - purchase terms (buyer,price,fee,destination,validator)
-    // and another part - resell terms (profitTarget)
-    struct ResellTerms {
-        // purchase terms
-        address _buyer;
-        address _validator;
+    struct Terms {
+        uint256 _price; // price of the current running contract at the time of purchase, 0 if contract is not running
+        uint256 _fee; // fee of the current running contract at the time of purchase
+        uint256 _speed; // hashes/second
+        uint256 _length; // seconds
+        uint32 _version;
+        int8 _profitTarget; // profit target in percentage, 10 means the price will be 10% higher than the mining price
+    }
+
+    struct HistoryEntry {
+        uint256 _purchaseTime;
+        uint256 _endTime;
         uint256 _price;
         uint256 _fee;
-        uint256 _startTime;
-        string _encrDestURL;
-        string _encrValidatorURL;
-        uint256 _lastSettlementTime; // timestamp when the contract was settled last time
-        // resell terms
-        address _seller; // seller of the contract !== account when there is a default buyer
-        uint256 _resellPrice; // fixed price of the resell, has priority over profit target
-        int8 _resellProfitTarget; // if resellPrice is not set then use profit target
-        bool _isResellable;
-        bool _isResellToDefaultBuyer; // indicates that this resell is to the default buyer, so if anyone buys the contract, they buy it from the reseller
-    }
-
-    /// @dev terms of the contract that are fixed between resells
-    /// @param _speed hashrate of the contract in hashes/second
-    /// @param _length duration of the contract in seconds
-    /// @param _version to prevent frontrunning terms update when purchase tx is discovered
-    struct Terms {
         uint256 _speed;
         uint256 _length;
-        uint32 _version;
+        address _buyer;
+        address _validator;
     }
 
-    // event meant to replace querying contract history
-    event contractPurchased(
-        address indexed _buyer,
-        address indexed _validator,
-        address indexed _seller,
-        uint256 _price,
-        uint256 _fee,
-        uint256 _resellPrice,
-        ResellFlags _resellFlags
-    );
-
-    event contractClosedEarly(
-        address indexed _buyer,
-        address indexed _validator,
-        address indexed _seller,
-        CloseReason _reason,
-        ResellFlags _resellFlags
-    );
+    event contractPurchased(address indexed _buyer);
+    event closedEarly(CloseReason _reason);
+    event purchaseInfoUpdated(address indexed _address); // emitted on either terms or futureTerms update
     event destinationUpdated(string newValidatorURL, string newDestURL);
-    event contractTermsUpdated(uint256 _speed, uint256 _length, uint32 _version);
     event fundsClaimed();
 
     /// @param _cloneFactory Address of the clone factory for access control
@@ -123,109 +107,163 @@ contract Implementation is Versionable, ContextUpgradeable {
     /// @notice Initializes the contract with basic parameters
     /// @param _seller Address of the seller of the contract
     /// @param _pubKey Encrypted data for pool target info
-    /// @param _speed Hashrate of the contract, hashes/second
+    /// @param _speed Hashrate of the contract
     /// @param _length Length of the contract in seconds
     /// @param _profitTarget Profit target in percentage (e.g., 10 means 10% higher than mining price)
     function initialize(address _seller, string calldata _pubKey, uint256 _speed, uint256 _length, int8 _profitTarget)
         external
         initializer
     {
+        terms = Terms(0, 0, _speed, _length, 0, _profitTarget);
+        seller = _seller;
         pubKey = _pubKey;
-        terms = Terms(_speed, _length, 0);
-        // seller = _seller;
-        resellChain.push(
-            ResellTerms({
-                _buyer: _seller,
-                // buy terms
-                _validator: address(0),
-                _price: 0,
-                _fee: 0,
-                _startTime: 0,
-                _encrDestURL: "",
-                _encrValidatorURL: "",
-                _lastSettlementTime: 0,
-                // resell terms
-                _isResellable: true,
-                _seller: _seller,
-                _resellPrice: 0,
-                _resellProfitTarget: _profitTarget,
-                _isResellToDefaultBuyer: false
-            })
+    }
+
+    /// @notice Returns the current state of the contract
+    /// @return The current contract state (Available or Running)
+    function contractState() public view returns (ContractState) {
+        uint256 expirationTime = startingBlockTimestamp + terms._length;
+        if (block.timestamp < expirationTime) {
+            return ContractState.Running;
+        }
+        return ContractState.Available;
+    }
+
+    /// @notice Returns all public variables of the contract
+    /// @return _state Current contract state
+    /// @return _terms Current contract terms
+    /// @return _startingBlockTimestamp When the contract started
+    /// @return _buyer Address of the buyer
+    /// @return _seller Address of the seller
+    /// @return _encryptedPoolData Encrypted pool data
+    /// @return _isDeleted Whether the contract is deleted
+    /// @return _balance Current balance of the contract
+    /// @return _hasFutureTerms Whether there are future terms set
+    function getPublicVariablesV2()
+        external
+        view
+        returns (
+            ContractState _state,
+            Terms memory _terms,
+            uint256 _startingBlockTimestamp,
+            address _buyer,
+            address _seller,
+            string memory _encryptedPoolData,
+            // TODO: add this in the next release string memory _encryptedDestURL,
+            bool _isDeleted,
+            uint256 _balance,
+            bool _hasFutureTerms
+        )
+    {
+        bool hasFutureTerms = futureTerms._length != 0;
+        Terms memory __terms = terms;
+        __terms._price = priceUnchecked();
+        __terms._fee = getValidatorFee(__terms._price, getValidatorFeeRateScaled());
+        return (
+            contractState(),
+            __terms,
+            startingBlockTimestamp,
+            buyer,
+            seller,
+            encrValidatorURL,
+            isDeleted,
+            paymentToken.balanceOf(address(this)),
+            hasFutureTerms
         );
+    }
+
+    /// @notice Returns the contract history entries
+    /// @param _offset Starting index for history entries
+    /// @param _limit Maximum number of entries to return
+    /// @return Array of history entries
+    function getHistory(uint256 _offset, uint8 _limit) external view returns (HistoryEntry[] memory) {
+        if (_offset > history.length) {
+            _offset = history.length;
+        }
+        if (_offset + _limit > history.length) {
+            _limit = uint8(history.length - _offset);
+        }
+
+        HistoryEntry[] memory values = new HistoryEntry[](_limit);
+        for (uint256 i = 0; i < _limit; i++) {
+            // return values in reverse historical for displaying purposes
+            values[i] = history[history.length - 1 - _offset - i];
+        }
+
+        return values;
+    }
+
+    /// @notice Returns statistics about successful and failed contracts
+    /// @return _successCount Number of successful contracts
+    /// @return _failCount Number of failed contracts
+    function getStats() external view returns (uint256 _successCount, uint256 _failCount) {
+        return (successCount, failCount);
     }
 
     /// @dev function that the clone factory calls to purchase the contract
     /// @dev the payment should be transeferred after calling this function
-    /// @param _buyer buyer of the contract
-    /// @param _seller reseller of the contract, if default buyer is used, it will be the original reseller
     function setPurchaseContract(
         string calldata _encrValidatorURL,
         string calldata _encrDestURL,
         uint256 _price,
-        uint256 _fee,
         address _buyer,
-        address _seller,
         address _validator,
-        ResellFlags calldata _resellFlags,
-        uint256 _resellPrice
+        uint256 _validatorFeeRateScaled
     ) external onlyCloneFactory {
         require(contractState() == ContractState.Available, "contract is not in an available state");
 
-        resellChain.push(
-            ResellTerms({
-                _buyer: _buyer,
-                // buy terms
-                _validator: _validator,
-                _price: _price,
-                _fee: _fee,
-                _startTime: block.timestamp,
-                _encrDestURL: _encrDestURL,
-                _encrValidatorURL: _encrValidatorURL,
-                _lastSettlementTime: block.timestamp,
-                // resell terms
-                _isResellable: _resellFlags.isResellable,
-                _seller: _seller,
-                _resellPrice: _resellPrice,
-                _resellProfitTarget: 0,
-                _isResellToDefaultBuyer: _resellFlags.isResellToDefaultBuyer
-            })
-        );
-        // console.log("\n\nadded to resellChain", resellChain.length);
-        // console.log("resellChain[0]._account", _buyer);
-        // console.log("resellChain[0]._seller", _seller);
-        // console.log("resellChain[0]._validator", _validator);
-        // console.log("resellChain[0]._price", _price);
-        // console.log("resellChain[0]._fee", _fee);
-        // console.log("resellChain[0]._startTime", block.timestamp);
-        // console.log("resellChain[0]._lastSettlementTime", block.timestamp);
-        // console.log("resellChain[0]._isResellable", _resellFlags.isResellable);
-        // console.log("resellChain[0]._isResellToDefaultBuyer", _resellFlags.isResellToDefaultBuyer);
+        (uint256 a, uint256 b, uint256 c, uint256 d) = getPayments(false);
+        maybeApplyFutureTerms();
+
+        buyer = _buyer;
+        terms._price = _price;
+        validator = _validator;
+        encrDestURL = _encrDestURL;
+        encrValidatorURL = _encrValidatorURL;
+        startingBlockTimestamp = block.timestamp;
+        validatorFeeRateScaled = _validatorFeeRateScaled;
 
         successCount++;
+        history.push(
+            HistoryEntry(
+                block.timestamp,
+                block.timestamp + terms._length,
+                terms._price,
+                getValidatorFee(_price, _validatorFeeRateScaled),
+                terms._speed,
+                terms._length,
+                _buyer,
+                _validator
+            )
+        );
 
-        emit contractPurchased(_buyer, _validator, _seller, _price, _fee, _resellPrice, _resellFlags);
+        sendPayments(a, b, c, d);
+
+        emit contractPurchased(_msgSender());
     }
 
     /// @notice Updates the mining destination during contract execution
     /// @param _encrValidatorURL New encrypted validator URL
     /// @param _encrDestURL New encrypted destination URL
     function setDestination(string calldata _encrValidatorURL, string calldata _encrDestURL) external {
-        ResellTerms storage latestResell = _getLatestResell();
-        require(_msgSender() == latestResell._buyer, "not authorized");
-        require(contractState() == ContractState.Running, "not running");
-        latestResell._encrValidatorURL = _encrValidatorURL;
-        latestResell._encrDestURL = _encrDestURL;
+        require(_msgSender() == buyer, "this account is not authorized to update the ciphertext information");
+        require(contractState() == ContractState.Running, "the contract is not in the running state");
+        encrDestURL = _encrDestURL;
+        encrValidatorURL = _encrValidatorURL;
         emit destinationUpdated(_encrValidatorURL, _encrDestURL);
     }
 
     /// @dev function to be called by clonefactory which can edit the cost, length, and hashrate of a given contract
-    function setTerms(uint256 _speed, uint256 _length) external onlyCloneFactory {
+    function setUpdatePurchaseInformation(uint256 _speed, uint256 _length, int8 _profitTarget)
+        external
+        onlyCloneFactory
+    {
         if (contractState() == ContractState.Running) {
-            futureTerms = Terms(_speed, _length, terms._version + 1);
+            futureTerms = Terms(0, 0, _speed, _length, terms._version + 1, _profitTarget);
         } else {
-            terms = Terms(_speed, _length, terms._version + 1);
+            terms = Terms(0, 0, _speed, _length, terms._version + 1, _profitTarget);
         }
-        emit contractTermsUpdated(_speed, _length, terms._version + 1);
+        emit purchaseInfoUpdated(address(this));
     }
 
     /// @dev this function is used to calculate the validator fee for the contract
@@ -235,7 +273,13 @@ contract Implementation is Versionable, ContextUpgradeable {
     }
 
     function getValidatorFeeRateScaled() private view returns (uint256) {
-        return cloneFactory.validatorFeeRateScaled();
+        // if contract is available, use the validator fee rate from the clone factory
+        if (contractState() == ContractState.Available) {
+            return cloneFactory.validatorFeeRateScaled();
+        }
+
+        // if contract is running, use the validator fee rate from the contract terms, as they are fixed for the duration of the contract
+        return validatorFeeRateScaled;
     }
 
     function setContractDeleted(bool _isDeleted) external onlyCloneFactory {
@@ -245,59 +289,20 @@ contract Implementation is Versionable, ContextUpgradeable {
     /// @notice Resolves the payments for contract/validator that are due.
     /// @notice Can be called during contract execution, then returns funds for elapsed time for current contract
     /// @dev Can be called from any address, but the seller reward will be sent to the seller
-    function claimFunds() public payable {
-        bool paid = false;
+    function claimFunds() external payable {
+        (uint256 a, uint256 b, uint256 c, uint256 d) = getPayments(false);
+        bool paid = sendPayments(a, b, c, d);
+        require(paid, "no funds to withdraw");
+        emit fundsClaimed();
+    }
 
-        uint256 endTime = getEndTime();
-
-        for (uint256 i = resellChain.length; i > 1; i--) {
-            ResellTerms storage resell = resellChain[i - 1];
-
-            bool isDefaultBuyer = resell._seller != resell._buyer;
-            // console.log("\n\n");
-            // console.log("now", block.timestamp);
-            // console.log("i", i);
-            // console.log("resellChain.length", resellChain.length);
-            // console.log("resell._buyer", resell._buyer);
-            // console.log("resell._seller", resell._seller);
-            // console.log("resell._validator", resell._validator);
-            // console.log("resell._price", resell._price);
-            // console.log("resell._fee", resell._fee);
-            // console.log("resell._startTime", resell._startTime);
-            // console.log("resell._lastSettlementTime", resell._lastSettlementTime);
-            // console.log("resell._isResellable", resell._isResellable);
-            // console.log("resell._isResellToDefaultBuyer", resell._isResellToDefaultBuyer);
-            // console.log("resell._resellProfitTarget");
-            // console.logInt(resell._resellProfitTarget);
-            // console.log("endTime", getEndTime());
-            // console.log("isDefaultBuyer", isDefaultBuyer);
-            // console.log();
-
-            if (resell._buyer == address(0)) {
-                break;
-            }
-            ResellTerms memory _seller = resellChain[i - 2];
-
-            (uint256 a, uint256 b, uint256 c, uint256 d) = getPayments(isDefaultBuyer, resell);
-            // if it is a resell to default buyer, then it will be settled fully when the real buyer purchases the contract
-            resell._lastSettlementTime = isDefaultBuyer ? endTime : block.timestamp;
-            if (sendPayments(a, b, c, d, _seller._seller, resell._validator, resell._buyer)) {
-                paid = true;
-            }
-        }
-
-        if (endTime > 0 && block.timestamp >= endTime) {
-            // console.log("===End of contract,removing history");
-            for (; resellChain.length > 1;) {
-                resellChain.pop();
-            }
-        }
-
-        if (paid) {
-            emit fundsClaimed();
-        }
-
-        maybeApplyFutureTerms();
+    /// @notice Resolves the payments for contract/validator that are due.
+    /// @dev same as claimFunds, kept for backwards compatibility
+    function claimFundsValidator() external {
+        (uint256 a, uint256 b, uint256 c, uint256 d) = getPayments(false);
+        bool paid = sendPayments(a, b, c, d);
+        require(paid, "no funds to withdraw");
+        emit fundsClaimed();
     }
 
     /// @notice Returns the current price and validator fee for the contract
@@ -311,116 +316,76 @@ contract Implementation is Versionable, ContextUpgradeable {
 
     /// @notice Returns the estimated price of the contract in the payment token
     function price() private view returns (uint256) {
-        if (_getLatestResell()._resellPrice > 0) {
-            return _getLatestResell()._resellPrice;
-        }
-        return priceV2(_getLatestResell()._resellProfitTarget);
-    }
-
-    // terms with length of the contract run
-    function priceV2(int8 _profitTarget) public view returns (uint256) {
         uint256 hashesForToken = hashrateOracle.getHashesforToken();
-        uint256 endTime = getEndTime();
-        uint256 remainingTime;
-        if (endTime < block.timestamp) {
-            remainingTime = terms._length;
-        } else {
-            remainingTime = endTime - block.timestamp;
-        }
-
-        uint256 priceInToken = (remainingTime * terms._speed) / hashesForToken;
-        int256 priceInTokenWithProfit = int256(priceInToken) + (int256(priceInToken) * int256(_profitTarget)) / 100;
+        uint256 priceInToken = (terms._length * terms._speed) / hashesForToken;
+        int256 priceInTokenWithProfit =
+            int256(priceInToken) + (int256(priceInToken) * int256(terms._profitTarget)) / 100;
 
         return priceInTokenWithProfit < 0 ? 0 : uint256(priceInTokenWithProfit);
     }
 
     function priceUnchecked() private view returns (uint256) {
-        ResellTerms storage latestPurchase = _getLatestResell();
-
         uint256 hashesForToken = hashrateOracle.getHashesForTokenUnchecked();
         uint256 priceInToken = (terms._length * terms._speed) / hashesForToken;
         int256 priceInTokenWithProfit =
-            int256(priceInToken) + (int256(priceInToken) * int256(latestPurchase._resellProfitTarget)) / 100;
+            int256(priceInToken) + (int256(priceInToken) * int256(terms._profitTarget)) / 100;
 
         return priceInTokenWithProfit < 0 ? 0 : uint256(priceInTokenWithProfit);
     }
 
     function maybeApplyFutureTerms() private {
-        if (!isReselling() && futureTerms._version != 0) {
-            terms = Terms(futureTerms._speed, futureTerms._length, futureTerms._version);
-            futureTerms = Terms(0, 0, 0);
-            emit contractTermsUpdated(futureTerms._speed, futureTerms._length, futureTerms._version);
+        if (futureTerms._version != 0) {
+            terms =
+                Terms(0, 0, futureTerms._speed, futureTerms._length, futureTerms._version, futureTerms._profitTarget);
+            futureTerms = Terms(0, 0, 0, 0, 0, 0);
+            emit purchaseInfoUpdated(address(this));
         }
     }
-
-    //TODO: add maybeApplyFutureProfitTarget that should work for every reseller
-    // fucntion maybeApplyFutureProfitTarget()
 
     /// @notice Allows the buyer or validator to close out the contract early
     /// @param reason The reason for the early closeout
     function closeEarly(CloseReason reason) external {
-        ResellTerms memory latestPurchase = _getLatestResell();
-        // console.log("latestBuyer", latestPurchase._buyer);
-
         require(
-            _msgSender() == latestPurchase._buyer || _msgSender() == latestPurchase._validator,
+            _msgSender() == buyer || _msgSender() == validator,
             "this account is not authorized to trigger an early closeout"
         );
-        require(block.timestamp < getEndTime(), "the contract is not in the running state");
+        require(contractState() == ContractState.Running, "the contract is not in the running state");
 
+        HistoryEntry storage historyEntry = history[history.length - 1];
+        historyEntry._endTime = block.timestamp;
         successCount--;
         failCount++;
 
-        (uint256 a, uint256 b, uint256 c, uint256 d) = getPayments(true, latestPurchase);
+        (uint256 a, uint256 b, uint256 c, uint256 d) = getPayments(true);
 
+        setPaymentResolved();
         maybeApplyFutureTerms();
 
-        resellChain.pop();
-
-        ResellTerms storage _latestResell = _getLatestResell();
-        // console.log("updated seller", _latestResell._buyer);
-        emit contractClosedEarly(
-            latestPurchase._buyer,
-            latestPurchase._validator,
-            _latestResell._buyer,
-            reason,
-            ResellFlags({
-                isResellable: _latestResell._isResellable,
-                isResellToDefaultBuyer: _latestResell._isResellToDefaultBuyer
-            })
-        );
-        sendPayments(a, b, c, d, _latestResell._buyer, latestPurchase._validator, latestPurchase._buyer);
-        if (_latestResell._isResellToDefaultBuyer) {
-            _latestResell._lastSettlementTime = block.timestamp;
-        }
-        claimFunds();
+        emit closedEarly(reason);
+        sendPayments(a, b, c, d);
     }
 
     /// @dev Pays the parties according to the payment struct
+    /// @dev Removed the events, cause Transfer events emitted anyway
     /// @dev split into two functions (getPayments and sendPayments) to better fit check-effect-interaction pattern
-    function getPayments(bool isCloseout, ResellTerms memory p)
-        private
-        view
-        returns (uint256, uint256, uint256, uint256)
-    {
-        bool hasValidator = p._validator != address(0);
-        uint256 deliveredPayment = getDeliveredPayment(p);
-        uint256 deliveredFee = hasValidator ? getDeliveredFee(p) : 0;
-
-        // total undelivered payment and fee for ongoing contract
-        uint256 undeliveredPayment = p._price - deliveredPayment;
-        uint256 undeliveredFee = hasValidator ? p._fee - deliveredFee : 0;
-
-        uint256 totalPurchaseDuration = getEndTime() - p._startTime;
-
-        // avoiding error when _lastSettlementTime is in the future
-        uint256 unpaidDuration = 0;
-        if (p._lastSettlementTime <= block.timestamp) {
-            unpaidDuration = min(block.timestamp, getEndTime()) - p._lastSettlementTime;
+    function getPayments(bool isCloseout) private view returns (uint256, uint256, uint256, uint256) {
+        if (isPaymentResolved()) {
+            return (0, 0, 0, 0);
         }
 
-        uint256 unpaidDeliveredPayment = p._price * unpaidDuration / totalPurchaseDuration;
-        uint256 unpaidDeliveredFee = p._fee * unpaidDuration / totalPurchaseDuration;
+        bool hasValidator = validator != address(0);
+        uint256 deliveredPayment = getDeliveredPayment();
+
+        // total undelivered payment and fee for ongoing contract
+        uint256 undeliveredPayment = terms._price - deliveredPayment;
+        uint256 undeliveredFee = hasValidator ? getValidatorFee(undeliveredPayment, validatorFeeRateScaled) : 0;
+
+        // used to correctly calculate claim when contract is ongoing
+        // total balance of the contract is what seller/validator should have received
+        // we need to subtract the undelivered payment and fee so the buyer could be paid
+        // if they decide to close out the contract early
+        uint256 unpaidDeliveredPayment = paymentToken.balanceOf(address(this)) - undeliveredPayment;
+        uint256 unpaidDeliveredFee = feeToken.balanceOf(address(this)) - undeliveredFee;
 
         if (isCloseout) {
             // refund the buyer for the undelivered payment and fee
@@ -430,124 +395,53 @@ contract Implementation is Versionable, ContextUpgradeable {
         }
     }
 
-    function _getLatestResell() private view returns (ResellTerms storage) {
-        return resellChain[resellChain.length - 1];
-    }
-
-    function getLatestResell() external view returns (ResellTerms memory) {
-        return resellChain[resellChain.length - 1];
-    }
-
-    function getStartTime() private view returns (uint256) {
-        if (resellChain.length <= 1) {
-            return 0;
-        }
-        return resellChain[1]._startTime;
-    }
-
-    /// @notice Returns the current state of the contract
-    /// @return ContractState Current contract state (Available or Running)
-    function contractState() public view returns (ContractState) {
-        ResellTerms memory latestResell = _getLatestResell();
-
-        if (latestResell._isResellable) {
-            return ContractState.Available;
-        }
-        if (latestResell._isResellToDefaultBuyer) {
-            return ContractState.Available;
-        }
-        if (latestResell._buyer == address(0)) {
-            return ContractState.Available;
-        }
-        if (resellChain.length == 1) {
-            return ContractState.Available;
-        }
-        if (block.timestamp >= latestResell._startTime + terms._length) {
-            return ContractState.Available;
-        }
-        return ContractState.Running;
-    }
-
     function sendPayments(
         uint256 sellerPayment,
         uint256 validatorFee,
         uint256 buyerRefundPayment,
-        uint256 buyerRefundFee,
-        address _seller,
-        address _validator,
-        address _buyer
+        uint256 buyerRefundFee
     ) private returns (bool) {
         bool isPaid = false;
 
         if (sellerPayment > 0) {
             isPaid = true;
-            // console.log("===Sending seller payment", sellerPayment, _seller);
-            paymentToken.safeTransfer(_seller, sellerPayment);
+            paymentToken.safeTransfer(seller, sellerPayment);
         }
-        if (validatorFee > 0 && _validator != address(0)) {
+        if (validatorFee > 0) {
             isPaid = true;
-            // console.log("===Sending validator fee", validatorFee, _validator);
-            feeToken.safeTransfer(_validator, validatorFee);
+            feeToken.safeTransfer(validator, validatorFee);
         }
         if (buyerRefundPayment > 0) {
             isPaid = true;
-            // console.log("===Sending buyer refund payment", buyerRefundPayment, _buyer);
-            paymentToken.safeTransfer(_buyer, buyerRefundPayment);
+            paymentToken.safeTransfer(buyer, buyerRefundPayment);
         }
         if (buyerRefundFee > 0) {
             isPaid = true;
-            // console.log("===Sending buyer refund fee", buyerRefundFee, _buyer);
-            feeToken.safeTransfer(_buyer, buyerRefundFee);
+            feeToken.safeTransfer(buyer, buyerRefundFee);
         }
 
         return isPaid;
     }
 
     /// @dev Amount of payment token that should be paid seller from the start of the contract till the current time
-    // TODO: inline getDeliveredPayment and getDeliveredFee
-    function getDeliveredPayment(ResellTerms memory p) private view returns (uint256) {
-        uint256 elapsedContractTime = (block.timestamp - p._startTime);
-        uint256 resellLength = getEndTime() - p._startTime;
-
-        if (block.timestamp >= getEndTime()) {
-            return p._price;
+    function getDeliveredPayment() private view returns (uint256) {
+        uint256 elapsedContractTime = (block.timestamp - startingBlockTimestamp);
+        if (elapsedContractTime <= terms._length) {
+            return (terms._price * elapsedContractTime) / terms._length;
         }
-        return p._price * elapsedContractTime / resellLength;
+        return terms._price;
     }
 
-    function getDeliveredFee(ResellTerms memory p) private view returns (uint256) {
-        uint256 elapsedContractTime = (block.timestamp - p._startTime);
-        uint256 resellLength = getEndTime() - p._startTime;
-        if (block.timestamp >= getEndTime()) {
-            return p._fee;
-        }
-        return p._fee * elapsedContractTime / resellLength;
+    /// @dev Returns true if the payment is due. That happens if the contract ran till completion
+    /// @dev but payment was not claimed.
+    function isPaymentResolved() private view returns (bool) {
+        return startingBlockTimestamp == 0;
     }
 
-    function getEndTime() private view returns (uint256) {
-        uint256 startTime = getStartTime();
-        if (startTime == 0) {
-            return 0;
-        }
-        return startTime + terms._length;
-    }
-
-    function seller() public view returns (address) {
-        return _getLatestResell()._seller;
-    }
-
-    /// @notice Returns true if the contract is reselling
-    /// @dev It means that the contract resell chain has at least one reseller
-    function isReselling() public view returns (bool) {
-        return resellChain.length > 1;
-    }
-
-    function owner() public view returns (address) {
-        return resellChain[0]._buyer;
-    }
-
-    function min(uint256 a, uint256 b) private pure returns (uint256) {
-        return a < b ? a : b;
+    /// @dev Indicates that the payment for the last contract run is resolved
+    function setPaymentResolved() private {
+        startingBlockTimestamp = 0;
+        terms._price = 0;
     }
 
     modifier onlyCloneFactory() {

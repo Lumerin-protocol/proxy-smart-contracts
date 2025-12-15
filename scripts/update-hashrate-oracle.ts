@@ -1,6 +1,9 @@
 import { requireEnvsSet } from "../lib/utils";
 import { viem } from "hardhat";
 import { verifyContract } from "./lib/verify";
+import { SafeWallet } from "./lib/safe";
+import { encodeFunctionData } from "viem/utils";
+import { OperationType } from "@safe-global/types-kit";
 
 async function main() {
   console.log("Hashrate Oracle deployment script");
@@ -16,7 +19,7 @@ async function main() {
 
   const SAFE_OWNER_ADDRESS = process.env.SAFE_OWNER_ADDRESS as `0x${string}` | undefined;
 
-  const [deployer] = await viem.getWalletClients();
+  const [deployer, proposer] = await viem.getWalletClients();
   const pc = await viem.getPublicClient();
   console.log("Deployer:", deployer.account.address);
   console.log("Safe owner address:", SAFE_OWNER_ADDRESS);
@@ -47,7 +50,7 @@ async function main() {
 
   console.log();
 
-  console.log("Checking existing HashrateOracle...");
+  // console.log("Checking existing HashrateOracle...");
   const oracleProxy = await viem.getContractAt("HashrateOracle", env.HASHRATE_ORACLE_ADDRESS);
   console.log("Version:", await oracleProxy.read.VERSION());
   console.log("Current implementation:", oracleProxy.address);
@@ -59,21 +62,47 @@ async function main() {
     tokenDecimals,
   ]);
   console.log("Deployed at:", hashrateOracleImpl.address);
-  // const hashrateOracleImpl = await viem.getContractAt(
-  //   "HashrateOracle",
-  //   "0xfd9e680c92514a7d433d10d0ca3f1ffa6f212559"
-  // );
   await verifyContract(hashrateOracleImpl.address, [env.BTCUSDC_ORACLE_ADDRESS, tokenDecimals]);
 
-  const tx = await oracleProxy.write.upgradeToAndCall([hashrateOracleImpl.address, "0x"]);
+  if (SAFE_OWNER_ADDRESS) {
+    console.log();
+    console.log("Proposing upgrade to Safe wallet...");
 
-  await pc.waitForTransactionReceipt({ hash: tx });
-  console.log("Done!");
+    const upgradeData = encodeFunctionData({
+      abi: oracleProxy.abi,
+      functionName: "upgradeToAndCall",
+      args: [hashrateOracleImpl.address, "0x"],
+    });
+
+    const safe = new SafeWallet(SAFE_OWNER_ADDRESS, proposer);
+    const txHash = await safe.proposeTransaction({
+      data: upgradeData,
+      to: env.HASHRATE_ORACLE_ADDRESS,
+      value: "0",
+      operation: OperationType.Call,
+    });
+
+    console.log("Transaction proposed!");
+    console.log("Safe TX Hash:", txHash);
+    console.log("Transaction URL:", safe.getSafeUITxUrl(txHash));
+    await pc.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+  } else {
+    console.log();
+    console.log("Upgrading proxy to new implementation...");
+    const tx = await oracleProxy.write.upgradeToAndCall([hashrateOracleImpl.address, "0x"]);
+
+    await pc.waitForTransactionReceipt({ hash: tx });
+    console.log("Upgrade transaction completed!");
+  }
 
   console.log();
-  const newImpl = await viem.getContractAt("HashrateOracle", env.HASHRATE_ORACLE_ADDRESS);
-  console.log("Version:", await newImpl.read.VERSION());
-  console.log();
+  console.log("Verifying upgrade...");
+  const upgradedOracle = await viem.getContractAt("HashrateOracle", env.HASHRATE_ORACLE_ADDRESS);
+
+  console.log("Hashes for BTC:", await upgradedOracle.read.getHashesForBTCV2());
+  console.log("Hashes for token:", await upgradedOracle.read.getHashesForTokenV2());
+  console.log("Updater address:", await upgradedOracle.read.updaterAddress());
+  console.log("Owner:", await upgradedOracle.read.owner());
 }
 
 main().catch((error) => {

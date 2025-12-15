@@ -205,15 +205,15 @@ export async function deployLocalFixture() {
 
   const cloneFactory = await viem.getContractAt("CloneFactory", cloneFactoryProxy.address);
 
-  await cloneFactory.write.setDefaultBuyer(
-    [
-      defaultBuyer.account.address,
-      cloneFactoryConfig.defaultBuyerProfitTarget,
-      "default.buyer.com:1234",
-      "default.buyer.com:1234",
-    ],
-    { account: owner.account }
-  );
+  // await cloneFactory.write.setDefaultBuyer(
+  //   [
+  //     defaultBuyer.account.address,
+  //     cloneFactoryConfig.defaultBuyerProfitTarget,
+  //     "default.buyer.com:1234",
+  //     "default.buyer.com:1234",
+  //   ],
+  //   { account: owner.account }
+  // );
 
   const implementation = await viem.deployContract(
     "contracts/marketplace/Implementation.sol:Implementation",
@@ -339,43 +339,43 @@ export async function deployLocalFixture() {
   const hashrateContracts: Awaited<ReturnType<typeof getImplementation>>[] = [];
 
   // Create contracts
-  for (const contract of sampleContracts) {
-    for (let i = 0; i < contract.count; i++) {
-      const hash = await cloneFactory.write.setCreateNewRentalContractV2(
-        [
-          BigInt(THPStoHPS(contract.config.speedTHPS)),
-          BigInt(hoursToSeconds(contract.config.lengthHours)),
-          Number(contract.config.profitTargetPercent),
-          await getPublicKey(seller),
-        ],
-        {
-          account: seller.account,
-        }
-      );
+  // for (const contract of sampleContracts) {
+  //   for (let i = 0; i < contract.count; i++) {
+  //     const hash = await cloneFactory.write.setCreateNewRentalContractV2(
+  //       [
+  //         BigInt(THPStoHPS(contract.config.speedTHPS)),
+  //         BigInt(hoursToSeconds(contract.config.lengthHours)),
+  //         Number(contract.config.profitTargetPercent),
+  //         await getPublicKey(seller),
+  //       ],
+  //       {
+  //         account: seller.account,
+  //       }
+  //     );
 
-      const receipt = await pc.waitForTransactionReceipt({ hash });
-      const [event] = parseEventLogs({
-        logs: receipt.logs,
-        abi: cloneFactory.abi,
-        eventName: "contractCreated",
-      });
-      const address = event.args._address;
+  //     const receipt = await pc.waitForTransactionReceipt({ hash });
+  //     const [event] = parseEventLogs({
+  //       logs: receipt.logs,
+  //       abi: cloneFactory.abi,
+  //       eventName: "contractCreated",
+  //     });
+  //     const address = event.args._address;
 
-      const hrContract = await viem.getContractAt("Implementation", address);
+  //     const hrContract = await viem.getContractAt("Implementation", address);
 
-      cloneFactoryConfig.contractAddresses.push(address);
-      hashrateContracts.push(hrContract);
-    }
-  }
+  //     cloneFactoryConfig.contractAddresses.push(address);
+  //     hashrateContracts.push(hrContract);
+  //   }
+  // }
 
-  await buyContract(
-    cloneFactoryConfig.contractAddresses[0],
-    lumerinToken,
-    cloneFactory,
-    buyer,
-    usdcMock,
-    validator
-  );
+  // await buyContract(
+  //   cloneFactoryConfig.contractAddresses[0],
+  //   lumerinToken,
+  //   cloneFactory,
+  //   buyer,
+  //   usdcMock,
+  //   validator
+  // );
   // await buyContract(
   //   cloneFactoryConfig.contractAddresses[1],
   //   lumerinToken,
@@ -413,10 +413,10 @@ export async function deployLocalFixture() {
 
   await tc.increaseTime({ seconds: (sampleContracts[0].config.lengthHours * 3600) / 2 });
 
-  const c1 = await viem.getContractAt("Implementation", cloneFactoryConfig.contractAddresses[0]);
-  await c1.write.closeEarly([0], {
-    account: buyer.account,
-  });
+  // const c1 = await viem.getContractAt("Implementation", cloneFactoryConfig.contractAddresses[0]);
+  // await c1.write.closeEarly([0], {
+  //   account: buyer.account,
+  // });
   // await pc.waitForTransactionReceipt({ hash });
 
   // Return all deployed contracts and accounts

@@ -463,6 +463,12 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
         emit ValidatorURLUpdated(_validatorURL);
     }
 
+    /// @notice Sets the validator address
+    /// @dev Limits access to the functions with onlyValidator modifier
+    function setValidatorAddress(address _validatorAddress) external onlyOwner {
+        validatorAddress = _validatorAddress;
+    }
+
     /// @notice Gets the maintenance margin of a position, the minimum amount of effective margin that is required to avoid a margin call
     function getMaintenanceMarginForPosition(uint256 _entryPricePerDay, int256 _qty) private view returns (uint256) {
         return _entryPricePerDay * deliveryDurationDays * abs(_qty) * getMarginPercent() / 100;
