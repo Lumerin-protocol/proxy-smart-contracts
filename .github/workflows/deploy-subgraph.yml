@@ -23,7 +23,7 @@ on:
 
 permissions:
   id-token: write   # Required for OIDC
-  contents: read
+  contents: write   # Required for creating git tags
 
 env:
   SERVICE_NAME: subgraph-futures
