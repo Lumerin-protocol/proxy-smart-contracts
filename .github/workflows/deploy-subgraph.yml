@@ -237,7 +237,7 @@ jobs:
 
       - name: Install Graph CLI
         run: |
-          npm install -g @graphprotocol/graph-cli
+          npm install -g @graphprotocol/graph-cli@0.98.1
 
       - name: Create subgraph (if not exists)
         working-directory: ./subgraph-futures
