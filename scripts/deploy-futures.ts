@@ -68,8 +68,8 @@ async function main() {
   console.log();
 
   const nearestMonday = new Date();
-  nearestMonday.setDate(nearestMonday.getDate() + 1);
-  nearestMonday.setHours(0, 0, 0, 0);
+  nearestMonday.setUTCDate(nearestMonday.getUTCDate() + 8 - nearestMonday.getUTCDay());
+  nearestMonday.setUTCHours(12, 0, 0, 0);
 
   // Deploy Futures proxy
   console.log("Deploying Futures proxy...");
