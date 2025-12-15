@@ -31,26 +31,29 @@ export function handleBlock(block: ethereum.Block): void {
   const hashesForBTC = ho.try_getHashesForBTC();
   if (hashesForBTC.reverted) {
     log.info("Hashes for BTC reverted", []);
-  } else {
-    log.info("Hashes for BTC {}", [hashesForBTC.value.value.toString()]);
+    return;
   }
 
   const hashesForToken = ho.try_getHashesforToken();
   if (hashesForToken.reverted) {
     log.info("Hashes for Token reverted", []);
-  } else {
-    log.info("Hashes for Token {}", [hashesForToken.value.toString()]);
+    return;
   }
 
+  //TODO: store the latest hashrate index entry ID
+  // and update indexer only if the hashrate index entry is different from the latest one
+  // also considering the timestamp of the latest update
   const hashrateIndexEntry = new HashrateIndex(bigIntToBytes(block.number));
-  hashrateIndexEntry.hashesForBTC = hashesForBTC.reverted
-    ? BigInt.zero()
-    : hashesForBTC.value.value;
-  hashrateIndexEntry.hashesForToken = hashesForToken.reverted
-    ? BigInt.zero()
-    : hashesForToken.value;
+  hashrateIndexEntry.hashesForBTC = hashesForBTC.value.value;
+  hashrateIndexEntry.hashesForToken = hashesForToken.value;
   hashrateIndexEntry.updatedAt = block.timestamp;
   hashrateIndexEntry.blockNumber = block.number;
-  log.info("HashrateIndexEntry saved {} {}", [block.number.toString(), block.timestamp.toString()]);
   hashrateIndexEntry.save();
+
+  log.info("Hashes for BTC: {}, Hashes for Token: {}, Block number: {}, Timestamp: {}", [
+    hashesForBTC.value.value.toString(),
+    hashesForToken.value.toString(),
+    block.number.toString(),
+    block.timestamp.toString(),
+  ]);
 }
