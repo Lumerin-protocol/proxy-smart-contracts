@@ -2,3 +2,4 @@ build
 data
 generated
 subgraph.yaml
+.env
