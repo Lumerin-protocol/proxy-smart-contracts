@@ -235,16 +235,12 @@ jobs:
           aws-region: ${{ needs.build.outputs.aws_region }}
           role-session-name: GitHubActions-Subgraph-${{ github.run_id }}
 
-      - name: Install Graph CLI
-        run: |
-          npm install -g @graphprotocol/graph-cli@0.98.1
-
       - name: Create subgraph (if not exists)
         working-directory: ./subgraph-futures
         continue-on-error: true
         run: |
           echo "📝 Creating subgraph in Graph Node..."
-          graph create --node ${{ needs.build.outputs.graph_node_url }}:8020 \
+          npx graph create --node ${{ needs.build.outputs.graph_node_url }}:8020 \
             ${{ needs.build.outputs.subgraph_name }} || echo "Subgraph already exists"
 
       - name: Deploy subgraph
@@ -270,8 +266,9 @@ jobs:
             echo "================================================"
             
             # Graph Node handles IPFS internally - no need to specify --ipfs
+            # Use npx to run the local graph-cli version from package.json
             set +e  # Don't exit on error, capture it
-            graph deploy --node ${{ needs.build.outputs.graph_node_url }}:8020 \
+            npx graph deploy --node ${{ needs.build.outputs.graph_node_url }}:8020 \
               --version-label ${{ needs.build.outputs.version }} \
               ${{ needs.build.outputs.subgraph_name }}
             DEPLOY_EXIT_CODE=$?
