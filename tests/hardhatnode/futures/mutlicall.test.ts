@@ -46,13 +46,13 @@ describe("Futures - multicall write", function () {
     const closeCalldata = [
       encodeFunctionData({
         abi: futures.abi,
-        functionName: "closeOrder",
-        args: [events[0].args.orderId],
+        functionName: "createOrder",
+        args: [price, deliveryDate, "", 1],
       }),
       encodeFunctionData({
         abi: futures.abi,
-        functionName: "closeOrder",
-        args: [events[1].args.orderId],
+        functionName: "createOrder",
+        args: [price, deliveryDate, "", 1],
       }),
     ];
 
