@@ -29,14 +29,21 @@ env:
   SERVICE_NAME: subgraph-futures
 
 jobs:
-  # First job to determine environment (needed before we can use GitHub Environments)
+  # First job to determine environment and version (runs without environment protection)
   setup:
     name: 🔧 Setup
     runs-on: ubuntu-latest
     outputs:
       environment: ${{ steps.env.outputs.environment }}
       is_cicd_branch: ${{ steps.env.outputs.is_cicd_branch }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Determine environment
         id: env
         run: |
@@ -52,7 +59,7 @@ jobs:
             elif [[ "$BRANCH" == cicd/* ]]; then
               ENV="dev"
               IS_CICD="true"
-              echo "🔧 CI/CD test branch - will build but skip deploy"
+              echo "🔧 CI/CD test branch - will skip build/deploy"
             else
               ENV="dev"
             fi
@@ -61,14 +68,40 @@ jobs:
           echo "is_cicd_branch=${IS_CICD}" >> $GITHUB_OUTPUT
           echo "🎯 Target environment: ${ENV}"
 
+      - name: Generate version tag
+        id: version
+        run: |
+          LAST_TAG=$(git tag -l "subgraph-v*" | sort -V | tail -n 1)
+          
+          if [ -z "$LAST_TAG" ]; then
+            VERSION="0.1.0"
+          else
+            LAST_VERSION=$(echo $LAST_TAG | sed 's/subgraph-v//' | sed 's/-.*$//')
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$LAST_VERSION"
+            PATCH=$((PATCH + 1))
+            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          fi
+          
+          ENV="${{ steps.env.outputs.environment }}"
+          if [ "$ENV" != "main" ]; then
+            FULL_VERSION="v${VERSION}-${ENV}"
+          else
+            FULL_VERSION="v${VERSION}"
+          fi
+          
+          echo "version=${FULL_VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=subgraph-${FULL_VERSION}" >> $GITHUB_OUTPUT
+          echo "📦 Version: ${FULL_VERSION}"
+
   build:
     name: 🔨 Build
     runs-on: ubuntu-latest
     needs: setup
+    if: needs.setup.outputs.is_cicd_branch != 'true'
     environment: ${{ needs.setup.outputs.environment }}
     outputs:
-      version: ${{ steps.version.outputs.version }}
-      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ needs.setup.outputs.version }}
+      tag: ${{ needs.setup.outputs.tag }}
       environment: ${{ needs.setup.outputs.environment }}
       graph_node_url: ${{ steps.env.outputs.graph_node_url }}
       subgraph_name: ${{ steps.env.outputs.subgraph_name }}
@@ -112,31 +145,6 @@ jobs:
               echo "subgraph_name=marketplace" >> $GITHUB_OUTPUT
               ;;
           esac
-
-      - name: Generate version tag
-        id: version
-        run: |
-          LAST_TAG=$(git tag -l "subgraph-v*" | sort -V | tail -n 1)
-          
-          if [ -z "$LAST_TAG" ]; then
-            VERSION="0.1.0"
-          else
-            LAST_VERSION=$(echo $LAST_TAG | sed 's/subgraph-v//' | sed 's/-.*$//')
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$LAST_VERSION"
-            PATCH=$((PATCH + 1))
-            VERSION="${MAJOR}.${MINOR}.${PATCH}"
-          fi
-          
-          ENV="${{ needs.setup.outputs.environment }}"
-          if [ "$ENV" != "main" ]; then
-            FULL_VERSION="v${VERSION}-${ENV}"
-          else
-            FULL_VERSION="v${VERSION}"
-          fi
-          
-          echo "version=${FULL_VERSION}" >> $GITHUB_OUTPUT
-          echo "tag=subgraph-${FULL_VERSION}" >> $GITHUB_OUTPUT
-          echo "📦 Version: ${FULL_VERSION}"
 
       - name: Install dependencies
         working-directory: ./subgraph-futures
@@ -205,13 +213,11 @@ jobs:
             abi/
           retention-days: 1
 
-      - name: CI/CD test summary
-        if: needs.setup.outputs.is_cicd_branch == 'true'
+      - name: Build summary
         run: |
-          echo "## 🔧 CI/CD Test Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔨 Build Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Mode:** Test only (no deployment)" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.setup.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "**Subgraph:** Built and validated successfully" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ Build verification successful" >> $GITHUB_STEP_SUMMARY
@@ -363,8 +369,8 @@ jobs:
   cleanup:
     name: 🧹 Cleanup
     runs-on: ubuntu-latest
-    needs: [build, verify]
-    if: always() && needs.build.outputs.is_cicd_branch != 'true'
+    needs: [setup, build, verify]
+    if: always() && needs.setup.outputs.is_cicd_branch != 'true'
     
     steps:
       - name: Checkout code
@@ -373,12 +379,12 @@ jobs:
           fetch-depth: 0
 
       - name: Create Git tag
-        if: needs.build.outputs.environment == 'main' && needs.verify.result == 'success'
+        if: needs.setup.outputs.environment == 'main' && needs.verify.result == 'success'
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git tag -a "${{ needs.build.outputs.tag }}" -m "Release ${{ needs.build.outputs.version }}"
-          git push origin "${{ needs.build.outputs.tag }}"
+          git tag -a "${{ needs.setup.outputs.tag }}" -m "Release ${{ needs.setup.outputs.version }}"
+          git push origin "${{ needs.setup.outputs.tag }}"
 
       - name: Deployment summary
         if: needs.verify.result == 'success'
@@ -386,8 +392,8 @@ jobs:
           echo "## 🎉 Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Service:** Subgraph (Futures Marketplace)" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ needs.build.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ needs.build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ needs.setup.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.setup.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "**Subgraph:** ${{ needs.build.outputs.subgraph_name }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Endpoints:**" >> $GITHUB_STEP_SUMMARY
@@ -402,16 +408,16 @@ jobs:
           echo "## ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Service:** Subgraph (Futures Marketplace)" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ needs.build.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ needs.build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ needs.setup.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.setup.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "⚠️ Deployment or verification failed. Check logs above for details." >> $GITHUB_STEP_SUMMARY
 
   notify:
     name: 📢 Notify
     runs-on: ubuntu-latest
-    needs: [build, deploy, verify, cleanup]
-    if: always() && (needs.build.result == 'success')
+    needs: [setup, build, deploy, verify, cleanup]
+    if: always()
     
     steps:
       - name: Checkout (for composite action)
@@ -422,11 +428,11 @@ jobs:
       - name: Determine status
         id: status
         run: |
-          if [ "${{ needs.build.outputs.is_cicd_branch }}" == "true" ]; then
+          if [ "${{ needs.setup.outputs.is_cicd_branch }}" == "true" ]; then
             echo "status=success" >> $GITHUB_OUTPUT
           elif [ "${{ needs.verify.result }}" == "success" ]; then
             echo "status=success" >> $GITHUB_OUTPUT
-          elif [ "${{ needs.verify.result }}" == "failure" ] || [ "${{ needs.deploy.result }}" == "failure" ]; then
+          elif [ "${{ needs.verify.result }}" == "failure" ] || [ "${{ needs.deploy.result }}" == "failure" ] || [ "${{ needs.build.result }}" == "failure" ]; then
             echo "status=failure" >> $GITHUB_OUTPUT
           elif [ "${{ needs.verify.result }}" == "cancelled" ] || [ "${{ needs.deploy.result }}" == "cancelled" ]; then
             echo "status=cancelled" >> $GITHUB_OUTPUT
@@ -438,10 +444,10 @@ jobs:
         uses: ./.github/actions/slack-notify
         with:
           status: ${{ steps.status.outputs.status }}
-          environment: ${{ needs.build.outputs.environment }}
+          environment: ${{ needs.setup.outputs.environment }}
           service_name: 'Subgraph'
-          version: ${{ needs.build.outputs.version }}
+          version: ${{ needs.setup.outputs.version }}
           slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          additional_info: '${{ needs.build.outputs.is_cicd_branch == ''true'' && ''*Mode:* CI/CD Test (build only, no deploy)'' || format(''*Subgraph:* `{0}` • *GraphQL:* `{1}/subgraphs/name/{0}`'', needs.build.outputs.subgraph_name, needs.build.outputs.graph_node_url) }}'
+          additional_info: '${{ needs.setup.outputs.is_cicd_branch == ''true'' && ''*Mode:* CI/CD Test (no build/deploy)'' || format(''*Subgraph:* `{0}` • *GraphQL:* `{1}/subgraphs/name/{0}`'', needs.build.outputs.subgraph_name, needs.build.outputs.graph_node_url) }}'
 

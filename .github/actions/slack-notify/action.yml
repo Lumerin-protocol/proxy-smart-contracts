@@ -120,19 +120,15 @@ runs:
         RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
         COMMIT_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
         
-        # Build header text
-        HEADER_TEXT="$ENV_EMOJI $ENV_LABEL | $SERVICE_NAME | $STATUS_EMOJI $STATUS_TEXT"
+        # Build header: ENV | repo | service | status
+        # Format: 🔧 DEV | proxy-smart-contracts | Market Maker | ✅ Deployed Successfully
+        HEADER_TEXT="$ENV_EMOJI $ENV_LABEL | $REPO_SHORT | $SERVICE_NAME | $STATUS_EMOJI $STATUS_TEXT"
         
-        # Build fields array using jq
+        # Build fields array (removed repo and branch - now in header)
         FIELDS=$(jq -n \
-          --arg repo "$REPO_SHORT" \
-          --arg repo_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
-          --arg branch "$GITHUB_REF_NAME" \
           --arg version "$VERSION" \
           --arg actor "$GITHUB_ACTOR" \
           '[
-            {"type": "mrkdwn", "text": ("*Repository:*\n<" + $repo_url + "|" + $repo + ">")},
-            {"type": "mrkdwn", "text": ("*Branch:*\n`" + $branch + "`")},
             {"type": "mrkdwn", "text": ("*Version:*\n`" + $version + "`")},
             {"type": "mrkdwn", "text": ("*Triggered by:*\n" + $actor)}
           ]')
@@ -150,8 +146,8 @@ runs:
             '. + [{"type": "mrkdwn", "text": ("*Image:*\n`" + $img + "`")}]')
         fi
         
-        # Build commit section
-        COMMIT_TEXT="*Commit:* <${COMMIT_URL}|\`${COMMIT_SHORT}\`> ${COMMIT_MSG}"
+        # Build commit section (just message, hash available via button)
+        COMMIT_TEXT="*Commit:* ${COMMIT_MSG}"
         
         # Build blocks array
         BLOCKS=$(jq -n \
@@ -160,7 +156,6 @@ runs:
           --arg commit_text "$COMMIT_TEXT" \
           '[
             {"type": "header", "text": {"type": "plain_text", "text": $header, "emoji": true}},
-            {"type": "divider"},
             {"type": "section", "fields": $fields},
             {"type": "section", "text": {"type": "mrkdwn", "text": $commit_text}}
           ]')
@@ -171,7 +166,7 @@ runs:
             '. + [{"type": "section", "text": {"type": "mrkdwn", "text": $info}}]')
         fi
         
-        # Add divider and action buttons
+        # Add action buttons
         if [ -n "$PR_NUMBER" ]; then
           PR_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${PR_NUMBER}"
           BLOCKS=$(echo "$BLOCKS" | jq \
@@ -180,10 +175,9 @@ runs:
             --arg run_url "$RUN_URL" \
             --arg commit_url "$COMMIT_URL" \
             '. + [
-              {"type": "divider"},
               {"type": "actions", "elements": [
-                {"type": "button", "text": {"type": "plain_text", "text": "🔀 View PR #" + $pr_num, "emoji": true}, "url": $pr_url, "style": "primary"},
-                {"type": "button", "text": {"type": "plain_text", "text": "📋 Workflow", "emoji": true}, "url": $run_url},
+                {"type": "button", "text": {"type": "plain_text", "text": "🔀 View PR", "emoji": true}, "url": $pr_url, "style": "primary"},
+                {"type": "button", "text": {"type": "plain_text", "text": "📋 Actions", "emoji": true}, "url": $run_url},
                 {"type": "button", "text": {"type": "plain_text", "text": "🔍 Commit", "emoji": true}, "url": $commit_url}
               ]}
             ]')
@@ -192,10 +186,9 @@ runs:
             --arg run_url "$RUN_URL" \
             --arg commit_url "$COMMIT_URL" \
             '. + [
-              {"type": "divider"},
               {"type": "actions", "elements": [
-                {"type": "button", "text": {"type": "plain_text", "text": "📋 View Workflow", "emoji": true}, "url": $run_url, "style": "primary"},
-                {"type": "button", "text": {"type": "plain_text", "text": "🔍 View Commit", "emoji": true}, "url": $commit_url}
+                {"type": "button", "text": {"type": "plain_text", "text": "📋 Actions", "emoji": true}, "url": $run_url, "style": "primary"},
+                {"type": "button", "text": {"type": "plain_text", "text": "🔍 Commit", "emoji": true}, "url": $commit_url}
               ]}
             ]')
         fi
