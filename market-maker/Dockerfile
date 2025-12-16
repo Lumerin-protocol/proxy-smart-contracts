@@ -12,5 +12,4 @@ RUN yarn install --frozen-lockfile --production
 COPY abi/ ./abi/
 COPY *.ts ./
 
-# Run the application
 CMD ["node", "index.ts"]
