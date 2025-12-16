@@ -43,10 +43,17 @@ export function handleBlock(block: ethereum.Block): void {
   //TODO: store the latest hashrate index entry ID
   // and update indexer only if the hashrate index entry is different from the latest one
   // also considering the timestamp of the latest update
-  const hashrateIndexEntry = new HashrateIndex(bigIntToBytes(block.number));
+  const hashrateIndexEntry = new HashrateIndex(0);
   hashrateIndexEntry.hashesForBTC = hashesForBTC.value.value;
   hashrateIndexEntry.hashesForToken = hashesForToken.value;
   hashrateIndexEntry.updatedAt = block.timestamp;
+
+  log.info("Block timestamp: {} / {} / {}", [
+    block.timestamp.toString(),
+    block.timestamp.toI64().toString(),
+    block.timestamp.toI32().toString(),
+  ]);
+
   hashrateIndexEntry.blockNumber = block.number;
   hashrateIndexEntry.save();
 
