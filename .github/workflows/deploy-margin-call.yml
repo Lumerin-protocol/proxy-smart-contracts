@@ -1,4 +1,4 @@
-name: Deploy Margin Call Lambda
+name: Deploy Margin Call Lambda Function
 
 on:
   push:

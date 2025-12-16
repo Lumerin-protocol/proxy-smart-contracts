@@ -1,4 +1,4 @@
-name: Deploy Oracle Update Lambda
+name: Deploy Oracle Update Lambda Function
 
 on:
   push:

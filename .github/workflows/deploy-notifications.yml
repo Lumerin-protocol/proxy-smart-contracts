@@ -1,4 +1,4 @@
-name: Deploy Notifications Service
+name: Deploy Notifications ECS Service
 
 on:
   push:

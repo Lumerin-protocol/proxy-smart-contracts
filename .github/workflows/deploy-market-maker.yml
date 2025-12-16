@@ -1,4 +1,4 @@
-name: Deploy Market Maker to ECS Service
+name: Deploy Market Maker ECS Service
 
 on:
   push:
