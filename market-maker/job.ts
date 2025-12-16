@@ -21,15 +21,30 @@ export async function main() {
   const log = pino({
     level: config.LOG_LEVEL,
   });
+  log.info(
+    {
+      ACTIVE_QUOTING_AMOUNT_RATIO: config.ACTIVE_QUOTING_AMOUNT_RATIO,
+      CHAIN_ID: config.CHAIN_ID,
+      FLOAT_AMOUNT: `${formatUnits(config.FLOAT_AMOUNT, 6)} USDC`,
+      FUTURES_ADDRESS: config.FUTURES_ADDRESS,
+      GRID_LEVELS: config.GRID_LEVELS,
+      LOG_LEVEL: config.LOG_LEVEL,
+      LOOP_INTERVAL_MS: config.LOOP_INTERVAL_MS,
+      MAX_POSITION: config.MAX_POSITION,
+      RISK_AVERSION: config.RISK_AVERSION,
+      SPREAD_AMOUNT: `${formatUnits(config.SPREAD_AMOUNT, 6)} USDC`,
+      SUBGRAPH_URL: config.SUBGRAPH_URL,
+    },
+    "Config"
+  );
+
   const subgraph = new Subgraph(config.SUBGRAPH_URL, config.SUBGRAPH_API_KEY);
-  const account = privateKeyToAccount(config.PRIVATE_KEY);
   const contract = new FuturesContract(
     config.FUTURES_ADDRESS,
     config.ETH_NODE_URL,
     config.PRIVATE_KEY,
     config.CHAIN_ID
   );
-  log.info(`Wallet address: ${contract.getWalletAddress()}`);
   const volatilityDurationSeconds = 30 * 24 * 3600;
   const nowSeconds = NowSeconds();
   const historicalPrices = await subgraph.getHistoricalPrices(
@@ -38,67 +53,81 @@ export async function main() {
   );
   const resampledPrices = resampleHourlyClose(historicalPrices, 3600);
   const { sigmaPerStep: volatilityPerHour } = realizedVolatility(resampledPrices);
-  log.info(`Volatility per hour: ${volatilityPerHour}`);
-  log.info(`Risk aversion: ${config.RISK_AVERSION}`);
   const contractMultiplier = BigInt(await contract.getContractMultiplier());
-  log.info(`Contract multiplier: ${contractMultiplier}`);
   const tickSize = await contract.getTickSize();
-  log.info(`Tick size: ${tickSize}`);
-  log.info(`Grid levels: ${config.GRID_LEVELS}`);
-  log.info(`Active quoting amount ratio: ${config.ACTIVE_QUOTING_AMOUNT_RATIO}`);
+  log.info(
+    {
+      contractMultiplier,
+      walletAddress: contract.getWalletAddress(),
+      volatilityPerHour,
+      tickSize,
+    },
+    "Derived data"
+  );
 
-  if (config.SPREAD_AMOUNT % (tickSize * 2n) !== 0n) {
+  if (config.SPREAD_AMOUNT % tickSize !== 0n) {
     throw new Error(
-      `Spread amount (${config.SPREAD_AMOUNT}) is not divisible by 2x tick size (2 *${tickSize}), please adjust the spread amount`
+      `Spread amount (${config.SPREAD_AMOUNT}) is not divisible by tick size (${tickSize}), please adjust the spread amount`
     );
   }
 
   const futuresAccountBalance = await contract.getBalance();
-  log.info(`Margin account balance: ${formatUnits(futuresAccountBalance, 6)}`);
 
   if (futuresAccountBalance < config.FLOAT_AMOUNT) {
     const depositAmount = config.FLOAT_AMOUNT - futuresAccountBalance;
     await contract.approve(depositAmount);
     const { blockNumber } = await contract.deposit(depositAmount);
     log.info(
-      `Deposited ${formatUnits(depositAmount, 6)} to margin account, block number: ${blockNumber}`
+      {
+        depositAmount,
+        blockNumber,
+      },
+      "Deposited to margin account"
     );
   }
 
   for (let iteration = 0; ; iteration++) {
-    log.info(`\n\n\n\n================= Iteration: ${iteration} =================`);
+    log.info({ iteration }, `\n\n\n\n================= Iteration =================`);
     // main loop
     // 1. Observe the market
     // 	•	Continuously read the best bid, best ask, and last traded price for the gold futures you care about.
     const marginAccountBalance = await contract.getBalance();
-    log.info(`Margin account balance: $${formatUnits(marginAccountBalance, 6)}`);
     const remainingGas = await contract.getETHBalance();
-    log.info(`Remaining gas: $${formatUnits(remainingGas, 18)} ETH`);
-
     const indexPrice = await contract.getIndexPrice();
-    log.info(`Index price: ${indexPrice}`);
-
     const deliveryDate = await contract.getCurrentDeliveryDate();
-    log.info(`Delivery date: ${deliveryDate} (${new Date(deliveryDate * 1000).toISOString()})`);
-
     const currentPosition = await subgraph.getCurrentPosition(
       BigInt(deliveryDate),
       contract.getWalletAddress()
     );
-    log.info(`Current position: ${currentPosition.position}`);
-    log.info(`Current average price: $${formatUnits(currentPosition.averagePrice, 6)}`);
-
     const unrealizedPnL = currentPosition.position * (indexPrice - currentPosition.averagePrice);
-    log.info(`Unrealized P&L: $${formatUnits(unrealizedPnL, 6)}`);
+    const remainingTimeHours = (deliveryDate - NowSeconds()) / 3600;
+
+    log.info(`Margin account balance: $${formatUnits(marginAccountBalance, 6)}`);
+    log.info(`Remaining gas: $${formatUnits(remainingGas, 18)} ETH`);
+
+    log.info(
+      {
+        marginAccountBalance: `${formatUnits(marginAccountBalance, 6)} USDC`,
+        remainingGas: `${formatUnits(remainingGas, 18)} ETH`,
+      },
+      "Margin account balance and remaining gas"
+    );
+
+    log.info(
+      {
+        indexPrice: `${formatUnits(indexPrice, 6)} USDC`,
+        deliveryDate: new Date(deliveryDate * 1000).toISOString(),
+        currentPosition: currentPosition.position,
+        currentAveragePrice: `${formatUnits(currentPosition.averagePrice, 6)} USDC`,
+        unrealizedPnL: `${formatUnits(unrealizedPnL, 6)} USDC`,
+        remainingTimeHours,
+        volatilityPerHour,
+      },
+      "Market data"
+    );
 
     // 	•	Optionally estimate a “fair” mid price (for example, midpoint of bid/ask) and some measure of recent volatility to know how “calm” or “wild” the market is.
     // const fairPrice = (price.bestBid + price.bestAsk) / 2n;
-    const remainingTimeHours = (deliveryDate - NowSeconds()) / 3600;
-    log.info(`Remaining time hours: ${remainingTimeHours}`);
-    log.info(`Volatility per hour: ${volatilityPerHour}`);
-    log.info(`Risk aversion: ${config.RISK_AVERSION}`);
-    log.info(`Current position: ${currentPosition.position}`);
-    log.info(`Index price: ${indexPrice}`);
     let reservationPrice = calculateReservationPrice(
       indexPrice,
       currentPosition.position * contractMultiplier,
@@ -107,16 +136,19 @@ export async function main() {
       remainingTimeHours
     );
     reservationPrice = roundToNearest(reservationPrice, tickSize);
-    log.info(`Rounded reservation price: ${reservationPrice}`);
-    log.info("Price shift: %s", reservationPrice - indexPrice);
+    log.info(
+      {
+        reservationPrice: `${formatUnits(reservationPrice, 6)} USDC`,
+        priceShift: `${formatUnits(reservationPrice - indexPrice, 6)} USDC`,
+      },
+      "Reservation price"
+    );
 
     // inventory skew shifts the middle price up or down based on the current position
     // const inventorySkew = (currentPosition.position * config.SPREAD_AMOUNT) / config.MAX_POSITION;
 
     // 2. Model the grid of orders based on the current price
-    log.info(`Float amount: ${config.FLOAT_AMOUNT}`);
     const budget = mult(config.FLOAT_AMOUNT, config.ACTIVE_QUOTING_AMOUNT_RATIO);
-    log.info(`Budget: ${budget}`);
 
     // budget skew shifts the budget up or down based on the current position
     const normalizedInventory = clamp(
@@ -126,25 +158,39 @@ export async function main() {
     );
     const bidSkew = clamp(1 - Math.max(normalizedInventory, 0), 0, null);
     const askSkew = clamp(1 + Math.min(normalizedInventory, 0), 0, null);
-    log.info(`Bid skew: ${bidSkew}`);
-    log.info(`Ask skew: ${askSkew}`);
 
     const bidBudget = mult(budget / 2n, bidSkew);
     const askBudget = mult(budget / 2n, askSkew);
-    log.info(`Bid budget: ${bidBudget}`);
-    log.info(`Ask budget: ${askBudget}`);
+
+    log.info(
+      {
+        bidSkew,
+        askSkew,
+        budget: `${formatUnits(budget, 6)} USDC`,
+        bidBudget: `${formatUnits(bidBudget, 6)} USDC`,
+        askBudget: `${formatUnits(askBudget, 6)} USDC`,
+      },
+      "Bid and ask budgets"
+    );
     // geometric taper allocations are used to distribute the budget across the grid levels
     // more distributed closer to the middle price, less further away
     const bidOrdersNotional = geometricTaperAllocations(bidBudget, Number(config.GRID_LEVELS));
     const askOrdersNotional = geometricTaperAllocations(askBudget, Number(config.GRID_LEVELS));
+    let bidSpread = config.SPREAD_AMOUNT / 2n;
+    let askSpread = config.SPREAD_AMOUNT / 2n;
+
+    if (config.SPREAD_AMOUNT <= tickSize) {
+      bidSpread = 0n;
+      askSpread = config.SPREAD_AMOUNT;
+    }
     // generate the contract total values for the different price levels
     const bidOrderValues = generateContractValues(
-      (reservationPrice - config.SPREAD_AMOUNT / 2n) * contractMultiplier,
+      (reservationPrice + bidSpread) * contractMultiplier,
       tickSize * contractMultiplier,
       -Number(config.GRID_LEVELS)
     );
     const askOrderValues = generateContractValues(
-      (reservationPrice + config.SPREAD_AMOUNT / 2n) * contractMultiplier,
+      (reservationPrice + askSpread) * contractMultiplier,
       tickSize * contractMultiplier,
       Number(config.GRID_LEVELS)
     );
@@ -167,18 +213,18 @@ export async function main() {
         qty: -askOrders.result[i],
       });
     }
-    log.info(`Modelled orders: \n${ordersToString(modelledOrders)}`);
+    log.info(ordersToString(modelledOrders), "Modelled orders");
 
     // 3. Query current orders
     const currentOrders = await subgraph.getCurrentOrders(
       BigInt(deliveryDate),
       contract.getWalletAddress()
     );
-    log.info(`Current orders: \n${ordersToString(currentOrders)}`);
+    log.info(ordersToString(currentOrders), "Current orders");
 
     // 4. Calculate which orders to place to achieve modelled orders
     const ordersToPlace = calculateOrders(modelledOrders, currentOrders);
-    log.info(`Orders to place: \n${ordersToString(ordersToPlace)}`);
+    log.info(ordersToString(ordersToPlace), "Orders to place");
 
     const ordersToPlaceWithDeliveryDate = ordersToPlace.map((order) => ({
       ...order,
@@ -188,10 +234,11 @@ export async function main() {
     if (ordersToPlaceWithDeliveryDate.length > 0) {
       const rec = await contract.placeOrders(ordersToPlaceWithDeliveryDate);
       log.info(
-        `Orders placed: Block number: ${rec.blockNumber}, gas fee: ${formatUnits(
-          getGasFee(rec),
-          18
-        )} ETH`
+        {
+          blockNumber: rec.blockNumber,
+          gasFee: `${formatUnits(getGasFee(rec), 18)} ETH`,
+        },
+        "Orders placed"
       );
     } else {
       log.info(`No orders to place, skipping...`);
@@ -203,7 +250,10 @@ export async function main() {
       //   log.info(`Position created, continuing...`);
       // }),
       wait(config.LOOP_INTERVAL_MS).then(() => {
-        log.info(`Loop interval timeout, continuing...`);
+        log.info(
+          { LOOP_INTERVAL_MS: config.LOOP_INTERVAL_MS },
+          "Loop interval timeout, continuing..."
+        );
       }),
     ]);
 
