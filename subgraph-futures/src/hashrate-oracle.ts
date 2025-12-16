@@ -46,6 +46,7 @@ export function handleBlock(block: ethereum.Block): void {
   const hashrateIndexEntry = new HashrateIndex(0);
   hashrateIndexEntry.hashesForBTC = hashesForBTC.value.value;
   hashrateIndexEntry.hashesForToken = hashesForToken.value;
+  hashrateIndexEntry.updatedAt = block.timestamp;
 
   log.info("Block timestamp: {} / {} / {}", [
     block.timestamp.toString(),

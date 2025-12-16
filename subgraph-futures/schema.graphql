@@ -108,8 +108,9 @@ type HashrateIndex @entity(timeseries: true) {
   id: Int8!
   hashesForBTC: BigInt!
   hashesForToken: BigInt!
-  blockNumber: BigInt!
+  updatedAt: BigInt! # deprecated, use timestamp instead
   timestamp: Timestamp!
+  blockNumber: BigInt!
 }
 
 type HashesForBTCCandle @aggregation(intervals: ["hour", "day"], source: "HashrateIndex") {
