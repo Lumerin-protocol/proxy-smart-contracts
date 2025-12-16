@@ -116,12 +116,12 @@ describe("Order Creation", function () {
     const { futures } = contracts;
     const { seller, pc } = accounts;
 
-    const price = parseUnits("100", 6); // $100
-    const margin = parseUnits("100000", 6);
-    const deliveryDate = BigInt(config.deliveryDates[0]);
     const qty = 5;
+    const price = await futures.read.getMarketPrice();
+    const margin = await futures.read.getMinMarginForPosition([price, BigInt(qty)]);
+    const deliveryDate = BigInt(config.deliveryDates[0]);
 
-    await futures.write.addMargin([margin], {
+    await futures.write.addMargin([margin + config.orderFee], {
       account: seller.account,
     });
 
@@ -183,10 +183,10 @@ describe("Order Creation", function () {
     }
   });
 
-  it("should collect order fee", async function () {
+  it("should collect order fee, when order is created or matched, but not when it is offsetted (closed)", async function () {
     const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
-    const { futures, usdcMock } = contracts;
-    const { seller, owner, pc } = accounts;
+    const { futures } = contracts;
+    const { seller, pc } = accounts;
 
     const price = parseUnits("100", 6);
     const margin = parseUnits("10000", 6);
@@ -200,7 +200,6 @@ describe("Order Creation", function () {
     // Get initial balances
     const initialSellerBalance = await futures.read.balanceOf([seller.account.address]);
     const initialContractBalance = await futures.read.balanceOf([futures.address]);
-    const initialOwnerUsdcBalance = await usdcMock.read.balanceOf([owner.account.address]);
 
     // Create order - this should collect the order fee
     const txHash = await futures.write.createOrder([price, deliveryDate, "", 5], {
@@ -217,6 +216,22 @@ describe("Order Creation", function () {
     // Verify order fee was added to contract's reserve pool balance
     const finalContractBalance = await futures.read.balanceOf([futures.address]);
     expect(finalContractBalance).to.equal(initialContractBalance + config.orderFee);
+
+    // Create a sell order with opposite direction (same price and delivery date)
+    const sellOrderTxHash = await futures.write.createOrder([price, deliveryDate, "", -5], {
+      account: seller.account,
+    });
+
+    const sellOrderReceipt = await pc.waitForTransactionReceipt({ hash: sellOrderTxHash });
+    expect(sellOrderReceipt.status).to.equal("success");
+
+    // Verify order fee was not deducted from seller's balance
+    const finalSellerBalance2 = await futures.read.balanceOf([seller.account.address]);
+    expect(finalSellerBalance2).to.equal(finalSellerBalance);
+
+    // Verify order fee was not added to contract's reserve pool balance
+    const finalContractBalance2 = await futures.read.balanceOf([futures.address]);
+    expect(finalContractBalance2).to.equal(finalContractBalance);
   });
 
   it("should reject order creation with zero price", async function () {
@@ -270,12 +285,20 @@ describe("Order Creation", function () {
     const { futures } = contracts;
     const { seller } = accounts;
 
-    const price = parseUnits("100", 6);
+    const price = await futures.read.getMarketPrice();
     const deliveryDate = config.deliveryDates[0];
 
     // Don't add any margin - balance should be 0
     const balance = await futures.read.balanceOf([seller.account.address]);
     expect(balance).to.equal(0n);
+
+    const deficit = await futures.read.getCollateralDeficit([seller.account.address]);
+    expect(deficit).to.be.equal(0n);
+
+    // we need to add order fee to the margin balance, so we can create an order
+    await futures.write.addMargin([config.orderFee], {
+      account: seller.account,
+    });
 
     await catchError(futures.abi, "InsufficientMarginBalance", async () => {
       await futures.write.createOrder([price, deliveryDate, "", 1], {
@@ -330,9 +353,12 @@ describe("Order Creation", function () {
     const price = await futures.read.getMarketPrice();
     const deliveryDate = config.deliveryDates[0];
 
-    // Don't add any margin - balance should be 0
+    // The margin balance should be exactly the order fee
+    await futures.write.addMargin([config.orderFee], {
+      account: seller.account,
+    });
     const balance = await futures.read.balanceOf([seller.account.address]);
-    expect(balance).to.equal(0n);
+    expect(balance).to.equal(config.orderFee);
 
     await catchError(futures.abi, "InsufficientMarginBalance", async () => {
       await futures.write.createOrder([price, deliveryDate, "", -1], {
@@ -522,6 +548,42 @@ describe("Order Creation", function () {
     expect(remainingOrder.isBuy).to.equal(false);
     expect(remainingOrder.pricePerDay).to.equal(price);
     expect(remainingOrder.deliveryAt).to.equal(deliveryDate);
+  });
+
+  it("should remove existing orders when creating an opposite order even if margin balance is insufficient", async function () {
+    const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
+    const { futures } = contracts;
+    const { seller, pc } = accounts;
+
+    const price = await futures.read.getMarketPrice();
+    const deliveryDate = config.deliveryDates[0];
+
+    const minMarginForOneOrder = await futures.read.getMinMarginForPosition([price, -1n]);
+
+    // Add just enough margin for one order plus the order fee
+    const orderFee = await futures.read.orderFee();
+    const margin = minMarginForOneOrder + orderFee * 2n; // enough for one order + fees for both operations
+
+    await futures.write.addMargin([margin], {
+      account: seller.account,
+    });
+
+    // Create a buy order - this should use most of the margin
+    await futures.write.createOrder([price, deliveryDate, "", 1], {
+      account: seller.account,
+    });
+
+    // Check that margin is now mostly used
+    const collateralDeficit = await futures.read.getCollateralDeficit([seller.account.address]);
+    // collateralDeficit should be close to 0 or positive (meaning we're near or at margin limit)
+    console.log("Collateral deficit after buy order:", collateralDeficit);
+
+    // Now try to create a sell order with the same price and delivery date
+    // This should close the existing buy order, but currently fails due to insufficient margin check
+    // happening before the order closing logic
+    await futures.write.createOrder([price, deliveryDate, "", -1], {
+      account: seller.account,
+    });
   });
 
   it("should automatically remove outdated orders when creating a new order", async function () {

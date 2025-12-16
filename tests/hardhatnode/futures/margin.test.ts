@@ -363,7 +363,7 @@ describe("Futures - margin management", function () {
     const deliveryDate = config.deliveryDates[0];
 
     // Add margin
-    await futures.write.addMargin([minMargin], {
+    await futures.write.addMargin([minMargin + config.orderFee], {
       account: seller.account,
     });
 
@@ -393,7 +393,7 @@ describe("Futures - margin call", function () {
     const deliveryDate = config.deliveryDates[0];
 
     // Add small margin
-    await futures.write.addMargin([minMargin], {
+    await futures.write.addMargin([minMargin + config.orderFee], {
       account: seller.account,
     });
 

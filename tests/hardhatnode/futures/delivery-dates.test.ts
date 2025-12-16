@@ -37,15 +37,15 @@ describe("Delivery Date Management", function () {
   });
 
   it("should allow owner to update future delivery dates count", async function () {
-    const { contracts, accounts } = await loadFixture(deployFuturesFixture);
+    const { contracts, accounts, config } = await loadFixture(deployFuturesFixture);
     const { futures } = contracts;
     const { owner, pc } = accounts;
 
     const initialDeliveryDates = await futures.read.getDeliveryDates();
-    expect(initialDeliveryDates.length).to.equal(3);
+    expect(initialDeliveryDates.length).to.equal(config.futureDeliveryDatesCount);
 
     // Update to 5 delivery dates
-    const newCount = 5;
+    const newCount = config.futureDeliveryDatesCount + 1;
     const txHash = await futures.write.setFutureDeliveryDatesCount([newCount], {
       account: owner.account,
     });

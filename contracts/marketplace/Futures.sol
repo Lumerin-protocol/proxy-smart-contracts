@@ -179,12 +179,6 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
         validateDeliveryDate(_deliveryDate);
         validateQty(_qty);
 
-        int256 marginNeeded = getMinMarginForPosition(_price, _qty);
-        int256 collateralDeficit = getCollateralDeficit(_msgSender());
-
-        if (-collateralDeficit < marginNeeded) {
-            revert InsufficientMarginBalance();
-        }
         bool _isBuy = _qty > 0;
 
         // cache order indexes since they are the same for the loop
@@ -194,8 +188,10 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
         EnumerableSet.Bytes32Set storage participantPriceOrderIds =
             participantDeliveryDatePriceOrderIdsIndex[_msgSender()][_deliveryDate][_price];
 
+        bool orderCreatedOrMatched = false;
+
         for (uint8 i = 0; i < abs8(_qty); i++) {
-            _createOrMatchSingleOrder(
+            bool created = _createOrMatchSingleOrder(
                 orderIndex,
                 oppositeOrderIndex,
                 participantPriceOrderIds,
@@ -205,12 +201,21 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
                 _destURL,
                 _isBuy
             );
+            if (created) {
+                orderCreatedOrMatched = true;
+            }
         }
 
-        // order fee
-        _update(_msgSender(), address(this), orderFee);
+        // order fee only for created or matched orders
+        if (orderCreatedOrMatched) {
+            _update(_msgSender(), address(this), orderFee);
+        }
+        ensureNoCollateralDeficit(_msgSender());
     }
 
+    /// @notice Creates or matches a single order
+    /// @dev Creates a new order if no matching order is found, otherwise matches the order
+    /// @return orderCreated Return true if the order was created or matched, false if it offsetted existing order (closed)
     function _createOrMatchSingleOrder(
         StructuredLinkedList.List storage orderIndexId,
         StructuredLinkedList.List storage oppositeOrderIndexId,
@@ -220,7 +225,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
         uint256 _deliveryDate,
         string memory _destURL,
         bool _isBuy
-    ) private {
+    ) private returns (bool orderCreated) {
         //
         // No matching order found
         //
@@ -233,7 +238,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
             orderIndexId.pushBack(uint256(_orderId));
             participantOrders.add(_orderId);
             participantPriceOrderIds.add(_orderId);
-            return;
+            return true;
         }
 
         //
@@ -244,7 +249,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
             Order memory order = orders[orderId];
             if (order.isBuy != _isBuy) {
                 _closeOrder(orderId, order);
-                return;
+                return false;
             }
         }
 
@@ -260,6 +265,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
 
         // create new position
         _createPosition(oppositeOrderId, oppositeOrder, _participant, _destURL);
+        return true;
     }
 
     function _createOrder(
@@ -373,14 +379,6 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
             _temp.destURL,
             orderId
         );
-    }
-
-    function closeOrder(bytes32 _orderId) external {
-        Order memory order = orders[_orderId];
-        if (order.participant != _msgSender()) {
-            revert OrderNotBelongToSender();
-        }
-        _closeOrder(_orderId, order);
     }
 
     /// @notice Removes all outdated orders for a specific participant
@@ -963,6 +961,13 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
     function validateQty(int8 _qty) private pure {
         if (_qty == 0) {
             revert InvalidQty();
+        }
+    }
+
+    function ensureNoCollateralDeficit(address _participant) private view {
+        int256 collateralDeficit = getCollateralDeficit(_participant);
+        if (collateralDeficit > 0) {
+            revert InsufficientMarginBalance();
         }
     }
 
