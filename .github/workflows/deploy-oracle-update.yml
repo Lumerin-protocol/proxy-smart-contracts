@@ -38,6 +38,7 @@ jobs:
       environment: ${{ steps.env.outputs.environment }}
       lambda_function: ${{ steps.env.outputs.lambda_function }}
       aws_region: ${{ steps.env.outputs.aws_region }}
+      is_cicd_branch: ${{ steps.env.outputs.is_cicd_branch }}
     
     steps:
       - name: Checkout code
@@ -55,6 +56,7 @@ jobs:
       - name: Determine environment
         id: env
         run: |
+          IS_CICD="false"
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             ENV="${{ github.event.inputs.environment }}"
           else
@@ -65,12 +67,14 @@ jobs:
               ENV="stg"
             elif [[ "$BRANCH" == cicd/* ]]; then
               ENV="dev"
-              echo "🔧 CI/CD feature branch detected - deploying to DEV"
+              IS_CICD="true"
+              echo "🔧 CI/CD test branch - will build but skip deploy"
             else
               ENV="dev"
             fi
           fi
           echo "environment=${ENV}" >> $GITHUB_OUTPUT
+          echo "is_cicd_branch=${IS_CICD}" >> $GITHUB_OUTPUT
           
           # Lambda function name is the same across all environments (different AWS accounts)
           echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
@@ -125,10 +129,22 @@ jobs:
           path: oracle-update/dist/index.zip
           retention-days: 1
 
+      - name: CI/CD test summary
+        if: steps.env.outputs.is_cicd_branch == 'true'
+        run: |
+          echo "## 🔧 CI/CD Test Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Mode:** Test only (no deployment)" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Package:** index.zip built successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Build verification successful" >> $GITHUB_STEP_SUMMARY
+
   deploy:
     name: 🚀 Deploy
     runs-on: ubuntu-latest
     needs: build
+    if: needs.build.outputs.is_cicd_branch != 'true'
     outputs:
       lambda_version: ${{ steps.publish.outputs.lambda_version }}
     
@@ -184,6 +200,7 @@ jobs:
     name: 🔍 Verify
     runs-on: ubuntu-latest
     needs: [build, deploy]
+    if: needs.build.outputs.is_cicd_branch != 'true'
     
     steps:
       - name: Configure AWS credentials
@@ -208,7 +225,7 @@ jobs:
     name: 🧹 Cleanup
     runs-on: ubuntu-latest
     needs: [build, deploy, verify]
-    if: always()
+    if: always() && needs.build.outputs.is_cicd_branch != 'true'
     
     steps:
       - name: Checkout code
@@ -265,7 +282,9 @@ jobs:
       - name: Determine status
         id: status
         run: |
-          if [ "${{ needs.verify.result }}" == "success" ]; then
+          if [ "${{ needs.build.outputs.is_cicd_branch }}" == "true" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+          elif [ "${{ needs.verify.result }}" == "success" ]; then
             echo "status=success" >> $GITHUB_OUTPUT
           elif [ "${{ needs.verify.result }}" == "failure" ] || [ "${{ needs.deploy.result }}" == "failure" ]; then
             echo "status=failure" >> $GITHUB_OUTPUT
@@ -284,7 +303,5 @@ jobs:
           version: ${{ needs.build.outputs.version }}
           slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          additional_info: |
-            *Lambda Function:* \`${{ needs.build.outputs.lambda_function }}\`
-            *Lambda Version:* \`${{ needs.deploy.outputs.lambda_version }}\`
+          additional_info: '${{ needs.build.outputs.is_cicd_branch == ''true'' && ''*Mode:* CI/CD Test (build only, no deploy)'' || format(''*Lambda Function:* `{0}` • *Lambda Version:* `{1}`'', needs.build.outputs.lambda_function, needs.deploy.outputs.lambda_version) }}'
 

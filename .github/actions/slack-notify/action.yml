@@ -174,8 +174,8 @@ runs:
         # Build additional info block if provided
         ADDITIONAL_BLOCK=""
         if [ -n "$ADDITIONAL_INFO" ] && [ "$ADDITIONAL_INFO" != "" ]; then
-          # Escape the additional info for JSON
-          ESCAPED_INFO=$(echo "$ADDITIONAL_INFO" | sed 's/\\/\\\\/g; s/"/\\"/g')
+          # Escape the additional info for JSON (handle newlines, backslashes, quotes, backticks)
+          ESCAPED_INFO=$(printf '%s' "$ADDITIONAL_INFO" | sed 's/\\/\\\\/g; s/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
           ADDITIONAL_BLOCK=",{\"type\": \"section\",\"text\": {\"type\": \"mrkdwn\",\"text\": \"${ESCAPED_INFO}\"}}"
         fi
         
