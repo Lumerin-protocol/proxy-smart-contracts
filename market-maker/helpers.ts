@@ -241,8 +241,6 @@ export function generateContractValues(price: bigint, tickSize: bigint, levels: 
   return array;
 }
 
-export function ordersToString(orders: { price: bigint; qty: bigint }[]): string {
-  return orders
-    .map((o) => `${o.qty > 0n ? "+" : "-"}${abs(o.qty)} @ $${formatUnits(o.price, 6)}`)
-    .join("\n");
+export function ordersToString(orders: { price: bigint; qty: bigint }[]): string[] {
+  return orders.map((o) => `${o.qty > 0n ? "+" : "-"}${abs(o.qty)} @ $${formatUnits(o.price, 6)}`);
 }
