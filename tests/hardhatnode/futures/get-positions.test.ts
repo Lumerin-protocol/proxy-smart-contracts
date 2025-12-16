@@ -21,6 +21,5 @@ describe("Get Positions", function () {
       seller.account.address,
       deliveryDate,
     ]);
-    console.log(positions);
   });
 });

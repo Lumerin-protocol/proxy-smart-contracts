@@ -287,9 +287,10 @@ describe("Futures - Liquidation", function () {
       const { futures, hashrateOracle } = contracts;
       const { seller, buyer, buyer2, validator, pc } = accounts;
 
-      const margin = await futures.read.getMinMarginForPosition([entryPricePerDay, 2n]);
-      await futures.write.addMargin([margin], { account: seller.account });
-      await futures.write.addMargin([margin], { account: buyer.account });
+      const margin = await futures.read.getMinMarginForPosition([entryPricePerDay, -2n]);
+      const orderFee = await futures.read.orderFee();
+      await futures.write.addMargin([margin + orderFee], { account: seller.account });
+      await futures.write.addMargin([margin + orderFee], { account: buyer.account });
 
       // Create multiple positions for seller
       await futures.write.createOrder([entryPricePerDay, deliveryDate, "", -2], {
@@ -310,8 +311,6 @@ describe("Futures - Liquidation", function () {
       // Move market price up (seller loses on both positions)
       const hashesForBTC = await hashrateOracle.read.getHashesForBTC();
       await hashrateOracle.write.setHashesForBTC([(hashesForBTC.value * 90n) / 100n]);
-
-      const marketPrice2 = await contracts.futures.read.getMarketPrice();
 
       // Check margin is insufficient
       const sellerMarginDeficit = await getMarginDeficit(futures, seller.account);

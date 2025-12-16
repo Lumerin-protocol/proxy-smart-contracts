@@ -1,4 +1,4 @@
-name: Deploy Market Maker
+name: Deploy Market Maker ECS Service
 
 on:
   push:
@@ -42,6 +42,7 @@ jobs:
       ecs_cluster: ${{ steps.env.outputs.ecs_cluster }}
       ecs_service: ${{ steps.env.outputs.ecs_service }}
       aws_region: ${{ steps.env.outputs.aws_region }}
+      is_cicd_branch: ${{ steps.env.outputs.is_cicd_branch }}
     
     steps:
       - name: Checkout code
@@ -52,6 +53,7 @@ jobs:
       - name: Determine environment
         id: env
         run: |
+          IS_CICD="false"
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             ENV="${{ github.event.inputs.environment }}"
           else
@@ -62,12 +64,14 @@ jobs:
               ENV="stg"
             elif [[ "$BRANCH" == cicd/* ]]; then
               ENV="dev"
-              echo "🔧 CI/CD feature branch detected - deploying to DEV"
+              IS_CICD="true"
+              echo "🔧 CI/CD test branch - will build but skip deploy"
             else
               ENV="dev"
             fi
           fi
           echo "environment=${ENV}" >> $GITHUB_OUTPUT
+          echo "is_cicd_branch=${IS_CICD}" >> $GITHUB_OUTPUT
           
           case $ENV in
             dev)
@@ -126,7 +130,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./market-maker
-          push: true
+          push: ${{ steps.env.outputs.is_cicd_branch != 'true' }}
+          load: ${{ steps.env.outputs.is_cicd_branch == 'true' }}
           tags: |
             ${{ env.GHCR_IMAGE }}:${{ steps.version.outputs.version }}
             ${{ env.GHCR_IMAGE }}:${{ steps.env.outputs.environment }}-latest
@@ -137,10 +142,22 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.version.outputs.version }}
 
+      - name: CI/CD test summary
+        if: steps.env.outputs.is_cicd_branch == 'true'
+        run: |
+          echo "## 🔧 CI/CD Test Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Mode:** Test only (no deployment)" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** Built locally, not pushed to GHCR" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Build verification successful" >> $GITHUB_STEP_SUMMARY
+
   deploy:
     name: 🚀 Deploy
     runs-on: ubuntu-latest
     needs: build
+    if: needs.build.outputs.is_cicd_branch != 'true'
     
     steps:
       - name: Configure AWS credentials
@@ -169,6 +186,7 @@ jobs:
     name: 🔍 Verify
     runs-on: ubuntu-latest
     needs: [build, deploy]
+    if: needs.build.outputs.is_cicd_branch != 'true'
     
     steps:
       - name: Configure AWS credentials
@@ -192,7 +210,7 @@ jobs:
     name: 🧹 Cleanup
     runs-on: ubuntu-latest
     needs: [build, verify]
-    if: always()
+    if: always() && needs.build.outputs.is_cicd_branch != 'true'
     
     steps:
       - name: Checkout code
@@ -232,4 +250,49 @@ jobs:
           echo "**Version:** ${{ needs.build.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "⚠️ Deployment or verification failed. Check logs above for details." >> $GITHUB_STEP_SUMMARY
+
+  notify:
+    name: 📢 Notify
+    runs-on: ubuntu-latest
+    needs: [build, deploy, verify, cleanup]
+    if: always() && (needs.build.result == 'success')
+    
+    steps:
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      
+      - name: Determine status
+        id: status
+        run: |
+          # For CI/CD test branches, report success if build passed
+          if [ "${{ needs.build.outputs.is_cicd_branch }}" == "true" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "mode=CI/CD Test (build only)" >> $GITHUB_OUTPUT
+          elif [ "${{ needs.verify.result }}" == "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "mode=Deployed" >> $GITHUB_OUTPUT
+          elif [ "${{ needs.verify.result }}" == "failure" ] || [ "${{ needs.deploy.result }}" == "failure" ]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "mode=Deploy Failed" >> $GITHUB_OUTPUT
+          elif [ "${{ needs.verify.result }}" == "cancelled" ] || [ "${{ needs.deploy.result }}" == "cancelled" ]; then
+            echo "status=cancelled" >> $GITHUB_OUTPUT
+            echo "mode=Cancelled" >> $GITHUB_OUTPUT
+          else
+            echo "status=skipped" >> $GITHUB_OUTPUT
+            echo "mode=Skipped" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Send Slack notification
+        uses: ./.github/actions/slack-notify
+        with:
+          status: ${{ steps.status.outputs.status }}
+          environment: ${{ needs.build.outputs.environment }}
+          service_name: 'Market Maker'
+          version: ${{ needs.build.outputs.version }}
+          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          image_tag: ${{ needs.build.outputs.is_cicd_branch != 'true' && format('{0}:{1}', env.GHCR_IMAGE, needs.build.outputs.version) || '' }}
+          additional_info: '${{ needs.build.outputs.is_cicd_branch == ''true'' && ''*Mode:* CI/CD Test (build only, no deploy)'' || format(''*ECS Cluster:* `{0}` • *Service:* `{1}`'', needs.build.outputs.ecs_cluster, needs.build.outputs.ecs_service) }}'
 
