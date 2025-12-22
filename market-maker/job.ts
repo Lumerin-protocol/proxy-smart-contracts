@@ -72,12 +72,21 @@ export async function main() {
     );
   }
 
-  const futuresAccountBalance = await contract.getBalance();
-  const accountBalance = await contract.getBalance();
+  const futuresBalance = await contract.getBalance();
+  const usdcBalance = await contract.getUSDCBalance(contract.getWalletAddress());
 
-  if (futuresAccountBalance < config.FLOAT_AMOUNT) {
-    const depositAmount = config.FLOAT_AMOUNT - futuresAccountBalance;
-    if (depositAmount <= accountBalance) {
+  log.info(
+    {
+      futuresBalance: `${formatUnits(futuresBalance, 6)} USDC`,
+      usdcBalance: `${formatUnits(usdcBalance, 6)} USDC`,
+      floatAmount: `${formatUnits(config.FLOAT_AMOUNT, 6)} USDC`,
+    },
+    "Account balances"
+  );
+
+  if (futuresBalance < config.FLOAT_AMOUNT) {
+    const depositAmount = config.FLOAT_AMOUNT - futuresBalance;
+    if (depositAmount <= usdcBalance) {
       if (!config.DRY_RUN) {
         await contract.approve(depositAmount);
         const { blockNumber } = await contract.deposit(depositAmount);
@@ -93,7 +102,7 @@ export async function main() {
       }
     } else {
       log.warn(
-        { depositAmount, accountBalance },
+        { depositAmount, accountBalance: usdcBalance },
         "Deposit amount is greater than account balance, skipping..."
       );
     }
