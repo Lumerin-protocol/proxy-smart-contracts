@@ -1,8 +1,8 @@
 import { createPublicClient, createWalletClient, encodeFunctionData, http } from "viem";
 import { FuturesABI } from "./abi/Futures.ts";
 import { privateKeyToAccount } from "viem/accounts";
-import { hardhat } from "viem/chains";
 import { getChain } from "./chainId.ts";
+import { IERC20ABI } from "./abi/IERC20.ts";
 
 function makeClient(url: string, chainId: number) {
   return createPublicClient({
@@ -23,6 +23,7 @@ export class FuturesContract {
   private address: `0x${string}`;
   private pc: ReturnType<typeof makeClient>;
   private wc: ReturnType<typeof makeWalletClient>;
+  private usdcAddress: `0x${string}`;
 
   constructor(address: `0x${string}`, url: string, privateKey: `0x${string}`, chainId: number) {
     this.address = address;
@@ -40,6 +41,24 @@ export class FuturesContract {
       abi: FuturesABI,
       functionName: "balanceOf",
       args: [this.wc.account.address],
+      authorizationList: undefined,
+    });
+  }
+
+  async getUSDCBalance(address: `0x${string}`): Promise<bigint> {
+    if (!this.usdcAddress) {
+      this.usdcAddress = await this.pc.readContract({
+        address: this.address as `0x${string}`,
+        abi: FuturesABI,
+        functionName: "token",
+        authorizationList: undefined,
+      });
+    }
+    return this.pc.readContract({
+      address: this.usdcAddress,
+      abi: IERC20ABI,
+      functionName: "balanceOf",
+      args: [address],
       authorizationList: undefined,
     });
   }
