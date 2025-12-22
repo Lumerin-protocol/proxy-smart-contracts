@@ -12,6 +12,7 @@ const TypePrivateKey = (opt?: StringOptions) =>
 const schema = Type.Object({
   ACTIVE_QUOTING_AMOUNT_RATIO: Type.Number({ minimum: 0, maximum: 1 }),
   CHAIN_ID: Type.Number({ minimum: 0, multipleOf: 1 }),
+  COMMIT_HASH: Type.String({ default: "unknown" }),
   DRY_RUN: Type.Boolean({ default: false }),
   DRY_RUN_WALLET_ADDRESS: Type.Optional(TypeEthAddress()),
   ETH_NODE_URL: Type.String({ format: "uri" }),
