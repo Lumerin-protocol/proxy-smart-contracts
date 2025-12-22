@@ -72,18 +72,30 @@ export async function main() {
   }
 
   const futuresAccountBalance = await contract.getBalance();
+  const accountBalance = await contract.getBalance();
 
   if (futuresAccountBalance < config.FLOAT_AMOUNT) {
     const depositAmount = config.FLOAT_AMOUNT - futuresAccountBalance;
-    await contract.approve(depositAmount);
-    const { blockNumber } = await contract.deposit(depositAmount);
-    log.info(
-      {
-        depositAmount,
-        blockNumber,
-      },
-      "Deposited to margin account"
-    );
+    if (depositAmount <= accountBalance) {
+      if (!config.DRY_RUN) {
+        await contract.approve(depositAmount);
+        const { blockNumber } = await contract.deposit(depositAmount);
+        log.info(
+          {
+            depositAmount,
+            blockNumber,
+          },
+          "Deposited to margin account"
+        );
+      } else {
+        log.info("Dry run, skipping deposit");
+      }
+    } else {
+      log.warn(
+        { depositAmount, accountBalance },
+        "Deposit amount is greater than account balance, skipping..."
+      );
+    }
   }
 
   for (let iteration = 0; ; iteration++) {
@@ -97,10 +109,17 @@ export async function main() {
     const deliveryDate = await contract.getCurrentDeliveryDate();
     const currentPosition = await subgraph.getCurrentPosition(
       BigInt(deliveryDate),
-      contract.getWalletAddress()
+      config.DRY_RUN && config.DRY_RUN_WALLET_ADDRESS
+        ? config.DRY_RUN_WALLET_ADDRESS
+        : contract.getWalletAddress()
     );
     const unrealizedPnL = currentPosition.position * (indexPrice - currentPosition.averagePrice);
-    const remainingTimeHours = (deliveryDate - NowSeconds()) / 3600;
+
+    const now = new Date();
+    const nextMarginCallTime = new Date(now);
+    nextMarginCallTime.setUTCHours(0, 0, config.MARGIN_CALL_TIME_SECONDS, 0);
+    const remainingTimeToMarginCallHours =
+      (nextMarginCallTime.getTime() - now.getTime()) / (3600 * 1000);
 
     log.info(`Margin account balance: $${formatUnits(marginAccountBalance, 6)}`);
     log.info(`Remaining gas: $${formatUnits(remainingGas, 18)} ETH`);
@@ -120,7 +139,7 @@ export async function main() {
         currentPosition: currentPosition.position,
         currentAveragePrice: `${formatUnits(currentPosition.averagePrice, 6)} USDC`,
         unrealizedPnL: `${formatUnits(unrealizedPnL, 6)} USDC`,
-        remainingTimeHours,
+        remainingTimeToMarginCallHours,
         volatilityPerHour,
       },
       "Market data"
@@ -133,7 +152,7 @@ export async function main() {
       currentPosition.position * contractMultiplier,
       config.RISK_AVERSION,
       volatilityPerHour,
-      remainingTimeHours
+      remainingTimeToMarginCallHours
     );
     reservationPrice = roundToNearest(reservationPrice, tickSize);
     log.info(
@@ -218,7 +237,9 @@ export async function main() {
     // 3. Query current orders
     const currentOrders = await subgraph.getCurrentOrders(
       BigInt(deliveryDate),
-      contract.getWalletAddress()
+      config.DRY_RUN && config.DRY_RUN_WALLET_ADDRESS
+        ? config.DRY_RUN_WALLET_ADDRESS
+        : contract.getWalletAddress()
     );
     log.info(ordersToString(currentOrders), "Current orders");
 
@@ -232,14 +253,18 @@ export async function main() {
     }));
 
     if (ordersToPlaceWithDeliveryDate.length > 0) {
-      const rec = await contract.placeOrders(ordersToPlaceWithDeliveryDate);
-      log.info(
-        {
-          blockNumber: rec.blockNumber,
-          gasFee: `${formatUnits(getGasFee(rec), 18)} ETH`,
-        },
-        "Orders placed"
-      );
+      if (!config.DRY_RUN) {
+        const rec = await contract.placeOrders(ordersToPlaceWithDeliveryDate);
+        log.info(
+          {
+            blockNumber: rec.blockNumber,
+            gasFee: `${formatUnits(getGasFee(rec), 18)} ETH`,
+          },
+          "Orders placed"
+        );
+      } else {
+        log.info("Dry run, skipping orders placement");
+      }
     } else {
       log.info(`No orders to place, skipping...`);
     }
