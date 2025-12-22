@@ -12,6 +12,8 @@ const TypePrivateKey = (opt?: StringOptions) =>
 const schema = Type.Object({
   ACTIVE_QUOTING_AMOUNT_RATIO: Type.Number({ minimum: 0, maximum: 1 }),
   CHAIN_ID: Type.Number({ minimum: 0, multipleOf: 1 }),
+  DRY_RUN: Type.Boolean({ default: false }),
+  DRY_RUN_WALLET_ADDRESS: Type.Optional(TypeEthAddress()),
   ETH_NODE_URL: Type.String({ format: "uri" }),
   FLOAT_AMOUNT: Type.Number({ minimum: 0, multipleOf: 1 }),
   FUTURES_ADDRESS: TypeEthAddress(),
@@ -19,6 +21,7 @@ const schema = Type.Object({
   LOG_LEVEL: Type.String(),
   LOOP_INTERVAL_MS: Type.Number({ minimum: 0, multipleOf: 1 }),
   MAX_POSITION: Type.Number({ minimum: 0, multipleOf: 1 }),
+  MARGIN_CALL_TIME_SECONDS: Type.Number({ minimum: 0, multipleOf: 1, default: 0 }),
   PRIVATE_KEY: TypePrivateKey(),
   RISK_AVERSION: Type.Number({ minimum: 0, multipleOf: 1 }),
   SPREAD_AMOUNT: Type.Number({ minimum: 0, multipleOf: 1 }),
