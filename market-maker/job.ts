@@ -61,6 +61,7 @@ export async function main() {
       walletAddress: contract.getWalletAddress(),
       volatilityPerHour,
       tickSize,
+      commitHash: config.COMMIT_HASH,
     },
     "Derived data"
   );
