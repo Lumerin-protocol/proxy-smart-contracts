@@ -80,6 +80,10 @@ type Position @entity(immutable: false) {
   orderId: Bytes!
   destURL: String!
 
+  # PnL
+  sellerPnl: BigInt
+  buyerPnl: BigInt
+
   # Status
   isActive: Boolean!
   closedAt: BigInt
