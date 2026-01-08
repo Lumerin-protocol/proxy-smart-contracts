@@ -1,9 +1,7 @@
 import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import { parseEventLogs, parseUnits, getAddress, zeroAddress } from "viem";
-import { time } from "@nomicfoundation/hardhat-network-helpers";
+import { parseEventLogs, parseUnits, getAddress } from "viem";
 import { deployFuturesFixture } from "./fixtures";
-import { catchError } from "../../lib";
 
 describe("Futures - createOrder - Order Matching and Position Creation", function () {
   it("should match sell and buy orders and create a position", async function () {
@@ -375,5 +373,24 @@ describe("Futures - createOrder - Order Matching and Position Creation", functio
     expect(createdEvent2.args.buyPricePerDay).to.equal(newPrice);
     expect(createdEvent2.args.deliveryAt).to.equal(deliveryDate);
     expect(createdEvent2.args.orderId).to.equal(order2CreatedEvent.args.orderId);
+
+    // realized pnl  event
+    const [buyerRealizedProfitEvent] = parseEventLogs({
+      logs: receipt2.logs,
+      abi: futures.abi,
+      eventName: "PositionExited",
+      args: { participant: buyer.account.address },
+    });
+
+    const pnl = (newPrice - price) * BigInt(config.deliveryDurationDays);
+    expect(buyerRealizedProfitEvent.args.pnl).to.equal(pnl);
+
+    // const [buyer2RealizedLossDueToFeeEvent] = parseEventLogs({
+    //   logs: receipt2.logs,
+    //   abi: futures.abi,
+    //   eventName: "PositionExited",
+    //   args: { participant: buyer2.account.address },
+    // });
+    // expect(buyer2RealizedLossDueToFeeEvent.args.pnl).to.equal(-config.orderFee);
   });
 });
