@@ -984,7 +984,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
     function _transferPnl(address _from, address _to, int256 _pnl) private {
         if (_pnl > 0) {
             _transfer(_from, _to, uint256(_pnl));
-        } else {
+        } else if (_pnl < 0) {
             _transfer(_to, _from, uint256(-_pnl));
         }
     }
