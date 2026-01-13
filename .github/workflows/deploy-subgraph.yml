@@ -127,7 +127,8 @@ jobs:
           ENV="${{ needs.setup.outputs.environment }}"
           
           # Map to endpoints
-          # Note: Graph Node handles IPFS internally via admin API
+          # IPFS uploads go to The Graph's public IPFS (api.thegraph.com/ipfs/)
+          # Our Graph Node fetches from public IPFS gateways when indexing
           case $ENV in
             dev)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
@@ -266,17 +267,26 @@ jobs:
           npx graph create --node ${{ needs.build.outputs.graph_node_url }}:8020 \
             ${{ needs.build.outputs.subgraph_name }} || echo "Subgraph already exists"
 
+      # Deploy subgraph to Graph Node
+      # Uses The Graph's public IPFS (api.thegraph.com/ipfs) - content is immediately
+      # available since Graph Node uses the same IPFS endpoint. No propagation wait needed.
       - name: Deploy subgraph
+        id: deploy
         working-directory: ./subgraph-futures
         run: |
-          echo "🚀 Deploying to ${{ needs.build.outputs.environment }} environment"
-          echo "   Graph Node: ${{ needs.build.outputs.graph_node_url }}"
-          echo "   Subgraph: ${{ needs.build.outputs.subgraph_name }}"
-          echo "   Version: ${{ needs.build.outputs.version }}"
-          echo "   Start time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
+          echo "🚀 Deploying subgraph..."
+          echo "   Environment: ${{ needs.build.outputs.environment }}"
+          echo "   Graph Node:  ${{ needs.build.outputs.graph_node_url }}:8020"
+          echo "   IPFS:        https://api.thegraph.com/ipfs/"
+          echo "   Subgraph:    ${{ needs.build.outputs.subgraph_name }}"
+          echo "   Version:     ${{ needs.build.outputs.version }}"
+          echo "   Start time:  $(date -u +%Y-%m-%dT%H:%M:%S)Z"
           echo ""
           
-          # Retry logic to handle transient network issues
+          # Build first
+          npx graph build
+          
+          # Deploy with retry logic
           MAX_ATTEMPTS=3
           ATTEMPT=1
           DEPLOY_START_TIME=$(date +%s)
@@ -288,41 +298,60 @@ jobs:
             echo "   Timestamp: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
             echo "================================================"
             
-            # Graph Node handles IPFS internally - no need to specify --ipfs
-            # Use npx to run the local graph-cli version from package.json
-            set +e  # Don't exit on error, capture it
-            npx graph deploy --node ${{ needs.build.outputs.graph_node_url }}:8020 \
+            set +e
+            npx graph deploy \
+              --node ${{ needs.build.outputs.graph_node_url }}:8020 \
+              --ipfs "https://api.thegraph.com/ipfs/" \
               --version-label ${{ needs.build.outputs.version }} \
-              ${{ needs.build.outputs.subgraph_name }}
-            DEPLOY_EXIT_CODE=$?
+              ${{ needs.build.outputs.subgraph_name }} 2>&1 | tee deploy_output.txt
+            DEPLOY_EXIT_CODE=${PIPESTATUS[0]}
             set -e
             
             ATTEMPT_END_TIME=$(date +%s)
             ATTEMPT_DURATION=$((ATTEMPT_END_TIME - ATTEMPT_START_TIME))
             
+            # Extract CID from output
+            IPFS_HASH=$(grep -oP 'Qm[a-zA-Z0-9]{44}' deploy_output.txt | tail -1 || echo "")
+            
             if [ $DEPLOY_EXIT_CODE -eq 0 ]; then
               TOTAL_DURATION=$((ATTEMPT_END_TIME - DEPLOY_START_TIME))
+              echo ""
               echo "================================================"
-              echo "✅ Subgraph deployed successfully"
-              echo "   Attempt: $ATTEMPT"
-              echo "   Attempt duration: ${ATTEMPT_DURATION}s"
-              echo "   Total duration: ${TOTAL_DURATION}s"
-              echo "   End time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
+              echo "✅ Subgraph deployed successfully!"
+              echo "   Duration: ${ATTEMPT_DURATION}s"
+              if [ -n "$IPFS_HASH" ]; then
+                echo "   CID: $IPFS_HASH"
+              fi
               echo "================================================"
+              
+              # Write success to job summary
+              echo "## ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+              echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+              echo "| Environment | ${{ needs.build.outputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+              echo "| Version | ${{ needs.build.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+              echo "| Graph Node | ${{ needs.build.outputs.graph_node_url }} |" >> $GITHUB_STEP_SUMMARY
+              echo "| Duration | ${TOTAL_DURATION}s |" >> $GITHUB_STEP_SUMMARY
+              if [ -n "$IPFS_HASH" ]; then
+                echo "| Deployment CID | \`$IPFS_HASH\` |" >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "### Verify CID" >> $GITHUB_STEP_SUMMARY
+                echo "- [🔍 Check on IPFS Network](https://check.ipfs.network/?cid=$IPFS_HASH)" >> $GITHUB_STEP_SUMMARY
+                echo "- [🌐 View on ipfs.io](https://ipfs.io/ipfs/$IPFS_HASH)" >> $GITHUB_STEP_SUMMARY
+              fi
+              echo "" >> $GITHUB_STEP_SUMMARY
+              
               exit 0
             fi
             
             echo "================================================"
-            echo "❌ Deployment attempt $ATTEMPT failed"
-            echo "   Exit code: $DEPLOY_EXIT_CODE"
-            echo "   Duration: ${ATTEMPT_DURATION}s"
-            echo "   End time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
+            echo "❌ Attempt $ATTEMPT failed (exit code: $DEPLOY_EXIT_CODE)"
             echo "================================================"
             
             if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
-              WAIT_TIME=$((ATTEMPT * 30))
-              echo "⏳ Waiting ${WAIT_TIME} seconds before retry..."
-              echo ""
+              WAIT_TIME=30
+              echo "⏳ Waiting ${WAIT_TIME}s before retry..."
               sleep $WAIT_TIME
             fi
             
@@ -330,11 +359,22 @@ jobs:
           done
           
           TOTAL_DURATION=$(($(date +%s) - DEPLOY_START_TIME))
+          echo ""
           echo "================================================"
           echo "❌ Deployment failed after $MAX_ATTEMPTS attempts"
           echo "   Total duration: ${TOTAL_DURATION}s"
-          echo "   Final time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
           echo "================================================"
+          
+          # Write failure to job summary
+          echo "## ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Deployment failed after $MAX_ATTEMPTS attempts." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Troubleshooting" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check Graph Node logs" >> $GITHUB_STEP_SUMMARY
+          echo "2. Re-run the workflow" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
           exit 1
 
   verify:
