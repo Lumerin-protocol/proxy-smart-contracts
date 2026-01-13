@@ -293,14 +293,15 @@ jobs:
         run: |
           echo "🚀 Deploying to ${{ needs.build.outputs.environment }} environment"
           echo "   Graph Node: ${{ needs.build.outputs.graph_node_url }}:8020"
-          echo "   IPFS Node:  https://${{ needs.build.outputs.ipfs_host }} (private, authenticated)"
+          echo "   IPFS Node:  https://${{ needs.build.outputs.ipfs_host }} (private, authenticated via query param)"
           echo "   Subgraph:   ${{ needs.build.outputs.subgraph_name }}"
           echo "   Version:    ${{ needs.build.outputs.version }}"
           echo "   Start time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
           echo ""
           
-          # Construct authenticated IPFS URL (API key as username, 'x' as password)
-          IPFS_URL="https://${IPFS_API_KEY}:x@${{ needs.build.outputs.ipfs_host }}"
+          # Construct authenticated IPFS URL (API key as query parameter)
+          # Note: graph-cli's Fetch API blocks credentials in URL, so we use query param instead
+          IPFS_URL="https://${{ needs.build.outputs.ipfs_host }}?key=${IPFS_API_KEY}"
           
           # Retry logic to handle transient network issues
           MAX_ATTEMPTS=3
