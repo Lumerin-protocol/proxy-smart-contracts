@@ -104,6 +104,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
         bytes32 orderId
     );
     event PositionClosed(bytes32 indexed positionId);
+    event PositionExited(bytes32 indexed positionId, address indexed participant, int256 pnl); // positive pnl is participant's profit
     event PositionDeliveryClosed(bytes32 indexed positionId, address indexed closedBy);
     event PositionPaid(bytes32 indexed positionId);
     event PositionPaymentReceived(bytes32 indexed positionId);
@@ -208,7 +209,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
 
         // order fee only for created or matched orders
         if (orderCreatedOrMatched) {
-            _update(_msgSender(), address(this), orderFee);
+            _transfer(_msgSender(), address(this), orderFee);
         }
         ensureNoCollateralDeficit(_msgSender());
     }
@@ -345,10 +346,14 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
             }
             int256 pnl = pnlPerDay * int256(uint256(deliveryDurationDays));
 
-            if (pnl > 0) {
-                _update(order.participant, address(this), uint256(pnl));
-            } else if (pnl < 0) {
-                _update(address(this), order.participant, uint256(-pnl));
+            _transferPnl(order.participant, address(this), pnl);
+            emit PositionExited(existingPositionId, order.participant, -pnl);
+
+            if (_temp.buyer == _temp.seller) {
+                // both parties exiting the position
+                emit PositionExited(existingPositionId, _temp.buyer, pnl);
+                _transferPnl(address(this), _temp.buyer, pnl);
+                return;
             }
         }
 
@@ -651,11 +656,7 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
             positionRemainingTime = deliveryDurationSeconds();
         }
 
-        uint256 hashesForToken = _getHashesForToken();
-
-        // if the position is not started yet, then use the current price
-        uint256 currentPrice = _getMarketPrice(hashesForToken);
-
+        // payment for a delivered portion of the hashrate
         int256 priceDifference = int256(position.sellPricePerDay) - int256(position.buyPricePerDay);
         if (priceDifference > 0) {
             uint256 buyerPaysToSeller =
@@ -677,24 +678,19 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
             _transfer(position.buyer, position.seller, buyerPaysToSeller);
         }
 
-        // Calculate PnL based on market price vs buyer's entry price for remaining time
+        // Payment for the remaining portion of the hashrate
+        uint256 hashesForToken = _getHashesForToken();
+        uint256 currentPrice = _getMarketPrice(hashesForToken);
         uint256 mult = uint256(deliveryDurationDays) * positionRemainingTime / uint256(deliveryDurationSeconds());
 
         int256 sellerPnl = (int256(position.sellPricePerDay) - int256(currentPrice)) * int256(mult);
         int256 buyerPnl = (int256(currentPrice) - int256(position.buyPricePerDay)) * int256(mult);
 
-        if (sellerPnl < 0) {
-            _transfer(position.seller, address(this), uint256(-sellerPnl));
-        }
-        if (buyerPnl < 0) {
-            _transfer(position.buyer, address(this), uint256(-buyerPnl));
-        }
-        if (sellerPnl > 0) {
-            _transfer(address(this), position.seller, uint256(sellerPnl));
-        }
-        if (buyerPnl > 0) {
-            _transfer(address(this), position.buyer, uint256(buyerPnl));
-        }
+        emit PositionExited(_positionId, position.seller, -sellerPnl);
+        emit PositionExited(_positionId, position.buyer, -buyerPnl);
+
+        _transferPnl(address(this), position.seller, sellerPnl);
+        _transferPnl(address(this), position.buyer, buyerPnl);
 
         // remove position
         _removePosition(_positionId, position);
@@ -983,6 +979,14 @@ contract Futures is UUPSUpgradeable, OwnableUpgradeable, ERC20Upgradeable, Multi
     function withdrawReservePool(uint256 _amount) external onlyOwner {
         _burn(address(this), _amount);
         token.safeTransfer(_msgSender(), _amount);
+    }
+
+    function _transferPnl(address _from, address _to, int256 _pnl) private {
+        if (_pnl > 0) {
+            _transfer(_from, _to, uint256(_pnl));
+        } else if (_pnl < 0) {
+            _transfer(_to, _from, uint256(-_pnl));
+        }
     }
 
     // ERC20 functions
