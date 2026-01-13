@@ -104,7 +104,6 @@ jobs:
       tag: ${{ needs.setup.outputs.tag }}
       environment: ${{ needs.setup.outputs.environment }}
       graph_node_url: ${{ steps.env.outputs.graph_node_url }}
-      ipfs_host: ${{ steps.env.outputs.ipfs_host }}
       subgraph_name: ${{ steps.env.outputs.subgraph_name }}
       aws_region: ${{ steps.env.outputs.aws_region }}
       is_cicd_branch: ${{ needs.setup.outputs.is_cicd_branch }}
@@ -128,26 +127,22 @@ jobs:
           ENV="${{ needs.setup.outputs.environment }}"
           
           # Map to endpoints
-          # IPFS URL is used for direct uploads to our private IPFS node
-          # This ensures files are uploaded directly instead of through public IPFS
-          # Note: IPFS_API_KEY is added at deploy time for security (not stored in outputs)
+          # IPFS uploads go to The Graph's public IPFS (api.thegraph.com/ipfs/)
+          # Our Graph Node fetches from public IPFS gateways when indexing
           case $ENV in
             dev)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
               echo "graph_node_url=https://graphidx.dev.lumerin.io" >> $GITHUB_OUTPUT
-              echo "ipfs_host=graphidx.dev.lumerin.io:5001" >> $GITHUB_OUTPUT
               echo "subgraph_name=marketplace" >> $GITHUB_OUTPUT
               ;;
             stg)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
               echo "graph_node_url=https://graphidx.stg.lumerin.io" >> $GITHUB_OUTPUT
-              echo "ipfs_host=graphidx.stg.lumerin.io:5001" >> $GITHUB_OUTPUT
               echo "subgraph_name=marketplace" >> $GITHUB_OUTPUT
               ;;
             main)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
               echo "graph_node_url=https://graphidx.lmn.lumerin.io" >> $GITHUB_OUTPUT
-              echo "ipfs_host=graphidx.lmn.lumerin.io:5001" >> $GITHUB_OUTPUT
               echo "subgraph_name=marketplace" >> $GITHUB_OUTPUT
               ;;
           esac
@@ -272,38 +267,122 @@ jobs:
           npx graph create --node ${{ needs.build.outputs.graph_node_url }}:8020 \
             ${{ needs.build.outputs.subgraph_name }} || echo "Subgraph already exists"
 
-      - name: Fetch IPFS API key from AWS Secrets Manager
-        id: secrets
-        run: |
-          # Fetch the indexer secrets from AWS Secrets Manager
-          SECRET_JSON=$(aws secretsmanager get-secret-value \
-            --secret-id hashrouter-indexer-secrets \
-            --query SecretString \
-            --output text)
-          
-          # Extract the IPFS API key and mask it in logs
-          IPFS_API_KEY=$(echo "$SECRET_JSON" | jq -r '.ipfs_api_key')
-          echo "::add-mask::$IPFS_API_KEY"
-          echo "ipfs_api_key=$IPFS_API_KEY" >> $GITHUB_OUTPUT
-
-      - name: Deploy subgraph
+      - name: Build and upload to IPFS
+        id: ipfs_upload
         working-directory: ./subgraph-futures
-        env:
-          IPFS_API_KEY: ${{ steps.secrets.outputs.ipfs_api_key }}
+        run: |
+          echo "📦 Building subgraph and uploading to IPFS..."
+          echo "   IPFS: https://api.thegraph.com/ipfs/ (The Graph's public IPFS)"
+          echo "   Start time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
+          echo ""
+          
+          # Build and upload to IPFS (this doesn't deploy to Graph Node yet)
+          # We use graph build + manual upload approach to separate concerns
+          npx graph build
+          
+          # Upload to The Graph's IPFS and capture the deployment ID
+          UPLOAD_OUTPUT=$(npx graph deploy \
+            --node ${{ needs.build.outputs.graph_node_url }}:8020 \
+            --ipfs "https://api.thegraph.com/ipfs/" \
+            --version-label ${{ needs.build.outputs.version }} \
+            ${{ needs.build.outputs.subgraph_name }} 2>&1) || true
+          
+          echo "$UPLOAD_OUTPUT"
+          
+          # Extract the subgraph deployment ID (IPFS hash starting with Qm)
+          IPFS_HASH=$(echo "$UPLOAD_OUTPUT" | grep -oP 'Qm[a-zA-Z0-9]{44}' | tail -1 || echo "")
+          
+          if [ -n "$IPFS_HASH" ]; then
+            echo ""
+            echo "📦 Subgraph uploaded to IPFS"
+            echo "   Deployment ID: $IPFS_HASH"
+            echo "   Gateway URL: https://ipfs.io/ipfs/$IPFS_HASH"
+            echo "ipfs_hash=$IPFS_HASH" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️  Could not extract IPFS hash from upload output"
+            echo "   Continuing with deployment (Graph Node may already have content)"
+            echo "ipfs_hash=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Wait for IPFS propagation
+        if: steps.ipfs_upload.outputs.ipfs_hash != ''
+        run: |
+          IPFS_HASH="${{ steps.ipfs_upload.outputs.ipfs_hash }}"
+          echo "⏳ Waiting for IPFS content to propagate..."
+          echo "   CID: $IPFS_HASH"
+          echo ""
+          
+          # Configuration for IPFS propagation check
+          # Max wait: 15 minutes (15 checks × 60 seconds)
+          MAX_CHECKS=15
+          CHECK_INTERVAL=60
+          CHECK=1
+          
+          # Multiple gateways to check (redundancy)
+          GATEWAYS=(
+            "https://ipfs.io/ipfs"
+            "https://cloudflare-ipfs.com/ipfs"
+            "https://gateway.pinata.cloud/ipfs"
+          )
+          
+          echo "================================================"
+          echo "🔍 Checking IPFS availability (max ${MAX_CHECKS} checks, ${CHECK_INTERVAL}s interval)"
+          echo "   Maximum wait time: $((MAX_CHECKS * CHECK_INTERVAL / 60)) minutes"
+          echo "================================================"
+          echo ""
+          
+          while [ $CHECK -le $MAX_CHECKS ]; do
+            ELAPSED=$((CHECK * CHECK_INTERVAL - CHECK_INTERVAL))
+            echo "Check $CHECK/$MAX_CHECKS (${ELAPSED}s elapsed)..."
+            
+            # Try each gateway
+            for GATEWAY in "${GATEWAYS[@]}"; do
+              GATEWAY_NAME=$(echo "$GATEWAY" | sed 's|https://||' | cut -d'/' -f1)
+              
+              # Check if content is retrievable (HEAD request with timeout)
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+                "${GATEWAY}/${IPFS_HASH}" 2>/dev/null || echo "000")
+              
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo ""
+                echo "================================================"
+                echo "✅ IPFS content is available!"
+                echo "   Gateway: $GATEWAY_NAME"
+                echo "   CID: $IPFS_HASH"
+                echo "   Propagation time: ~${ELAPSED}s"
+                echo "================================================"
+                exit 0
+              fi
+            done
+            
+            if [ $CHECK -lt $MAX_CHECKS ]; then
+              echo "   Not available yet, waiting ${CHECK_INTERVAL}s..."
+              sleep $CHECK_INTERVAL
+            fi
+            
+            CHECK=$((CHECK + 1))
+          done
+          
+          echo ""
+          echo "================================================"
+          echo "⚠️  IPFS propagation timeout after $((MAX_CHECKS * CHECK_INTERVAL / 60)) minutes"
+          echo "   CID: $IPFS_HASH"
+          echo "   Continuing with deployment anyway (Graph Node may have different connectivity)"
+          echo "================================================"
+          # Don't fail here - Graph Node might still be able to fetch it
+
+      - name: Deploy to Graph Node
+        working-directory: ./subgraph-futures
         run: |
           echo "🚀 Deploying to ${{ needs.build.outputs.environment }} environment"
           echo "   Graph Node: ${{ needs.build.outputs.graph_node_url }}:8020"
-          echo "   IPFS Node:  https://${{ needs.build.outputs.ipfs_host }} (private, authenticated via query param)"
           echo "   Subgraph:   ${{ needs.build.outputs.subgraph_name }}"
           echo "   Version:    ${{ needs.build.outputs.version }}"
           echo "   Start time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
           echo ""
           
-          # Construct authenticated IPFS URL (API key as query parameter)
-          # Note: graph-cli's Fetch API blocks credentials in URL, so we use query param instead
-          IPFS_URL="https://${{ needs.build.outputs.ipfs_host }}?key=${IPFS_API_KEY}"
-          
-          # Retry logic to handle transient network issues
+          # Deploy with retry logic for Graph Node connectivity issues
+          # IPFS propagation is already handled above
           MAX_ATTEMPTS=3
           ATTEMPT=1
           DEPLOY_START_TIME=$(date +%s)
@@ -311,19 +390,17 @@ jobs:
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
             ATTEMPT_START_TIME=$(date +%s)
             echo "================================================"
-            echo "📤 Deployment attempt $ATTEMPT of $MAX_ATTEMPTS"
+            echo "📤 Graph Node deployment attempt $ATTEMPT of $MAX_ATTEMPTS"
             echo "   Timestamp: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
             echo "================================================"
             
-            # Upload directly to our private IPFS node (authenticated)
-            # This ensures instant content availability without peer discovery delays
-            set +e  # Don't exit on error, capture it
+            set +e
             npx graph deploy \
               --node ${{ needs.build.outputs.graph_node_url }}:8020 \
-              --ipfs "${IPFS_URL}" \
+              --ipfs "https://api.thegraph.com/ipfs/" \
               --version-label ${{ needs.build.outputs.version }} \
-              ${{ needs.build.outputs.subgraph_name }}
-            DEPLOY_EXIT_CODE=$?
+              ${{ needs.build.outputs.subgraph_name }} 2>&1 | tee deploy_output.txt
+            DEPLOY_EXIT_CODE=${PIPESTATUS[0]}
             set -e
             
             ATTEMPT_END_TIME=$(date +%s)
@@ -338,6 +415,13 @@ jobs:
               echo "   Total duration: ${TOTAL_DURATION}s"
               echo "   End time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
               echo "================================================"
+              
+              IPFS_HASH=$(grep -oP 'Qm[a-zA-Z0-9]{44}' deploy_output.txt | tail -1 || echo "")
+              if [ -n "$IPFS_HASH" ]; then
+                echo ""
+                echo "📦 Subgraph Deployment ID: $IPFS_HASH"
+                echo "   IPFS Gateway: https://ipfs.io/ipfs/$IPFS_HASH"
+              fi
               exit 0
             fi
             
@@ -345,13 +429,19 @@ jobs:
             echo "❌ Deployment attempt $ATTEMPT failed"
             echo "   Exit code: $DEPLOY_EXIT_CODE"
             echo "   Duration: ${ATTEMPT_DURATION}s"
-            echo "   End time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
             echo "================================================"
             
-            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
-              WAIT_TIME=$((ATTEMPT * 30))
-              echo "⏳ Waiting ${WAIT_TIME} seconds before retry..."
+            # Check if it's an IPFS fetch error
+            if grep -q "IPFS\|ipfs\|timeout\|fetch" deploy_output.txt 2>/dev/null; then
               echo ""
+              echo "💡 This appears to be an IPFS connectivity issue."
+              echo "   Graph Node may need more time to fetch content from IPFS."
+            fi
+            
+            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+              # Wait 2 minutes between Graph Node deploy attempts
+              WAIT_TIME=120
+              echo "⏳ Waiting ${WAIT_TIME}s before retry..."
               sleep $WAIT_TIME
             fi
             
@@ -362,7 +452,6 @@ jobs:
           echo "================================================"
           echo "❌ Deployment failed after $MAX_ATTEMPTS attempts"
           echo "   Total duration: ${TOTAL_DURATION}s"
-          echo "   Final time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
           echo "================================================"
           exit 1
 
