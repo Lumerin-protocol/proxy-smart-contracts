@@ -13,6 +13,7 @@ import {
   PositionPaid,
   PositionPaymentReceived,
   ValidatorURLUpdated,
+  PositionExited,
 } from "../generated/Futures/Futures";
 import { Futures, Participant, Position, Order, DeliveryDateOrder } from "../generated/schema";
 import { log, Address, dataSource } from "@graphprotocol/graph-ts";
@@ -152,7 +153,10 @@ export function handleOrderCreated(event: OrderCreated): void {
   futures.save();
 
   // Update DeliveryDateOrder counts
-  const deliveryDateOrder = getOrCreateDeliveryDateOrder(event.params.deliveryAt, event.params.pricePerDay);
+  const deliveryDateOrder = getOrCreateDeliveryDateOrder(
+    event.params.deliveryAt,
+    event.params.pricePerDay
+  );
   if (event.params.isBuy) {
     deliveryDateOrder.buyOrdersCount++;
   } else {
@@ -290,6 +294,25 @@ export function handlePositionClosed(event: PositionClosed): void {
     futures.closeoutCount++;
     futures.save();
   }
+}
+
+export function handlePositionExited(event: PositionExited): void {
+  log.info("Position exited: {}", [event.params.positionId.toHexString()]);
+  const position = Position.load(event.params.positionId);
+  if (!position) {
+    log.warning("Position not found: {}", [event.params.positionId.toHexString()]);
+    return;
+  }
+
+  if (event.params.participant.equals(position.seller)) {
+    position.sellerPnl = event.params.pnl;
+  } else if (event.params.participant.equals(position.buyer)) {
+    position.buyerPnl = event.params.pnl;
+  } else {
+    log.warning("Incorrect position participant: {}", [event.params.participant.toHexString()]);
+    return;
+  }
+  position.save();
 }
 
 export function handlePositionDeliveryClosed(event: PositionDeliveryClosed): void {
