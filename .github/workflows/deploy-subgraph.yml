@@ -298,10 +298,26 @@ jobs:
             echo "   Deployment ID: $IPFS_HASH"
             echo "   Gateway URL: https://ipfs.io/ipfs/$IPFS_HASH"
             echo "ipfs_hash=$IPFS_HASH" >> $GITHUB_OUTPUT
+            
+            # Write to GitHub Actions Job Summary for easy access
+            echo "## 📦 IPFS Upload" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Subgraph CID:** \`$IPFS_HASH\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Verify CID Availability" >> $GITHUB_STEP_SUMMARY
+            echo "- [🔍 Check on IPFS Network](https://check.ipfs.network/?cid=$IPFS_HASH)" >> $GITHUB_STEP_SUMMARY
+            echo "- [🌐 View on ipfs.io](https://ipfs.io/ipfs/$IPFS_HASH)" >> $GITHUB_STEP_SUMMARY
+            echo "- [☁️ View on Cloudflare](https://cloudflare-ipfs.com/ipfs/$IPFS_HASH)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
           else
             echo "⚠️  Could not extract IPFS hash from upload output"
             echo "   Continuing with deployment (Graph Node may already have content)"
             echo "ipfs_hash=" >> $GITHUB_OUTPUT
+            
+            echo "## ⚠️ IPFS Upload" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Could not extract IPFS CID from upload output." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Wait for IPFS propagation
@@ -422,6 +438,21 @@ jobs:
                 echo "📦 Subgraph Deployment ID: $IPFS_HASH"
                 echo "   IPFS Gateway: https://ipfs.io/ipfs/$IPFS_HASH"
               fi
+              
+              # Write success to job summary
+              echo "## ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+              echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+              echo "| Environment | ${{ needs.build.outputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+              echo "| Version | ${{ needs.build.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+              echo "| Graph Node | ${{ needs.build.outputs.graph_node_url }} |" >> $GITHUB_STEP_SUMMARY
+              echo "| Duration | ${TOTAL_DURATION}s |" >> $GITHUB_STEP_SUMMARY
+              if [ -n "$IPFS_HASH" ]; then
+                echo "| Deployment CID | \`$IPFS_HASH\` |" >> $GITHUB_STEP_SUMMARY
+              fi
+              echo "" >> $GITHUB_STEP_SUMMARY
+              
               exit 0
             fi
             
@@ -453,6 +484,20 @@ jobs:
           echo "❌ Deployment failed after $MAX_ATTEMPTS attempts"
           echo "   Total duration: ${TOTAL_DURATION}s"
           echo "================================================"
+          
+          # Write failure to job summary
+          echo "## ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Deployment to Graph Node failed after $MAX_ATTEMPTS attempts." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Total Duration:** ${TOTAL_DURATION}s" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Troubleshooting" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check the CID availability link above" >> $GITHUB_STEP_SUMMARY
+          echo "2. Verify at [check.ipfs.network](https://check.ipfs.network/)" >> $GITHUB_STEP_SUMMARY
+          echo "3. Re-run the workflow if IPFS propagation was slow" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
           exit 1
 
   verify:
