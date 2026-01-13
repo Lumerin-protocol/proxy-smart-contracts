@@ -104,6 +104,7 @@ jobs:
       tag: ${{ needs.setup.outputs.tag }}
       environment: ${{ needs.setup.outputs.environment }}
       graph_node_url: ${{ steps.env.outputs.graph_node_url }}
+      ipfs_host: ${{ steps.env.outputs.ipfs_host }}
       subgraph_name: ${{ steps.env.outputs.subgraph_name }}
       aws_region: ${{ steps.env.outputs.aws_region }}
       is_cicd_branch: ${{ needs.setup.outputs.is_cicd_branch }}
@@ -127,21 +128,26 @@ jobs:
           ENV="${{ needs.setup.outputs.environment }}"
           
           # Map to endpoints
-          # Note: Graph Node handles IPFS internally via admin API
+          # IPFS URL is used for direct uploads to our private IPFS node
+          # This ensures files are uploaded directly instead of through public IPFS
+          # Note: IPFS_API_KEY is added at deploy time for security (not stored in outputs)
           case $ENV in
             dev)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
               echo "graph_node_url=https://graphidx.dev.lumerin.io" >> $GITHUB_OUTPUT
+              echo "ipfs_host=graphidx.dev.lumerin.io:5001" >> $GITHUB_OUTPUT
               echo "subgraph_name=marketplace" >> $GITHUB_OUTPUT
               ;;
             stg)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
               echo "graph_node_url=https://graphidx.stg.lumerin.io" >> $GITHUB_OUTPUT
+              echo "ipfs_host=graphidx.stg.lumerin.io:5001" >> $GITHUB_OUTPUT
               echo "subgraph_name=marketplace" >> $GITHUB_OUTPUT
               ;;
             main)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
               echo "graph_node_url=https://graphidx.lmn.lumerin.io" >> $GITHUB_OUTPUT
+              echo "ipfs_host=graphidx.lmn.lumerin.io:5001" >> $GITHUB_OUTPUT
               echo "subgraph_name=marketplace" >> $GITHUB_OUTPUT
               ;;
           esac
@@ -266,15 +272,35 @@ jobs:
           npx graph create --node ${{ needs.build.outputs.graph_node_url }}:8020 \
             ${{ needs.build.outputs.subgraph_name }} || echo "Subgraph already exists"
 
+      - name: Fetch IPFS API key from AWS Secrets Manager
+        id: secrets
+        run: |
+          # Fetch the indexer secrets from AWS Secrets Manager
+          SECRET_JSON=$(aws secretsmanager get-secret-value \
+            --secret-id hashrouter-indexer-secrets \
+            --query SecretString \
+            --output text)
+          
+          # Extract the IPFS API key and mask it in logs
+          IPFS_API_KEY=$(echo "$SECRET_JSON" | jq -r '.ipfs_api_key')
+          echo "::add-mask::$IPFS_API_KEY"
+          echo "ipfs_api_key=$IPFS_API_KEY" >> $GITHUB_OUTPUT
+
       - name: Deploy subgraph
         working-directory: ./subgraph-futures
+        env:
+          IPFS_API_KEY: ${{ steps.secrets.outputs.ipfs_api_key }}
         run: |
           echo "🚀 Deploying to ${{ needs.build.outputs.environment }} environment"
-          echo "   Graph Node: ${{ needs.build.outputs.graph_node_url }}"
-          echo "   Subgraph: ${{ needs.build.outputs.subgraph_name }}"
-          echo "   Version: ${{ needs.build.outputs.version }}"
+          echo "   Graph Node: ${{ needs.build.outputs.graph_node_url }}:8020"
+          echo "   IPFS Node:  https://${{ needs.build.outputs.ipfs_host }} (private, authenticated)"
+          echo "   Subgraph:   ${{ needs.build.outputs.subgraph_name }}"
+          echo "   Version:    ${{ needs.build.outputs.version }}"
           echo "   Start time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
           echo ""
+          
+          # Construct authenticated IPFS URL (API key as username, 'x' as password)
+          IPFS_URL="https://${IPFS_API_KEY}:x@${{ needs.build.outputs.ipfs_host }}"
           
           # Retry logic to handle transient network issues
           MAX_ATTEMPTS=3
@@ -288,10 +314,12 @@ jobs:
             echo "   Timestamp: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
             echo "================================================"
             
-            # Graph Node handles IPFS internally - no need to specify --ipfs
-            # Use npx to run the local graph-cli version from package.json
+            # Upload directly to our private IPFS node (authenticated)
+            # This ensures instant content availability without peer discovery delays
             set +e  # Don't exit on error, capture it
-            npx graph deploy --node ${{ needs.build.outputs.graph_node_url }}:8020 \
+            npx graph deploy \
+              --node ${{ needs.build.outputs.graph_node_url }}:8020 \
+              --ipfs "${IPFS_URL}" \
               --version-label ${{ needs.build.outputs.version }} \
               ${{ needs.build.outputs.subgraph_name }}
             DEPLOY_EXIT_CODE=$?
