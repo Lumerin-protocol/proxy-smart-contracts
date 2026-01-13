@@ -127,7 +127,8 @@ jobs:
           ENV="${{ needs.setup.outputs.environment }}"
           
           # Map to endpoints
-          # Note: Graph Node handles IPFS internally via admin API
+          # IPFS uploads go to The Graph's public IPFS (api.thegraph.com/ipfs/)
+          # Our Graph Node fetches from public IPFS gateways when indexing
           case $ENV in
             dev)
               echo "aws_region=us-east-1" >> $GITHUB_OUTPUT
@@ -266,17 +267,205 @@ jobs:
           npx graph create --node ${{ needs.build.outputs.graph_node_url }}:8020 \
             ${{ needs.build.outputs.subgraph_name }} || echo "Subgraph already exists"
 
-      - name: Deploy subgraph
+      # STEP 1: Build and Upload to IPFS
+      # Note: graph deploy does both IPFS upload AND Graph Node deployment.
+      # IPFS upload happens first, so even if Graph Node has issues, the CID is on IPFS.
+      # We capture the CID here and consider the upload successful if we get a CID.
+      - name: Build and upload to IPFS
+        id: ipfs_upload
         working-directory: ./subgraph-futures
         run: |
-          echo "🚀 Deploying to ${{ needs.build.outputs.environment }} environment"
-          echo "   Graph Node: ${{ needs.build.outputs.graph_node_url }}"
-          echo "   Subgraph: ${{ needs.build.outputs.subgraph_name }}"
-          echo "   Version: ${{ needs.build.outputs.version }}"
+          echo "📦 Step 1: Building subgraph and uploading to IPFS..."
+          echo "   IPFS: https://api.thegraph.com/ipfs/ (The Graph's public IPFS)"
           echo "   Start time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
           echo ""
           
-          # Retry logic to handle transient network issues
+          # Build the subgraph first
+          npx graph build
+          
+          # Deploy to IPFS (and attempt Graph Node deployment)
+          # The IPFS upload happens first in graph deploy, so even if Graph Node
+          # deployment fails, the CID will be on IPFS. We capture output regardless.
+          set +e
+          UPLOAD_OUTPUT=$(npx graph deploy \
+            --node ${{ needs.build.outputs.graph_node_url }}:8020 \
+            --ipfs "https://api.thegraph.com/ipfs/" \
+            --version-label ${{ needs.build.outputs.version }} \
+            ${{ needs.build.outputs.subgraph_name }} 2>&1)
+          DEPLOY_EXIT=$?
+          set -e
+          
+          echo "$UPLOAD_OUTPUT"
+          
+          # Extract the subgraph deployment ID (IPFS hash starting with Qm)
+          IPFS_HASH=$(echo "$UPLOAD_OUTPUT" | grep -oP 'Qm[a-zA-Z0-9]{44}' | tail -1 || echo "")
+          
+          if [ -n "$IPFS_HASH" ]; then
+            echo ""
+            echo "================================================"
+            echo "✅ Subgraph uploaded to IPFS successfully"
+            echo "   CID: $IPFS_HASH"
+            echo "   Gateway: https://ipfs.io/ipfs/$IPFS_HASH"
+            if [ $DEPLOY_EXIT -eq 0 ]; then
+              echo "   Graph Node: Deployment also succeeded!"
+              echo "graph_deployed=true" >> $GITHUB_OUTPUT
+            else
+              echo "   Graph Node: Initial deployment pending (will retry in Step 3)"
+              echo "graph_deployed=false" >> $GITHUB_OUTPUT
+            fi
+            echo "================================================"
+            echo "ipfs_hash=$IPFS_HASH" >> $GITHUB_OUTPUT
+            
+            # Write to GitHub Actions Job Summary
+            echo "## 📦 Step 1: IPFS Upload" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Subgraph CID:** \`$IPFS_HASH\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Verify CID Availability" >> $GITHUB_STEP_SUMMARY
+            echo "- [🔍 Check on IPFS Network](https://check.ipfs.network/?cid=$IPFS_HASH)" >> $GITHUB_STEP_SUMMARY
+            echo "- [🌐 View on ipfs.io](https://ipfs.io/ipfs/$IPFS_HASH)" >> $GITHUB_STEP_SUMMARY
+            echo "- [☁️ View on Cloudflare](https://cloudflare-ipfs.com/ipfs/$IPFS_HASH)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          else
+            echo ""
+            echo "================================================"
+            echo "❌ Failed to upload to IPFS - could not extract CID"
+            echo "================================================"
+            echo "ipfs_hash=" >> $GITHUB_OUTPUT
+            echo "graph_deployed=false" >> $GITHUB_OUTPUT
+            
+            echo "## ❌ Step 1: IPFS Upload Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Could not extract IPFS CID from upload output." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      # STEP 2: Verify IPFS Availability
+      # Since we're using The Graph's public IPFS, content should be immediately available.
+      # This step verifies propagation to public gateways as a sanity check.
+      - name: Verify IPFS availability
+        id: ipfs_verify
+        if: steps.ipfs_upload.outputs.ipfs_hash != ''
+        run: |
+          IPFS_HASH="${{ steps.ipfs_upload.outputs.ipfs_hash }}"
+          echo "🔍 Step 2: Verifying IPFS content availability..."
+          echo "   CID: $IPFS_HASH"
+          echo ""
+          
+          # Configuration for IPFS propagation check
+          # Max wait: 15 minutes (15 checks × 60 seconds)
+          MAX_CHECKS=15
+          CHECK_INTERVAL=60
+          CHECK=1
+          
+          # Multiple gateways to check (redundancy)
+          GATEWAYS=(
+            "https://ipfs.io/ipfs"
+            "https://cloudflare-ipfs.com/ipfs"
+            "https://gateway.pinata.cloud/ipfs"
+          )
+          
+          echo "================================================"
+          echo "🔍 Checking IPFS availability (max ${MAX_CHECKS} checks, ${CHECK_INTERVAL}s interval)"
+          echo "   Maximum wait time: $((MAX_CHECKS * CHECK_INTERVAL / 60)) minutes"
+          echo "================================================"
+          echo ""
+          
+          while [ $CHECK -le $MAX_CHECKS ]; do
+            ELAPSED=$((CHECK * CHECK_INTERVAL - CHECK_INTERVAL))
+            echo "Check $CHECK/$MAX_CHECKS (${ELAPSED}s elapsed)..."
+            
+            # Try each gateway
+            for GATEWAY in "${GATEWAYS[@]}"; do
+              GATEWAY_NAME=$(echo "$GATEWAY" | sed 's|https://||' | cut -d'/' -f1)
+              
+              # Check if content is retrievable (HEAD request with timeout)
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+                "${GATEWAY}/${IPFS_HASH}" 2>/dev/null || echo "000")
+              
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo ""
+                echo "================================================"
+                echo "✅ IPFS content verified!"
+                echo "   Gateway: $GATEWAY_NAME"
+                echo "   CID: $IPFS_HASH"
+                echo "   Verification time: ~${ELAPSED}s"
+                echo "================================================"
+                echo "ipfs_verified=true" >> $GITHUB_OUTPUT
+                
+                echo "## ✅ Step 2: IPFS Verified" >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "CID available on **$GATEWAY_NAME** after ~${ELAPSED}s" >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+                exit 0
+              fi
+            done
+            
+            if [ $CHECK -lt $MAX_CHECKS ]; then
+              echo "   Not available yet, waiting ${CHECK_INTERVAL}s..."
+              sleep $CHECK_INTERVAL
+            fi
+            
+            CHECK=$((CHECK + 1))
+          done
+          
+          echo ""
+          echo "================================================"
+          echo "⚠️  IPFS verification timeout after $((MAX_CHECKS * CHECK_INTERVAL / 60)) minutes"
+          echo "   CID: $IPFS_HASH"
+          echo "   Continuing with Graph Node deployment (may have direct access)"
+          echo "================================================"
+          echo "ipfs_verified=false" >> $GITHUB_OUTPUT
+          
+          echo "## ⚠️ Step 2: IPFS Verification Timeout" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "CID not confirmed on public gateways after 15 minutes." >> $GITHUB_STEP_SUMMARY
+          echo "Proceeding with Graph Node deployment." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          # Don't fail - Graph Node connects directly to api.thegraph.com/ipfs
+
+      # STEP 3: Deploy to Graph Node
+      # If Step 1 already succeeded with Graph Node, this will be a quick no-op.
+      # If Step 1's Graph Node deployment failed but IPFS succeeded, this retries.
+      # Since IPFS content is already uploaded, the upload phase is instant (deduplicated).
+      - name: Deploy to Graph Node
+        working-directory: ./subgraph-futures
+        run: |
+          echo "🚀 Step 3: Deploying to Graph Node..."
+          echo "   Environment: ${{ needs.build.outputs.environment }}"
+          echo "   Graph Node:  ${{ needs.build.outputs.graph_node_url }}:8020"
+          echo "   IPFS:        https://api.thegraph.com/ipfs/"
+          echo "   Subgraph:    ${{ needs.build.outputs.subgraph_name }}"
+          echo "   Version:     ${{ needs.build.outputs.version }}"
+          echo "   Start time:  $(date -u +%Y-%m-%dT%H:%M:%S)Z"
+          echo ""
+          
+          # Check if Step 1 already completed Graph Node deployment
+          if [ "${{ steps.ipfs_upload.outputs.graph_deployed }}" = "true" ]; then
+            echo "================================================"
+            echo "✅ Graph Node deployment already completed in Step 1"
+            echo "   Skipping redundant deployment"
+            echo "================================================"
+            
+            echo "## ✅ Step 3: Deployment Complete" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Deployment completed in Step 1 (IPFS upload + Graph Node in one operation)." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Environment | ${{ needs.build.outputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Version | ${{ needs.build.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Graph Node | ${{ needs.build.outputs.graph_node_url }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Deployment CID | \`${{ steps.ipfs_upload.outputs.ipfs_hash }}\` |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+          
+          echo "📤 Deploying to Graph Node (IPFS content already uploaded)..."
+          echo ""
+          
+          # Deploy with retry logic
           MAX_ATTEMPTS=3
           ATTEMPT=1
           DEPLOY_START_TIME=$(date +%s)
@@ -288,13 +477,13 @@ jobs:
             echo "   Timestamp: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
             echo "================================================"
             
-            # Graph Node handles IPFS internally - no need to specify --ipfs
-            # Use npx to run the local graph-cli version from package.json
-            set +e  # Don't exit on error, capture it
-            npx graph deploy --node ${{ needs.build.outputs.graph_node_url }}:8020 \
+            set +e
+            npx graph deploy \
+              --node ${{ needs.build.outputs.graph_node_url }}:8020 \
+              --ipfs "https://api.thegraph.com/ipfs/" \
               --version-label ${{ needs.build.outputs.version }} \
-              ${{ needs.build.outputs.subgraph_name }}
-            DEPLOY_EXIT_CODE=$?
+              ${{ needs.build.outputs.subgraph_name }} 2>&1 | tee deploy_output.txt
+            DEPLOY_EXIT_CODE=${PIPESTATUS[0]}
             set -e
             
             ATTEMPT_END_TIME=$(date +%s)
@@ -305,24 +494,40 @@ jobs:
               echo "================================================"
               echo "✅ Subgraph deployed successfully"
               echo "   Attempt: $ATTEMPT"
-              echo "   Attempt duration: ${ATTEMPT_DURATION}s"
-              echo "   Total duration: ${TOTAL_DURATION}s"
+              echo "   Duration: ${ATTEMPT_DURATION}s"
               echo "   End time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
               echo "================================================"
+              
+              IPFS_HASH=$(grep -oP 'Qm[a-zA-Z0-9]{44}' deploy_output.txt | tail -1 || echo "")
+              if [ -n "$IPFS_HASH" ]; then
+                echo ""
+                echo "📦 Deployment CID: $IPFS_HASH"
+              fi
+              
+              # Write success to job summary
+              echo "## ✅ Step 3: Deployment Successful" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+              echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+              echo "| Environment | ${{ needs.build.outputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+              echo "| Version | ${{ needs.build.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+              echo "| Graph Node | ${{ needs.build.outputs.graph_node_url }} |" >> $GITHUB_STEP_SUMMARY
+              echo "| Duration | ${TOTAL_DURATION}s |" >> $GITHUB_STEP_SUMMARY
+              if [ -n "$IPFS_HASH" ]; then
+                echo "| Deployment CID | \`$IPFS_HASH\` |" >> $GITHUB_STEP_SUMMARY
+              fi
+              echo "" >> $GITHUB_STEP_SUMMARY
+              
               exit 0
             fi
             
             echo "================================================"
-            echo "❌ Deployment attempt $ATTEMPT failed"
-            echo "   Exit code: $DEPLOY_EXIT_CODE"
-            echo "   Duration: ${ATTEMPT_DURATION}s"
-            echo "   End time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
+            echo "❌ Attempt $ATTEMPT failed (exit code: $DEPLOY_EXIT_CODE)"
             echo "================================================"
             
             if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
-              WAIT_TIME=$((ATTEMPT * 30))
-              echo "⏳ Waiting ${WAIT_TIME} seconds before retry..."
-              echo ""
+              WAIT_TIME=60
+              echo "⏳ Waiting ${WAIT_TIME}s before retry..."
               sleep $WAIT_TIME
             fi
             
@@ -333,8 +538,19 @@ jobs:
           echo "================================================"
           echo "❌ Deployment failed after $MAX_ATTEMPTS attempts"
           echo "   Total duration: ${TOTAL_DURATION}s"
-          echo "   Final time: $(date -u +%Y-%m-%dT%H:%M:%S)Z"
           echo "================================================"
+          
+          # Write failure to job summary
+          echo "## ❌ Step 3: Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Deployment to Graph Node failed after $MAX_ATTEMPTS attempts." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Troubleshooting" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check the CID availability: [check.ipfs.network](https://check.ipfs.network/?cid=${{ steps.ipfs_upload.outputs.ipfs_hash }})" >> $GITHUB_STEP_SUMMARY
+          echo "2. Verify Graph Node health: ${{ needs.build.outputs.graph_node_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "3. Re-run the workflow" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
           exit 1
 
   verify:
